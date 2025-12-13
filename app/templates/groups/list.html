@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Groups - Playlist Service{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800">Channel Groups</h1>
+        <button onclick="showAddGroupModal()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            + Add Group
+        </button>
+    </div>
+
+    <!-- Groups table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="w-10 px-4 py-3"></th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Channels</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="groups-tbody" class="bg-white divide-y divide-gray-200">
+                <!-- Rows loaded via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let groups = [];
+    let currentGroupId = null;
+
+    document.addEventListener('DOMContentLoaded', loadGroups);
+
+    async function loadGroups() {
+        try {
+            const response = await fetch('/api/v1/groups');
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await response.json();
+            groups = data.data;
+            renderGroups();
+        } catch (error) {
+            console.error('Failed to load groups:', error);
+            showToast('Failed to load groups', 'error');
+        }
+    }
+
+    function renderGroups() {
+        const tbody = document.getElementById('groups-tbody');
+        tbody.innerHTML = '';
+
+        groups.forEach((group, index) => {
+            const row = document.createElement('tr');
+            row.dataset.id = group.id;
+            row.innerHTML = `
+                <td class="px-4 py-3">
+                    <span class="cursor-move text-gray-400 drag-handle">&#9776;</span>
+                </td>
+                <td class="px-4 py-3">
+                    <span class="font-medium">${escapeHtml(group.name)}</span>
+                </td>
+                <td class="px-4 py-3">
+                    <span class="text-gray-600">${group.channel_count}</span>
+                </td>
+                <td class="px-4 py-3">
+                    <button onclick="editGroup(${group.id})" class="text-blue-600 hover:text-blue-800 text-sm mr-2">Edit</button>
+                    <button onclick="deleteGroup(${group.id}, '${escapeHtml(group.name)}', ${group.channel_count})" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        // Initialize sortable
+        new Sortable(tbody, {
+            handle: '.drag-handle',
+            animation: 150,
+            onEnd: handleReorder
+        });
+    }
+
+    async function handleReorder(evt) {
+        const rows = document.querySelectorAll('#groups-tbody tr');
+        const order = Array.from(rows).map((row, index) => ({
+            id: parseInt(row.dataset.id),
+            sort_order: index
+        }));
+
+        try {
+            const response = await fetch('/api/v1/groups/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order })
+            });
+
+            if (response.ok) {
+                showToast('Groups reordered', 'success');
+            } else {
+                showToast('Failed to reorder groups', 'error');
+                loadGroups();
+            }
+        } catch (error) {
+            showToast('Failed to reorder groups', 'error');
+            loadGroups();
+        }
+    }
+
+    function showAddGroupModal() {
+        currentGroupId = null;
+        const content = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Group Name</label>
+                <input type="text" id="group-name"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        `;
+
+        showModal('Add Group', content, [
+            { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
+            { text: 'Save', class: 'bg-blue-600 text-white hover:bg-blue-700', onclick: 'saveGroup()' }
+        ]);
+    }
+
+    function editGroup(groupId) {
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        currentGroupId = groupId;
+        const content = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Group Name</label>
+                <input type="text" id="group-name" value="${escapeHtml(group.name)}"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        `;
+
+        showModal('Edit Group', content, [
+            { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
+            { text: 'Save', class: 'bg-blue-600 text-white hover:bg-blue-700', onclick: 'saveGroup()' }
+        ]);
+    }
+
+    async function saveGroup() {
+        const name = document.getElementById('group-name').value.trim();
+        if (!name) {
+            showToast('Please enter a group name', 'error');
+            return;
+        }
+
+        try {
+            const url = currentGroupId ? `/api/v1/groups/${currentGroupId}` : '/api/v1/groups';
+            const method = currentGroupId ? 'PATCH' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadGroups();
+                showToast(currentGroupId ? 'Group updated' : 'Group created', 'success');
+            } else {
+                const data = await response.json();
+                showToast(data.error?.message || 'Failed to save group', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to save group', 'error');
+        }
+    }
+
+    function deleteGroup(groupId, groupName, channelCount) {
+        const message = channelCount > 0
+            ? `This group has ${channelCount} channels. They will be unassigned.`
+            : 'This group has no channels.';
+
+        showConfirm(
+            'Delete Group',
+            `Are you sure you want to delete "${groupName}"?`,
+            message,
+            async () => {
+                try {
+                    const response = await fetch(`/api/v1/groups/${groupId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        loadGroups();
+                        showToast('Group deleted', 'success');
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error?.message || 'Failed to delete group', 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to delete group', 'error');
+                }
+            }
+        );
+    }
+</script>
+{% endblock %}

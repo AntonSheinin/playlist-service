@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Packages & Tariffs - Playlist Service{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-800">Packages & Tariffs</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Packages -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">Packages</h2>
+                <button onclick="showAddPackageModal()"
+                        class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
+                    + Add
+                </button>
+            </div>
+            <div class="divide-y divide-gray-200" id="packages-list">
+                <!-- Loaded via JS -->
+            </div>
+        </div>
+
+        <!-- Tariffs -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">Tariffs</h2>
+                <button onclick="showAddTariffModal()"
+                        class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
+                    + Add
+                </button>
+            </div>
+            <div class="divide-y divide-gray-200" id="tariffs-list">
+                <!-- Loaded via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let packages = [];
+    let tariffs = [];
+    let currentPackageId = null;
+    let currentTariffId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPackages();
+        loadTariffs();
+    });
+
+    async function loadPackages() {
+        try {
+            const response = await fetch('/api/v1/packages');
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await response.json();
+            packages = data.data;
+            renderPackages();
+        } catch (error) {
+            console.error('Failed to load packages:', error);
+            showToast('Failed to load packages', 'error');
+        }
+    }
+
+    async function loadTariffs() {
+        try {
+            const response = await fetch('/api/v1/tariffs');
+            const data = await response.json();
+            tariffs = data.data;
+            renderTariffs();
+        } catch (error) {
+            console.error('Failed to load tariffs:', error);
+            showToast('Failed to load tariffs', 'error');
+        }
+    }
+
+    function renderPackages() {
+        const container = document.getElementById('packages-list');
+        if (packages.length === 0) {
+            container.innerHTML = '<div class="px-6 py-4 text-gray-500 text-center">No packages yet</div>';
+            return;
+        }
+
+        container.innerHTML = packages.map(p => `
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <div class="font-medium">${escapeHtml(p.name)}</div>
+                    <div class="text-sm text-gray-500">${p.channel_count} channels</div>
+                    ${p.description ? `<div class="text-sm text-gray-400">${escapeHtml(p.description)}</div>` : ''}
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="editPackage(${p.id})" class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
+                    <button onclick="deletePackage(${p.id}, '${escapeHtml(p.name)}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderTariffs() {
+        const container = document.getElementById('tariffs-list');
+        if (tariffs.length === 0) {
+            container.innerHTML = '<div class="px-6 py-4 text-gray-500 text-center">No tariffs yet</div>';
+            return;
+        }
+
+        container.innerHTML = tariffs.map(t => `
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <div class="font-medium">${escapeHtml(t.name)}</div>
+                    <div class="text-sm text-gray-500">${t.package_count} packages</div>
+                    ${t.description ? `<div class="text-sm text-gray-400">${escapeHtml(t.description)}</div>` : ''}
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="editTariff(${t.id})" class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
+                    <button onclick="deleteTariff(${t.id}, '${escapeHtml(t.name)}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function showAddPackageModal() {
+        currentPackageId = null;
+        const content = `
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="package-name"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="package-description" rows="2"
+                              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <p class="text-sm text-gray-500">Note: Channels are assigned from the Channels page.</p>
+            </div>
+        `;
+
+        showModal('Add Package', content, [
+            { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
+            { text: 'Save', class: 'bg-blue-600 text-white hover:bg-blue-700', onclick: 'savePackage()' }
+        ]);
+    }
+
+    function editPackage(packageId) {
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) return;
+
+        currentPackageId = packageId;
+        const content = `
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="package-name" value="${escapeHtml(pkg.name)}"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="package-description" rows="2"
+                              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">${escapeHtml(pkg.description || '')}</textarea>
+                </div>
+            </div>
+        `;
+
+        showModal('Edit Package', content, [
+            { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
+            { text: 'Save', class: 'bg-blue-600 text-white hover:bg-blue-700', onclick: 'savePackage()' }
+        ]);
+    }
+
+    async function savePackage() {
+        const name = document.getElementById('package-name').value.trim();
+        const description = document.getElementById('package-description').value.trim();
+
+        if (!name) {
+            showToast('Please enter a package name', 'error');
+            return;
+        }
+
+        try {
+            const url = currentPackageId ? `/api/v1/packages/${currentPackageId}` : '/api/v1/packages';
+            const method = currentPackageId ? 'PATCH' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: description || null })
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadPackages();
+                showToast(currentPackageId ? 'Package updated' : 'Package created', 'success');
+            } else {
+                const data = await response.json();
+                showToast(data.error?.message || 'Failed to save package', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to save package', 'error');
+        }
+    }
+
+    async function deletePackage(packageId, packageName) {
+        showConfirm(
+            'Delete Package',
+            `Are you sure you want to delete "${packageName}"?`,
+            'This will remove the package from all tariffs and users.',
+            async () => {
+                try {
+                    const response = await fetch(`/api/v1/packages/${packageId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        loadPackages();
+                        showToast('Package deleted', 'success');
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error?.message || 'Failed to delete package', 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to delete package', 'error');
+                }
+            }
+        );
+    }
+
+    function showAddTariffModal() {
+        currentTariffId = null;
+        showTariffModal('Add Tariff', '', '', []);
+    }
+
+    function editTariff(tariffId) {
+        const tariff = tariffs.find(t => t.id === tariffId);
+        if (!tariff) return;
+
+        currentTariffId = tariffId;
+        showTariffModal('Edit Tariff', tariff.name, tariff.description || '', tariff.packages.map(p => p.id));
+    }
+
+    function showTariffModal(title, name, description, selectedPackageIds) {
+        const content = `
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="tariff-name" value="${escapeHtml(name)}"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="tariff-description" rows="2"
+                              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">${escapeHtml(description)}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Packages</label>
+                    <div class="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
+                        ${packages.map(p => `
+                            <label class="flex items-center">
+                                <input type="checkbox" value="${p.id}" class="tariff-package-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                       ${selectedPackageIds.includes(p.id) ? 'checked' : ''}>
+                                <span class="ml-2 text-sm">${escapeHtml(p.name)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        showModal(title, content, [
+            { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
+            { text: 'Save', class: 'bg-blue-600 text-white hover:bg-blue-700', onclick: 'saveTariff()' }
+        ]);
+    }
+
+    async function saveTariff() {
+        const name = document.getElementById('tariff-name').value.trim();
+        const description = document.getElementById('tariff-description').value.trim();
+        const checkboxes = document.querySelectorAll('.tariff-package-checkbox:checked');
+        const packageIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+        if (!name) {
+            showToast('Please enter a tariff name', 'error');
+            return;
+        }
+
+        try {
+            const url = currentTariffId ? `/api/v1/tariffs/${currentTariffId}` : '/api/v1/tariffs';
+            const method = currentTariffId ? 'PATCH' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: description || null, package_ids: packageIds })
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadTariffs();
+                showToast(currentTariffId ? 'Tariff updated' : 'Tariff created', 'success');
+            } else {
+                const data = await response.json();
+                showToast(data.error?.message || 'Failed to save tariff', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to save tariff', 'error');
+        }
+    }
+
+    async function deleteTariff(tariffId, tariffName) {
+        showConfirm(
+            'Delete Tariff',
+            `Are you sure you want to delete "${tariffName}"?`,
+            'This will remove the tariff from all users.',
+            async () => {
+                try {
+                    const response = await fetch(`/api/v1/tariffs/${tariffId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        loadTariffs();
+                        showToast('Tariff deleted', 'success');
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error?.message || 'Failed to delete tariff', 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to delete tariff', 'error');
+                }
+            }
+        );
+    }
+</script>
+{% endblock %}

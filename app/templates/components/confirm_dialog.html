@@ -1,0 +1,27 @@
+<!-- Confirm dialog template - used by JavaScript -->
+<template id="confirm-dialog-template">
+    <div class="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="px-6 py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="confirm-icon flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center">
+                        <!-- Icon will be set by JS -->
+                    </div>
+                    <div>
+                        <h3 class="confirm-title text-lg font-semibold text-gray-900"></h3>
+                        <p class="confirm-message text-sm text-gray-600 mt-1"></p>
+                    </div>
+                </div>
+                <div class="confirm-details mt-4 text-sm text-gray-600"></div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+                <button class="confirm-cancel px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button class="confirm-ok px-4 py-2 text-sm font-medium text-white rounded-md">
+                    <!-- Text and color set by JS -->
+                </button>
+            </div>
+        </div>
+    </div>
+</template>

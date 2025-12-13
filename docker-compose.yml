@@ -1,0 +1,57 @@
+services:
+  playlist-service:
+    build: .
+    container_name: playlist-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://playlist:playlist@postgres:5432/playlist_service
+      - DB_POOL_SIZE=5
+      - DB_MAX_OVERFLOW=10
+      - DB_ECHO=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SESSION_TIMEOUT=86400
+      - FLUSSONIC_URL=${FLUSSONIC_URL:-http://flussonic:8080}
+      - FLUSSONIC_USERNAME=${FLUSSONIC_USERNAME:-admin}
+      - FLUSSONIC_PASSWORD=${FLUSSONIC_PASSWORD:-}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-http://auth-service:8090}
+      - AUTH_SERVICE_API_KEY=${AUTH_SERVICE_API_KEY:-}
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - playlist-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: playlist-postgres
+    environment:
+      - POSTGRES_USER=playlist
+      - POSTGRES_PASSWORD=playlist
+      - POSTGRES_DB=playlist_service
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U playlist -d playlist_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - playlist-network
+
+volumes:
+  postgres_data:
+
+networks:
+  playlist-network:
+    driver: bridge

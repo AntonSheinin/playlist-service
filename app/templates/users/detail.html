@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}{% if user_id %}Edit User{% else %}New User{% endif %} - Playlist Service{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/users" class="text-gray-500 hover:text-gray-700">&larr; Back to Users</a>
+            <h1 class="text-2xl font-bold text-gray-800" id="page-title">
+                {% if user_id %}Edit User{% else %}New User{% endif %}
+            </h1>
+        </div>
+        {% if user_id %}
+        <button onclick="downloadPlaylist()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+            Download Playlist
+        </button>
+        {% endif %}
+    </div>
+
+    <form id="user-form" class="bg-white rounded-lg shadow">
+        <!-- User Information -->
+        <div class="px-6 py-4 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">User Information</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">First Name *</label>
+                    <input type="text" id="first-name" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Last Name *</label>
+                    <input type="text" id="last-name" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Agreement Number *</label>
+                    <input type="text" id="agreement-number" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Max Sessions</label>
+                    <input type="number" id="max-sessions" min="1" value="1"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Valid From</label>
+                    <input type="text" id="valid-from" placeholder="YYYY-MM-DD"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 flatpickr">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Valid Until</label>
+                    <input type="text" id="valid-until" placeholder="YYYY-MM-DD"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 flatpickr">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <select id="status"
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+            {% if user_id %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Token</label>
+                <div class="mt-1 flex items-center space-x-2">
+                    <input type="text" id="token" readonly
+                           class="block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 text-sm font-mono">
+                    <button type="button" onclick="regenerateToken()"
+                            class="px-3 py-2 border border-orange-300 text-orange-700 rounded-md hover:bg-orange-50 text-sm whitespace-nowrap">
+                        Regenerate
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Channel Assignment -->
+        <div class="px-6 py-4 border-t border-b">
+            <h2 class="text-lg font-semibold text-gray-800">Channel Assignment</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tariffs</label>
+                <select id="tariffs" multiple class="w-full"></select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Additional Packages (beyond tariffs)</label>
+                <select id="packages" multiple class="w-full"></select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Additional Channels (individual)</label>
+                <select id="channels" multiple class="w-full"></select>
+            </div>
+
+            {% if user_id %}
+            <div class="flex items-center justify-between pt-4 border-t">
+                <div>
+                    <span class="text-sm text-gray-600">Resolved Channels: <strong id="resolved-count">0</strong> total</span>
+                </div>
+                <button type="button" onclick="previewPlaylist()" class="text-blue-600 hover:text-blue-800 text-sm">
+                    Preview Playlist
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Actions -->
+        <div class="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-3">
+            <a href="/users" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100">
+                Cancel
+            </a>
+            {% if user_id %}
+            <button type="button" onclick="deleteUser()" class="px-4 py-2 border border-red-300 text-red-700 rounded-md hover:bg-red-50">
+                Delete
+            </button>
+            {% endif %}
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                Save
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Preview Modal Template -->
+<template id="preview-modal-template">
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600">Filename: <strong id="preview-filename"></strong></span>
+            <span class="text-sm text-gray-600">Channels: <strong id="preview-channel-count"></strong></span>
+        </div>
+        <textarea id="preview-content" readonly rows="15"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-xs"></textarea>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const userId = {{ user_id|tojson }};
+    let tariffsSelect, packagesSelect, channelsSelect;
+    let allTariffs = [], allPackages = [], allChannels = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize date pickers
+        flatpickr('.flatpickr', { dateFormat: 'Y-m-d' });
+
+        // Load lookup data
+        await Promise.all([loadTariffs(), loadPackages(), loadChannels()]);
+
+        // Initialize Tom Select
+        tariffsSelect = new TomSelect('#tariffs', {
+            plugins: ['remove_button'],
+            options: allTariffs.map(t => ({ value: t.id, text: t.name })),
+        });
+
+        packagesSelect = new TomSelect('#packages', {
+            plugins: ['remove_button'],
+            options: allPackages.map(p => ({ value: p.id, text: p.name })),
+        });
+
+        channelsSelect = new TomSelect('#channels', {
+            plugins: ['remove_button'],
+            options: allChannels.map(c => ({
+                value: c.id,
+                text: c.display_name || c.tvg_name || c.stream_name
+            })),
+            maxOptions: 500,
+        });
+
+        // Load user data if editing
+        if (userId) {
+            await loadUser();
+        }
+
+        // Form submit
+        document.getElementById('user-form').addEventListener('submit', saveUser);
+    });
+
+    async function loadTariffs() {
+        const response = await fetch('/api/v1/lookup/tariffs');
+        const data = await response.json();
+        allTariffs = data.data;
+    }
+
+    async function loadPackages() {
+        const response = await fetch('/api/v1/lookup/packages');
+        const data = await response.json();
+        allPackages = data.data;
+    }
+
+    async function loadChannels() {
+        const response = await fetch('/api/v1/lookup/channels?limit=500');
+        const data = await response.json();
+        allChannels = data.data;
+    }
+
+    async function loadUser() {
+        try {
+            const response = await fetch(`/api/v1/users/${userId}`);
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            if (!response.ok) {
+                showToast('User not found', 'error');
+                window.location.href = '/users';
+                return;
+            }
+
+            const data = await response.json();
+            const user = data.data;
+
+            document.getElementById('page-title').textContent = `Edit User: ${user.last_name} ${user.first_name}`;
+            document.getElementById('first-name').value = user.first_name;
+            document.getElementById('last-name').value = user.last_name;
+            document.getElementById('agreement-number').value = user.agreement_number;
+            document.getElementById('max-sessions').value = user.max_sessions;
+            document.getElementById('status').value = user.status;
+            document.getElementById('token').value = user.token;
+
+            if (user.valid_from) {
+                document.getElementById('valid-from').value = user.valid_from.split('T')[0];
+            }
+            if (user.valid_until) {
+                document.getElementById('valid-until').value = user.valid_until.split('T')[0];
+            }
+
+            // Set selections
+            tariffsSelect.setValue(user.tariffs.map(t => t.id));
+            packagesSelect.setValue(user.packages.map(p => p.id));
+            channelsSelect.setValue(user.channels.map(c => c.id));
+
+            // Load resolved count
+            loadResolvedCount();
+        } catch (error) {
+            console.error('Failed to load user:', error);
+            showToast('Failed to load user', 'error');
+        }
+    }
+
+    async function loadResolvedCount() {
+        if (!userId) return;
+
+        const response = await fetch(`/api/v1/users/${userId}/resolved-channels`);
+        const data = await response.json();
+        document.getElementById('resolved-count').textContent = data.data.length;
+    }
+
+    async function saveUser(e) {
+        e.preventDefault();
+
+        const firstName = document.getElementById('first-name').value.trim();
+        const lastName = document.getElementById('last-name').value.trim();
+        const agreementNumber = document.getElementById('agreement-number').value.trim();
+        const maxSessions = parseInt(document.getElementById('max-sessions').value) || 1;
+        const status = document.getElementById('status').value;
+        const validFrom = document.getElementById('valid-from').value || null;
+        const validUntil = document.getElementById('valid-until').value || null;
+
+        const tariffIds = tariffsSelect.getValue().map(v => parseInt(v));
+        const packageIds = packagesSelect.getValue().map(v => parseInt(v));
+        const channelIds = channelsSelect.getValue().map(v => parseInt(v));
+
+        const payload = {
+            first_name: firstName,
+            last_name: lastName,
+            agreement_number: agreementNumber,
+            max_sessions: maxSessions,
+            status: status,
+            tariff_ids: tariffIds,
+            package_ids: packageIds,
+            channel_ids: channelIds,
+        };
+
+        if (validFrom) payload.valid_from = validFrom + 'T00:00:00';
+        if (validUntil) payload.valid_until = validUntil + 'T23:59:59';
+
+        if (userId) {
+            payload.clear_valid_from = !validFrom;
+            payload.clear_valid_until = !validUntil;
+        }
+
+        try {
+            const url = userId ? `/api/v1/users/${userId}` : '/api/v1/users';
+            const method = userId ? 'PATCH' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showToast(userId ? 'User updated' : 'User created', 'success');
+
+                if (!userId) {
+                    window.location.href = `/users/${data.data.id}`;
+                } else {
+                    loadResolvedCount();
+                }
+            } else {
+                const data = await response.json();
+                showToast(data.error?.message || 'Failed to save user', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to save user', 'error');
+        }
+    }
+
+    async function regenerateToken() {
+        showConfirm(
+            'Regenerate Token',
+            'Are you sure you want to regenerate the token?',
+            'The old token will no longer work. The user will need a new playlist.',
+            async () => {
+                try {
+                    const response = await fetch(`/api/v1/users/${userId}/regenerate-token`, { method: 'POST' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        document.getElementById('token').value = data.data.token;
+                        showToast('Token regenerated', 'success');
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error?.message || 'Failed to regenerate token', 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to regenerate token', 'error');
+                }
+            }
+        );
+    }
+
+    async function deleteUser() {
+        showConfirm(
+            'Delete User',
+            'Are you sure you want to delete this user?',
+            'This action cannot be undone. The user will be removed from the Auth Service.',
+            async () => {
+                try {
+                    const response = await fetch(`/api/v1/users/${userId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        showToast('User deleted', 'success');
+                        window.location.href = '/users';
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error?.message || 'Failed to delete user', 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to delete user', 'error');
+                }
+            }
+        );
+    }
+
+    async function previewPlaylist() {
+        try {
+            const response = await fetch(`/api/v1/users/${userId}/playlist/preview`);
+            const data = await response.json();
+            const preview = data.data;
+
+            const template = document.getElementById('preview-modal-template').content.cloneNode(true);
+            const container = document.createElement('div');
+            container.appendChild(template);
+
+            showModal('Playlist Preview', container.innerHTML, [
+                { text: 'Close', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' }
+            ]);
+
+            document.getElementById('preview-filename').textContent = preview.filename;
+            document.getElementById('preview-channel-count').textContent = preview.channel_count;
+            document.getElementById('preview-content').value = preview.content;
+        } catch (error) {
+            showToast('Failed to load preview', 'error');
+        }
+    }
+
+    function downloadPlaylist() {
+        window.open(`/api/v1/users/${userId}/playlist`, '_blank');
+    }
+</script>
+{% endblock %}

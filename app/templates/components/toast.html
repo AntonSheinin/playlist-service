@@ -1,0 +1,28 @@
+<!-- Toast template - used by JavaScript -->
+<template id="toast-template">
+    <div class="toast px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in">
+        <span class="toast-icon"></span>
+        <span class="toast-message flex-1"></span>
+        <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<style>
+    .toast.success { background-color: #10B981; color: white; }
+    .toast.error { background-color: #EF4444; color: white; }
+    .toast.warning { background-color: #F59E0B; color: white; }
+    .toast.info { background-color: #3B82F6; color: white; }
+
+    @keyframes slide-in {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+</style>
