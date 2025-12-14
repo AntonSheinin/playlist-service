@@ -3,10 +3,13 @@ from fastapi.responses import PlainTextResponse
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.models import UserStatus
-from app.schemas.common import MessageResponse, PaginatedData, PaginatedResponse, SuccessResponse
-from app.schemas.user import (
+from app.schemas import (
+    MessageResponse,
+    PaginatedData,
+    PaginatedResponse,
     PlaylistPreview,
     ResolvedChannel,
+    SuccessResponse,
     UserCreate,
     UserListItem,
     UserResponse,

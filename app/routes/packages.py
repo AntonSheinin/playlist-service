@@ -1,13 +1,14 @@
 from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
-from app.schemas.common import MessageResponse, SuccessResponse
-from app.schemas.package import (
+from app.schemas import (
+    MessageResponse,
     PackageCreate,
     PackageDeleteInfo,
     PackageResponse,
     PackageUpdate,
     PackageWithCount,
+    SuccessResponse,
 )
 from app.services.package_service import PackageService
 

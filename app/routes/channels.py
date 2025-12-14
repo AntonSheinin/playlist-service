@@ -2,16 +2,19 @@ from fastapi import APIRouter, Query
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.models import SyncStatus
-from app.schemas.channel import (
+from app.schemas import (
     ChannelCascadeInfo,
     ChannelGroupUpdate,
     ChannelPackagesUpdate,
     ChannelReorderRequest,
     ChannelResponse,
     ChannelUpdate,
-    SyncResponse,
+    MessageResponse,
+    PaginatedData,
+    PaginatedResponse,
+    SuccessResponse,
+    SyncResultResponse,
 )
-from app.schemas.common import MessageResponse, PaginatedData, PaginatedResponse, SuccessResponse
 from app.services.channel_service import ChannelService
 from app.services.channel_sync import ChannelSyncService
 from app.utils.pagination import PaginationParams
@@ -134,16 +137,16 @@ async def reorder_channels(
     return MessageResponse(message="Channels reordered successfully")
 
 
-@router.post("/sync", response_model=SuccessResponse[SyncResponse])
+@router.post("/sync", response_model=SuccessResponse[SyncResultResponse])
 async def sync_channels(
     _admin_id: CurrentAdminId,
     db: DBSession,
-) -> SuccessResponse[SyncResponse]:
+) -> SuccessResponse[SyncResultResponse]:
     """Trigger channel synchronization from Flussonic."""
     service = ChannelSyncService(db)
     result = await service.sync()
     return SuccessResponse(
-        data=SyncResponse(
+        data=SyncResultResponse(
             total=result.total,
             new=result.new,
             updated=result.updated,

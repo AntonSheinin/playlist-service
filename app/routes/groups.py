@@ -1,13 +1,14 @@
 from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
-from app.schemas.common import MessageResponse, SuccessResponse
-from app.schemas.group import (
+from app.schemas import (
     GroupCreate,
     GroupReorderRequest,
     GroupResponse,
     GroupUpdate,
     GroupWithCount,
+    MessageResponse,
+    SuccessResponse,
 )
 from app.services.group_service import GroupService
 

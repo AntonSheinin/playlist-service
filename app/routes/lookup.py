@@ -1,11 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.dependencies import CurrentAdminId, DBSession
-from app.schemas.channel import ChannelLookup
-from app.schemas.common import SuccessResponse
-from app.schemas.group import GroupLookup
-from app.schemas.package import PackageLookup
-from app.schemas.tariff import TariffLookup
+from app.schemas import ChannelLookup, GroupLookup, PackageLookup, SuccessResponse, TariffLookup
 from app.services.channel_service import ChannelService
 from app.services.group_service import GroupService
 from app.services.package_service import PackageService

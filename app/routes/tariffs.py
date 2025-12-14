@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
-from app.schemas.common import SuccessResponse
-from app.schemas.tariff import (
+from app.schemas import (
+    SuccessResponse,
     TariffCreate,
     TariffDeleteInfo,
     TariffResponse,

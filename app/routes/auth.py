@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Response
 
 from app.dependencies import AppSettings, CurrentAdminId, DBSession, create_session_token
-from app.schemas.auth import AdminResponse, LoginRequest
-from app.schemas.common import ErrorResponse, MessageResponse, SuccessResponse
+from app.schemas import AdminResponse, ErrorResponse, LoginRequest, MessageResponse, SuccessResponse
 from app.services.admin_auth import AdminAuthService
 
 router = APIRouter()

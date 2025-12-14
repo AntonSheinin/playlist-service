@@ -3,8 +3,7 @@ from sqlalchemy import func, select
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.models import Channel, Group, Package, SyncStatus, Tariff, User, UserStatus
-from app.schemas.common import SuccessResponse
-from app.schemas.dashboard import DashboardStats
+from app.schemas import DashboardStats, SuccessResponse
 
 router = APIRouter()
 
