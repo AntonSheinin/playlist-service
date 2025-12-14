@@ -23,8 +23,6 @@ dependencies = [
 dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
-    "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
 ]
 
 [build-system]
@@ -44,7 +42,3 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
