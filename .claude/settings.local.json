@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push origin main)",
+      "Bash(cat:*)",
+      "Bash(powershell -Command \"\n# Update routes/tariffs.py\n$content = Get-Content -Raw ''app/routes/tariffs.py''\n$content = $content -replace ''from app\\.schemas\\.common import SuccessResponse\\r?\\nfrom app\\.schemas\\.tariff import \\(\\r?\\n    TariffCreate,\\r?\\n    TariffDeleteInfo,\\r?\\n    TariffResponse,\\r?\\n    TariffUpdate,\\r?\\n    TariffWithCount,\\r?\\n\\)'', ''from app.schemas import (\n    SuccessResponse,\n    TariffCreate,\n    TariffDeleteInfo,\n    TariffResponse,\n    TariffUpdate,\n    TariffWithCount,\n)''\nSet-Content ''app/routes/tariffs.py'' $content -NoNewline\n\")",
+      "Bash(powershell -Command \"\n# Update routes/dashboard.py\n$content = Get-Content -Raw ''app/routes/dashboard.py''\n$content = $content -replace ''from app\\.schemas\\.common import SuccessResponse\\r?\\nfrom app\\.schemas\\.dashboard import DashboardStats'', ''from app.schemas import DashboardStats, SuccessResponse''\nSet-Content ''app/routes/dashboard.py'' $content -NoNewline\n\")",
+      "Bash(powershell -Command \"\n# Update routes/packages.py\n$content = Get-Content -Raw ''app/routes/packages.py''\n$content = $content -replace ''from app\\.schemas\\.common import MessageResponse, SuccessResponse\\r?\\nfrom app\\.schemas\\.package import \\(\\r?\\n    PackageCreate,\\r?\\n    PackageDeleteInfo,\\r?\\n    PackageResponse,\\r?\\n    PackageUpdate,\\r?\\n    PackageWithCount,\\r?\\n\\)'', ''from app.schemas import (\n    MessageResponse,\n    PackageCreate,\n    PackageDeleteInfo,\n    PackageResponse,\n    PackageUpdate,\n    PackageWithCount,\n    SuccessResponse,\n)''\nSet-Content ''app/routes/packages.py'' $content -NoNewline\n\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python:*)",
+      "Bash(for f in app/routes/*.py)",
+      "Bash(do python -m py_compile \"$f\")",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(for f in app/services/*.py)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nSimplify project structure\n\n- Remove ruff and mypy dev dependencies\n- Consolidate models from separate files into single app/models.py\n- Consolidate schemas from separate files into single app/schemas.py\n- Update all route imports to use consolidated modules\n- Remove separate models/ and schemas/ directories\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(alembic upgrade:*)",
+      "Bash(uv run alembic:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(uv run python:*)"
     ]
   }
 }

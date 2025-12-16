@@ -28,24 +28,51 @@ class FlussonicClient:
         Fetch all streams from Flussonic.
 
         Tries multiple API endpoints for compatibility with different Flussonic versions:
-        1. /streamer/api/v3/streams (newer versions)
+        1. /streamer/api/v3/streams (newer versions, with pagination)
         2. /flussonic/api/media (older versions)
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             auth = httpx.BasicAuth(self.username, self.password)
 
-            # Try API v3 first
+            # Try API v3 first with pagination
             try:
-                response = await client.get(
-                    f"{self.base_url}/streamer/api/v3/streams",
-                    auth=auth,
-                )
-                if response.status_code == 200:
-                    return self._parse_v3_response(response.json())
+                all_streams = []
+                cursor = None
+                limit = 500  # Items per page
+
+                while True:
+                    params = {"limit": limit}
+                    if cursor:
+                        params["cursor"] = cursor
+
+                    response = await client.get(
+                        f"{self.base_url}/streamer/api/v3/streams",
+                        auth=auth,
+                        params=params,
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        streams = self._parse_v3_response(data)
+                        all_streams.extend(streams)
+
+                        # Check for next page - Flussonic uses "next" key
+                        if isinstance(data, dict):
+                            cursor = data.get("next")
+                            # If no next cursor, we're done
+                            if not cursor:
+                                break
+                        else:
+                            break
+                    else:
+                        break
+
+                if all_streams:
+                    return all_streams
             except httpx.RequestError:
                 pass
 
-            # Try older API
+            # Try older API (no pagination, returns all)
             try:
                 response = await client.get(
                     f"{self.base_url}/flussonic/api/media",

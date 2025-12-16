@@ -34,6 +34,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: playlist-postgres
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=playlist
       - POSTGRES_PASSWORD=playlist
