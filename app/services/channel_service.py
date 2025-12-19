@@ -115,14 +115,14 @@ class ChannelService:
             channel.tvg_logo = tvg_logo if tvg_logo else None
 
         await self.db.flush()
-        return channel
+        return await self.get_by_id(channel_id)
 
     async def update_group(self, channel_id: int, group_id: int | None) -> Channel:
         """Update channel's group assignment."""
         channel = await self.get_by_id(channel_id)
         channel.group_id = group_id
         await self.db.flush()
-        return channel
+        return await self.get_by_id(channel_id)
 
     async def update_packages(self, channel_id: int, package_ids: list[int]) -> Channel:
         """Update channel's package assignments."""
@@ -135,7 +135,7 @@ class ChannelService:
 
         channel.packages = packages
         await self.db.flush()
-        return channel
+        return await self.get_by_id(channel_id)
 
     async def delete(self, channel_id: int) -> None:
         """Delete an orphaned channel."""

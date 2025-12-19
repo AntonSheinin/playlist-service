@@ -30,6 +30,7 @@ services:
     restart: unless-stopped
     networks:
       - playlist-network
+      - auth-backend_default
 
   postgres:
     image: postgres:15-alpine
@@ -57,3 +58,5 @@ volumes:
 networks:
   playlist-network:
     driver: bridge
+  auth-backend_default:
+    external: true

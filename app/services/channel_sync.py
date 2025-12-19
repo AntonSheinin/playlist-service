@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -6,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.flussonic import FlussonicClient
 from app.models import Channel, SyncStatus
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -36,6 +39,8 @@ class ChannelSyncService:
            - If not in DB: create new channel
         3. Mark channels not in Flussonic as orphaned
         """
+        logger.info("Starting channel sync from Flussonic")
+
         # Fetch streams from Flussonic
         streams = await self.flussonic.get_streams()
         stream_names = {s.name for s in streams}
@@ -85,6 +90,11 @@ class ChannelSyncService:
                 orphaned_count += 1
 
         await self.db.flush()
+
+        logger.info(
+            "Channel sync complete: total=%d, new=%d, updated=%d, orphaned=%d",
+            len(streams), new_count, updated_count, orphaned_count
+        )
 
         return SyncResult(
             total=len(streams),

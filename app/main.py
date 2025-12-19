@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -5,7 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import get_settings
+from app.config import get_settings, setup_logging
 from app.exceptions import (
     AuthServiceError,
     ChannelNotOrphanedError,
@@ -20,11 +21,17 @@ from app.exceptions import (
 from app.routes import api_router, pages_router
 from app.services.database import engine
 
+# Initialize logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
+    logger.info("Playlist Service starting up")
     yield
+    logger.info("Playlist Service shutting down")
     await engine.dispose()
 
 
@@ -98,6 +105,7 @@ async def channel_not_orphaned_handler(
 
 @app.exception_handler(FlussonicError)
 async def flussonic_error_handler(request: Request, exc: FlussonicError) -> JSONResponse:
+    logger.error("Flussonic error: %s", exc.message)
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={"success": False, "error": {"code": exc.code, "message": exc.message}},
@@ -106,6 +114,7 @@ async def flussonic_error_handler(request: Request, exc: FlussonicError) -> JSON
 
 @app.exception_handler(AuthServiceError)
 async def auth_service_error_handler(request: Request, exc: AuthServiceError) -> JSONResponse:
+    logger.error("Auth service error: %s", exc.message)
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={"success": False, "error": {"code": exc.code, "message": exc.message}},
@@ -116,6 +125,7 @@ async def auth_service_error_handler(request: Request, exc: AuthServiceError) ->
 async def playlist_service_error_handler(
     request: Request, exc: PlaylistServiceError
 ) -> JSONResponse:
+    logger.error("Internal error: %s", exc.message)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"success": False, "error": {"code": exc.code, "message": exc.message}},

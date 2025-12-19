@@ -42,7 +42,7 @@ class PackageService:
         package = Package(name=name, description=description)
         self.db.add(package)
         await self.db.flush()
-        return package
+        return await self.get_by_id(package.id)
 
     async def update(
         self,
@@ -65,7 +65,7 @@ class PackageService:
             package.description = description
 
         await self.db.flush()
-        return package
+        return await self.get_by_id(package_id)
 
     async def delete(self, package_id: int) -> dict[str, int]:
         """Delete a package. Returns affected counts."""

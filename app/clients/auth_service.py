@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import httpx
@@ -5,6 +6,8 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.exceptions import AuthServiceError
+
+logger = logging.getLogger(__name__)
 
 
 class AuthTokenCreate(BaseModel):
@@ -38,6 +41,7 @@ class AuthServiceClient:
         settings = get_settings()
         self.base_url = settings.auth_service_url.rstrip("/")
         self.api_key = settings.auth_service_api_key
+        self.timeout = settings.auth_service_timeout
 
     def _get_headers(self) -> dict[str, str]:
         return {
@@ -50,56 +54,90 @@ class AuthServiceClient:
         Create a token in Auth Service.
         Returns the auth_token_id from the response.
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        url = f"{self.base_url}/api/tokens"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/api/tokens",
+                    url,
                     headers=self._get_headers(),
                     json=data.model_dump(mode="json", exclude_none=True),
                 )
 
                 if response.status_code in (200, 201):
                     result = response.json()
+                    logger.info("Created auth token %d for user %s", result["id"], data.user_id)
                     return result["id"]
 
+                logger.error(
+                    "Failed to create auth token for %s: %d - %s",
+                    data.user_id, response.status_code, response.text
+                )
                 raise AuthServiceError(
                     f"Failed to create token: {response.status_code} - {response.text}"
                 )
 
+            except httpx.TimeoutException:
+                logger.error("Timeout creating auth token for %s at %s", data.user_id, url)
+                raise AuthServiceError(f"Timeout connecting to Auth Service at {url}") from None
             except httpx.RequestError as e:
+                logger.error("Connection error creating auth token: %s", e)
                 raise AuthServiceError(f"Failed to connect to Auth Service: {e}") from e
 
     async def update_token(self, auth_token_id: int, data: AuthTokenUpdate) -> None:
         """Update a token in Auth Service."""
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        url = f"{self.base_url}/api/tokens/{auth_token_id}"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.patch(
-                    f"{self.base_url}/api/tokens/{auth_token_id}",
+                    url,
                     headers=self._get_headers(),
                     json=data.model_dump(mode="json", exclude_none=True),
                 )
 
-                if response.status_code not in (200, 204):
-                    raise AuthServiceError(
-                        f"Failed to update token: {response.status_code} - {response.text}"
-                    )
+                if response.status_code in (200, 204):
+                    logger.info("Updated auth token %d", auth_token_id)
+                    return
 
+                logger.error(
+                    "Failed to update auth token %d: %d - %s",
+                    auth_token_id, response.status_code, response.text
+                )
+                raise AuthServiceError(
+                    f"Failed to update token: {response.status_code} - {response.text}"
+                )
+
+            except httpx.TimeoutException:
+                logger.error("Timeout updating auth token %d at %s", auth_token_id, url)
+                raise AuthServiceError(f"Timeout connecting to Auth Service at {url}") from None
             except httpx.RequestError as e:
+                logger.error("Connection error updating auth token %d: %s", auth_token_id, e)
                 raise AuthServiceError(f"Failed to connect to Auth Service: {e}") from e
 
     async def delete_token(self, auth_token_id: int) -> None:
         """Delete a token from Auth Service."""
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        url = f"{self.base_url}/api/tokens/{auth_token_id}"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
-                response = await client.delete(
-                    f"{self.base_url}/api/tokens/{auth_token_id}",
-                    headers=self._get_headers(),
+                response = await client.delete(url, headers=self._get_headers())
+
+                if response.status_code in (200, 204, 404):
+                    logger.info("Deleted auth token %d", auth_token_id)
+                    return
+
+                logger.error(
+                    "Failed to delete auth token %d: %d - %s",
+                    auth_token_id, response.status_code, response.text
+                )
+                raise AuthServiceError(
+                    f"Failed to delete token: {response.status_code} - {response.text}"
                 )
 
-                if response.status_code not in (200, 204, 404):
-                    raise AuthServiceError(
-                        f"Failed to delete token: {response.status_code} - {response.text}"
-                    )
-
+            except httpx.TimeoutException:
+                logger.error("Timeout deleting auth token %d at %s", auth_token_id, url)
+                raise AuthServiceError(f"Timeout connecting to Auth Service at {url}") from None
             except httpx.RequestError as e:
+                logger.error("Connection error deleting auth token %d: %s", auth_token_id, e)
                 raise AuthServiceError(f"Failed to connect to Auth Service: {e}") from e

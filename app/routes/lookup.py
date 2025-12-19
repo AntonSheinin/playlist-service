@@ -54,7 +54,7 @@ async def lookup_channels(
     _admin_id: CurrentAdminId,
     db: DBSession,
     search: str = Query("", min_length=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=1000),
 ) -> SuccessResponse[list[ChannelLookup]]:
     """Search channels for dropdown."""
     service = ChannelService(db)

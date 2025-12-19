@@ -1,8 +1,12 @@
+import logging
 from collections.abc import AsyncGenerator
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -26,6 +30,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except SQLAlchemyError as e:
+            logger.error("Database error, rolling back transaction: %s", e)
             await session.rollback()
             raise

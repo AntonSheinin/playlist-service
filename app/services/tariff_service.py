@@ -55,7 +55,7 @@ class TariffService:
 
         self.db.add(tariff)
         await self.db.flush()
-        return tariff
+        return await self.get_by_id(tariff.id)
 
     async def update(
         self,
@@ -86,7 +86,7 @@ class TariffService:
             tariff.packages = packages
 
         await self.db.flush()
-        return tariff
+        return await self.get_by_id(tariff_id)
 
     async def delete(self, tariff_id: int) -> dict[str, int]:
         """Delete a tariff. Returns affected user count."""

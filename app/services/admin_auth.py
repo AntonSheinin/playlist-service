@@ -40,4 +40,4 @@ class AdminAuthService:
         )
         self.db.add(admin)
         await self.db.flush()
-        return admin
+        return await self.get_by_id(admin.id)

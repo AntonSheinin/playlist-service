@@ -1,8 +1,15 @@
+import logging
+
 import httpx
 from pydantic import BaseModel
 
-from app.config import get_settings
+from app.config import MINUTES_PER_DAY, SECONDS_PER_DAY, get_settings
 from app.exceptions import FlussonicError
+
+logger = logging.getLogger(__name__)
+
+# Threshold for distinguishing minutes from days in DVR depth
+DVR_DEPTH_MINUTES_THRESHOLD = 365
 
 
 class FlussonicStream(BaseModel):
@@ -17,86 +24,108 @@ class FlussonicStream(BaseModel):
 class FlussonicClient:
     """Client for Flussonic Media Server API."""
 
+    # API endpoints in order of preference (newest first)
+    API_ENDPOINTS = [
+        "/streamer/api/v3/streams",
+        "/flussonic/api/media",
+        "/erlyvideo/api/streams",
+    ]
+
     def __init__(self) -> None:
         settings = get_settings()
         self.base_url = settings.flussonic_url.rstrip("/")
         self.username = settings.flussonic_username
         self.password = settings.flussonic_password
+        self.timeout = settings.flussonic_timeout
+        self.page_limit = settings.flussonic_page_limit
 
     async def get_streams(self) -> list[FlussonicStream]:
         """
         Fetch all streams from Flussonic.
 
-        Tries multiple API endpoints for compatibility with different Flussonic versions:
-        1. /streamer/api/v3/streams (newer versions, with pagination)
-        2. /flussonic/api/media (older versions)
+        Tries multiple API endpoints for compatibility with different Flussonic versions.
         """
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             auth = httpx.BasicAuth(self.username, self.password)
 
             # Try API v3 first with pagination
-            try:
-                all_streams = []
-                cursor = None
-                limit = 500  # Items per page
+            streams = await self._try_v3_api(client, auth)
+            if streams is not None:
+                return streams
 
-                while True:
-                    params = {"limit": limit}
-                    if cursor:
-                        params["cursor"] = cursor
+            # Try legacy APIs
+            for endpoint in self.API_ENDPOINTS[1:]:
+                streams = await self._try_legacy_api(client, auth, endpoint)
+                if streams is not None:
+                    return streams
 
-                    response = await client.get(
-                        f"{self.base_url}/streamer/api/v3/streams",
-                        auth=auth,
-                        params=params,
+            raise FlussonicError("Failed to fetch streams from any Flussonic API endpoint")
+
+    async def _try_v3_api(
+        self, client: httpx.AsyncClient, auth: httpx.BasicAuth
+    ) -> list[FlussonicStream] | None:
+        """Try fetching streams from API v3 with pagination."""
+        endpoint = self.API_ENDPOINTS[0]
+        url = f"{self.base_url}{endpoint}"
+
+        try:
+            all_streams: list[FlussonicStream] = []
+            cursor = None
+
+            while True:
+                params: dict[str, int | str] = {"limit": self.page_limit}
+                if cursor:
+                    params["cursor"] = cursor
+
+                response = await client.get(url, auth=auth, params=params)
+
+                if response.status_code != 200:
+                    logger.debug(
+                        "Flussonic API v3 returned status %d", response.status_code
                     )
+                    return None
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        streams = self._parse_v3_response(data)
-                        all_streams.extend(streams)
+                data = response.json()
+                streams = self._parse_v3_response(data)
+                all_streams.extend(streams)
 
-                        # Check for next page - Flussonic uses "next" key
-                        if isinstance(data, dict):
-                            cursor = data.get("next")
-                            # If no next cursor, we're done
-                            if not cursor:
-                                break
-                        else:
-                            break
-                    else:
-                        break
+                cursor = data.get("next") if isinstance(data, dict) else None
+                if not cursor:
+                    break
 
-                if all_streams:
-                    return all_streams
-            except httpx.RequestError:
-                pass
+            logger.info("Fetched %d streams from Flussonic API v3", len(all_streams))
+            return all_streams if all_streams else None
 
-            # Try older API (no pagination, returns all)
-            try:
-                response = await client.get(
-                    f"{self.base_url}/flussonic/api/media",
-                    auth=auth,
-                )
-                if response.status_code == 200:
-                    return self._parse_legacy_response(response.json())
-            except httpx.RequestError:
-                pass
+        except httpx.TimeoutException:
+            logger.warning("Timeout connecting to Flussonic API v3 at %s", url)
+            return None
+        except httpx.RequestError as e:
+            logger.debug("Failed to connect to Flussonic API v3: %s", e)
+            return None
 
-            # Try erlyvideo API (even older)
-            try:
-                response = await client.get(
-                    f"{self.base_url}/erlyvideo/api/streams",
-                    auth=auth,
-                )
-                if response.status_code == 200:
-                    return self._parse_legacy_response(response.json())
-            except httpx.RequestError as e:
-                raise FlussonicError(f"Failed to connect to Flussonic: {e}") from e
+    async def _try_legacy_api(
+        self, client: httpx.AsyncClient, auth: httpx.BasicAuth, endpoint: str
+    ) -> list[FlussonicStream] | None:
+        """Try fetching streams from a legacy API endpoint."""
+        url = f"{self.base_url}{endpoint}"
 
-            raise FlussonicError(
-                f"Failed to fetch streams from Flussonic. Status: {response.status_code}"
-            )
+        try:
+            response = await client.get(url, auth=auth)
+
+            if response.status_code == 200:
+                streams = self._parse_legacy_response(response.json())
+                logger.info("Fetched %d streams from Flussonic %s", len(streams), endpoint)
+                return streams
+
+            logger.debug("Flussonic %s returned status %d", endpoint, response.status_code)
+            return None
+
+        except httpx.TimeoutException:
+            logger.warning("Timeout connecting to Flussonic at %s", url)
+            return None
+        except httpx.RequestError as e:
+            logger.debug("Failed to connect to Flussonic %s: %s", endpoint, e)
+            return None
 
     def _parse_v3_response(self, data: dict | list) -> list[FlussonicStream]:
         """Parse response from Flussonic API v3."""
@@ -159,20 +188,24 @@ class FlussonicClient:
 
     def _extract_dvr_days(self, item: dict) -> int | None:
         """Extract DVR days from various possible field names."""
-        # Try different field names used across Flussonic versions
         for field in ["dvr", "dvr_days", "catchup_days", "archive_depth"]:
             if field in item:
                 value = item[field]
                 if isinstance(value, int):
                     return value
-                if isinstance(value, dict) and "depth" in value:
-                    # Format: {"dvr": {"depth": 14}}
-                    depth = value["depth"]
-                    if isinstance(depth, int):
-                        # Convert minutes to days if needed
-                        if depth > 365:  # Likely in minutes
-                            return depth // (24 * 60)
-                        return depth
+                if isinstance(value, dict):
+                    # API v3 format: {"dvr": {"expiration": 1209600}} (seconds)
+                    if "expiration" in value:
+                        expiration = value["expiration"]
+                        if isinstance(expiration, int) and expiration > 0:
+                            return expiration // SECONDS_PER_DAY
+                    # Alternative format: {"dvr": {"depth": 14}}
+                    if "depth" in value:
+                        depth = value["depth"]
+                        if isinstance(depth, int):
+                            if depth > DVR_DEPTH_MINUTES_THRESHOLD:
+                                return depth // MINUTES_PER_DAY
+                            return depth
         return None
 
     def get_stream_url(self, stream_name: str) -> str:

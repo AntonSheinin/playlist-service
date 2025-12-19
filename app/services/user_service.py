@@ -146,7 +146,7 @@ class UserService:
 
         self.db.add(user)
         await self.db.flush()
-        return user
+        return await self.get_by_id(user.id)
 
     async def update(
         self,
@@ -219,11 +219,12 @@ class UserService:
             user.channels = list(result.scalars().all())
 
         await self.db.flush()
-        return user
+        return await self.get_by_id(user_id)
 
     async def delete(self, user_id: int) -> User:
         """Delete a user. Returns the user for auth service cleanup."""
         user = await self.get_by_id(user_id)
+        # Store data before delete since we can't re-fetch after
         await self.db.delete(user)
         await self.db.flush()
         return user
@@ -233,7 +234,7 @@ class UserService:
         user = await self.get_by_id(user_id)
         user.token = generate_token()
         await self.db.flush()
-        return user
+        return await self.get_by_id(user_id)
 
     async def resolve_channels(self, user_id: int) -> list[Channel]:
         """

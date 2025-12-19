@@ -42,7 +42,7 @@ class GroupService:
         group = Group(name=name, sort_order=max_order + 1)
         self.db.add(group)
         await self.db.flush()
-        return group
+        return await self.get_by_id(group.id)
 
     async def update(self, group_id: int, name: str) -> Group:
         """Update a group."""
@@ -56,7 +56,7 @@ class GroupService:
 
         group.name = name
         await self.db.flush()
-        return group
+        return await self.get_by_id(group_id)
 
     async def delete(self, group_id: int) -> int:
         """Delete a group. Returns count of affected channels."""

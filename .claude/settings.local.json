@@ -19,7 +19,13 @@
       "Bash(uv run alembic:*)",
       "Bash(docker-compose down:*)",
       "Bash(docker-compose up:*)",
-      "Bash(uv run python:*)"
+      "Bash(uv run python:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker network:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }
