@@ -25,7 +25,8 @@
       "Bash(curl:*)",
       "Bash(docker network:*)",
       "Bash(docker ps:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(tree:*)"
     ]
   }
 }

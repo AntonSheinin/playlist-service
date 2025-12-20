@@ -44,3 +44,6 @@ htmlcov
 # Docker
 Dockerfile
 docker-compose*.yml
+
+.claude
+.vscode

@@ -2,22 +2,20 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import DuplicateEntryError, NotFoundError
-from app.models import Package, tariff_packages, user_packages
+from app.exceptions import NotFoundError
+from app.models import Package, package_channels, tariff_packages, user_packages
+from app.services.base import BaseService
 
 
-class PackageService:
+class PackageService(BaseService[Package]):
+    model_class = Package
+    not_found_message = "Package not found"
+
     def __init__(self, db: AsyncSession) -> None:
-        self.db = db
-
-    async def get_all(self) -> list[Package]:
-        """Get all packages."""
-        stmt = select(Package).options(selectinload(Package.channels)).order_by(Package.name)
-        result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        super().__init__(db)
 
     async def get_by_id(self, package_id: int) -> Package:
-        """Get package by ID."""
+        """Get package by ID with channels."""
         stmt = (
             select(Package)
             .where(Package.id == package_id)
@@ -27,17 +25,30 @@ class PackageService:
         package = result.scalar_one_or_none()
 
         if package is None:
-            raise NotFoundError("Package not found")
+            raise NotFoundError(self.not_found_message)
 
         return package
 
+    async def get_all(self) -> list[Package]:
+        """Get all packages."""
+        stmt = select(Package).options(selectinload(Package.channels)).order_by(Package.name)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_all_with_counts(self) -> list[tuple[Package, int]]:
+        """Get all packages with channel counts in a single query."""
+        stmt = (
+            select(Package, func.count(package_channels.c.channel_id).label("channel_count"))
+            .outerjoin(package_channels, Package.id == package_channels.c.package_id)
+            .group_by(Package.id)
+            .order_by(Package.name)
+        )
+        result = await self.db.execute(stmt)
+        return [(row.Package, row.channel_count) for row in result.all()]
+
     async def create(self, name: str, description: str | None = None) -> Package:
         """Create a new package."""
-        # Check for duplicate name
-        stmt = select(Package).where(Package.name == name)
-        result = await self.db.execute(stmt)
-        if result.scalar_one_or_none() is not None:
-            raise DuplicateEntryError(f"Package '{name}' already exists")
+        await self.check_unique("name", name, message=f"Package '{name}' already exists")
 
         package = Package(name=name, description=description)
         self.db.add(package)
@@ -54,11 +65,7 @@ class PackageService:
         package = await self.get_by_id(package_id)
 
         if name is not None:
-            # Check for duplicate name (excluding current package)
-            stmt = select(Package).where(Package.name == name, Package.id != package_id)
-            result = await self.db.execute(stmt)
-            if result.scalar_one_or_none() is not None:
-                raise DuplicateEntryError(f"Package '{name}' already exists")
+            await self.check_unique("name", name, exclude_id=package_id, message=f"Package '{name}' already exists")
             package.name = name
 
         if description is not None:
@@ -96,8 +103,3 @@ class PackageService:
             "tariffs": tariff_count,
             "users": user_count,
         }
-
-    async def get_channel_count(self, package_id: int) -> int:
-        """Get count of channels in a package."""
-        package = await self.get_by_id(package_id)
-        return len(package.channels)

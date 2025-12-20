@@ -4,7 +4,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import DuplicateEntryError, NotFoundError
+from app.exceptions import NotFoundError
 from app.models import (
     Channel,
     Group,
@@ -13,15 +13,37 @@ from app.models import (
     User,
     UserStatus,
     package_channels,
-    tariff_packages,
 )
+from app.services.base import BaseService
 from app.utils.pagination import PaginatedResult, PaginationParams
 from app.utils.token import generate_token
 
 
-class UserService:
+class UserService(BaseService[User]):
+    model_class = User
+    not_found_message = "User not found"
+
     def __init__(self, db: AsyncSession) -> None:
-        self.db = db
+        super().__init__(db)
+
+    async def get_by_id(self, user_id: int) -> User:
+        """Get user by ID with all relationships."""
+        stmt = (
+            select(User)
+            .where(User.id == user_id)
+            .options(
+                selectinload(User.tariffs).selectinload(Tariff.packages),
+                selectinload(User.packages).selectinload(Package.channels),
+                selectinload(User.channels),
+            )
+        )
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise NotFoundError(self.not_found_message)
+
+        return user
 
     async def get_paginated(
         self,
@@ -73,25 +95,6 @@ class UserService:
             per_page=pagination.per_page,
         )
 
-    async def get_by_id(self, user_id: int) -> User:
-        """Get user by ID with all relationships."""
-        stmt = (
-            select(User)
-            .where(User.id == user_id)
-            .options(
-                selectinload(User.tariffs).selectinload(Tariff.packages),
-                selectinload(User.packages).selectinload(Package.channels),
-                selectinload(User.channels),
-            )
-        )
-        result = await self.db.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if user is None:
-            raise NotFoundError("User not found")
-
-        return user
-
     async def create(
         self,
         first_name: str,
@@ -106,11 +109,11 @@ class UserService:
         channel_ids: list[int] | None = None,
     ) -> User:
         """Create a new user."""
-        # Check for duplicate agreement_number
-        stmt = select(User).where(User.agreement_number == agreement_number)
-        result = await self.db.execute(stmt)
-        if result.scalar_one_or_none() is not None:
-            raise DuplicateEntryError(f"Agreement number '{agreement_number}' already exists")
+        await self.check_unique(
+            "agreement_number",
+            agreement_number,
+            message=f"Agreement number '{agreement_number}' already exists",
+        )
 
         # Generate unique token
         token = generate_token()
@@ -174,14 +177,12 @@ class UserService:
             user.last_name = last_name
 
         if agreement_number is not None:
-            # Check for duplicate (excluding current user)
-            stmt = select(User).where(
-                User.agreement_number == agreement_number,
-                User.id != user_id,
+            await self.check_unique(
+                "agreement_number",
+                agreement_number,
+                exclude_id=user_id,
+                message=f"Agreement number '{agreement_number}' already exists",
             )
-            result = await self.db.execute(stmt)
-            if result.scalar_one_or_none() is not None:
-                raise DuplicateEntryError(f"Agreement number '{agreement_number}' already exists")
             user.agreement_number = agreement_number
 
         if max_sessions is not None:
@@ -224,7 +225,6 @@ class UserService:
     async def delete(self, user_id: int) -> User:
         """Delete a user. Returns the user for auth service cleanup."""
         user = await self.get_by_id(user_id)
-        # Store data before delete since we can't re-fetch after
         await self.db.delete(user)
         await self.db.flush()
         return user

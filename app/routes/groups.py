@@ -22,12 +22,10 @@ async def list_groups(
 ) -> SuccessResponse[list[GroupWithCount]]:
     """List all groups with channel counts."""
     service = GroupService(db)
-    groups = await service.get_all()
+    groups_with_counts = await service.get_all_with_counts()
 
-    result = []
-    for group in groups:
-        count = await service.get_channel_count(group.id)
-        group_data = GroupWithCount(
+    result = [
+        GroupWithCount(
             id=group.id,
             name=group.name,
             sort_order=group.sort_order,
@@ -35,7 +33,8 @@ async def list_groups(
             updated_at=group.updated_at,
             channel_count=count,
         )
-        result.append(group_data)
+        for group, count in groups_with_counts
+    ]
 
     return SuccessResponse(data=result)
 

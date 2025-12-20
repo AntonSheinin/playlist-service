@@ -21,12 +21,10 @@ async def list_tariffs(
 ) -> SuccessResponse[list[TariffWithCount]]:
     """List all tariffs with package counts."""
     service = TariffService(db)
-    tariffs = await service.get_all()
+    tariffs_with_counts = await service.get_all_with_counts()
 
-    result = []
-    for tariff in tariffs:
-        count = await service.get_package_count(tariff.id)
-        tariff_data = TariffWithCount(
+    result = [
+        TariffWithCount(
             id=tariff.id,
             name=tariff.name,
             description=tariff.description,
@@ -35,7 +33,8 @@ async def list_tariffs(
             updated_at=tariff.updated_at,
             package_count=count,
         )
-        result.append(tariff_data)
+        for tariff, count in tariffs_with_counts
+    ]
 
     return SuccessResponse(data=result)
 

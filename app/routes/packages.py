@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.schemas import (
-    MessageResponse,
     PackageCreate,
     PackageDeleteInfo,
     PackageResponse,
@@ -22,12 +21,10 @@ async def list_packages(
 ) -> SuccessResponse[list[PackageWithCount]]:
     """List all packages with channel counts."""
     service = PackageService(db)
-    packages = await service.get_all()
+    packages_with_counts = await service.get_all_with_counts()
 
-    result = []
-    for package in packages:
-        count = await service.get_channel_count(package.id)
-        package_data = PackageWithCount(
+    result = [
+        PackageWithCount(
             id=package.id,
             name=package.name,
             description=package.description,
@@ -35,7 +32,8 @@ async def list_packages(
             updated_at=package.updated_at,
             channel_count=count,
         )
-        result.append(package_data)
+        for package, count in packages_with_counts
+    ]
 
     return SuccessResponse(data=result)
 
