@@ -16,8 +16,41 @@
                     + Add
                 </button>
             </div>
-            <div class="divide-y divide-gray-200" id="packages-list">
-                <!-- Loaded via JS -->
+            <div class="overflow-x-auto">
+                <table id="packages-table" class="min-w-full divide-y divide-gray-200 resizable-table" style="width: 100%;">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th data-col-key="name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="name" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Name</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="name"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="description" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="description" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Description</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="description"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="channels" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="channel_count" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Channels</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="channel_count"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="actions" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Actions
+                                <span class="resize-handle"></span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="packages-tbody" class="bg-white divide-y divide-gray-200">
+                        <!-- Rows loaded via JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -30,8 +63,41 @@
                     + Add
                 </button>
             </div>
-            <div class="divide-y divide-gray-200" id="tariffs-list">
-                <!-- Loaded via JS -->
+            <div class="overflow-x-auto">
+                <table id="tariffs-table" class="min-w-full divide-y divide-gray-200 resizable-table" style="width: 100%;">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th data-col-key="name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="name" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Name</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="name"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="description" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="description" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Description</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="description"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="packages" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <button type="button" data-sort-key="package_count" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                                    <span>Packages</span>
+                                    <span class="sort-indicator text-gray-400" data-sort-indicator="package_count"></span>
+                                </button>
+                                <span class="resize-handle"></span>
+                            </th>
+                            <th data-col-key="actions" class="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Actions
+                                <span class="resize-handle"></span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tariffs-tbody" class="bg-white divide-y divide-gray-200">
+                        <!-- Rows loaded via JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -43,9 +109,35 @@
     let packages = [];
     let tariffs = [];
     let currentPackageId = null;
+    let currentPackageChannels = [];
+    let packageChannelsLoadError = false;
     let currentTariffId = null;
+    let currentPackageSortBy = 'name';
+    let currentPackageSortDir = 'asc';
+    let currentTariffSortBy = 'name';
+    let currentTariffSortDir = 'asc';
 
-    document.addEventListener('DOMContentLoaded', () => {
+    onDomReady(() => {
+        initResizableTable('packages-table', 'packagesTableWidths');
+        initTableSort('packages-table', {
+            sortBy: currentPackageSortBy,
+            sortDir: currentPackageSortDir,
+            onSortChange: (sortBy, sortDir) => {
+                currentPackageSortBy = sortBy;
+                currentPackageSortDir = sortDir;
+                renderPackages();
+            }
+        });
+        initResizableTable('tariffs-table', 'tariffsTableWidths');
+        initTableSort('tariffs-table', {
+            sortBy: currentTariffSortBy,
+            sortDir: currentTariffSortDir,
+            onSortChange: (sortBy, sortDir) => {
+                currentTariffSortBy = sortBy;
+                currentTariffSortDir = sortDir;
+                renderTariffs();
+            }
+        });
         loadPackages();
         loadTariffs();
     });
@@ -57,11 +149,16 @@
                 window.location.href = '/login';
                 return;
             }
+            if (!response.ok) {
+                throw new Error('Failed to load packages');
+            }
             const data = await response.json();
-            packages = data.data;
+            packages = Array.isArray(data.data) ? data.data : [];
             renderPackages();
         } catch (error) {
             console.error('Failed to load packages:', error);
+            packages = [];
+            renderPackages();
             showToast('Failed to load packages', 'error');
         }
     }
@@ -69,57 +166,215 @@
     async function loadTariffs() {
         try {
             const response = await fetch('/api/v1/tariffs');
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            if (!response.ok) {
+                throw new Error('Failed to load tariffs');
+            }
             const data = await response.json();
-            tariffs = data.data;
+            tariffs = Array.isArray(data.data) ? data.data : [];
             renderTariffs();
         } catch (error) {
             console.error('Failed to load tariffs:', error);
+            tariffs = [];
+            renderTariffs();
             showToast('Failed to load tariffs', 'error');
         }
     }
 
     function renderPackages() {
-        const container = document.getElementById('packages-list');
-        if (packages.length === 0) {
-            container.innerHTML = '<div class="px-6 py-4 text-gray-500 text-center">No packages yet</div>';
+        const tbody = document.getElementById('packages-tbody');
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(packages) || packages.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">No packages yet</td></tr>';
             return;
         }
 
-        container.innerHTML = packages.map(p => `
-            <div class="px-6 py-4 flex items-center justify-between">
-                <div>
+        const sortedPackages = [...packages].sort((a, b) => {
+            const direction = currentPackageSortDir === 'asc' ? 1 : -1;
+            if (currentPackageSortBy === 'name') {
+                return direction * a.name.localeCompare(b.name);
+            }
+            if (currentPackageSortBy === 'description') {
+                return direction * (a.description || '').localeCompare(b.description || '');
+            }
+            if (currentPackageSortBy === 'channel_count') {
+                return direction * (a.channel_count - b.channel_count);
+            }
+            return 0;
+        });
+
+        sortedPackages.forEach(p => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-3">
                     <div class="font-medium">${escapeHtml(p.name)}</div>
-                    <div class="text-sm text-gray-500">${p.channel_count} channels</div>
-                    ${p.description ? `<div class="text-sm text-gray-400">${escapeHtml(p.description)}</div>` : ''}
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="editPackage(${p.id})" class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                    <button onclick="deletePackage(${p.id}, '${escapeHtml(p.name)}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
-                </div>
-            </div>
-        `).join('');
+                </td>
+                <td class="px-6 py-3">
+                    <div class="text-sm text-gray-500">${escapeHtml(p.description || '-')}</div>
+                </td>
+                <td class="px-6 py-3">
+                    <span class="text-gray-600">${p.channel_count}</span>
+                </td>
+                <td class="px-6 py-3">
+                    <div class="flex items-center space-x-1">
+                        <button onclick="editPackage(${p.id})" class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
+                        <button onclick="deletePackage(${p.id}, '${escapeHtml(p.name)}')" class="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
     }
 
     function renderTariffs() {
-        const container = document.getElementById('tariffs-list');
-        if (tariffs.length === 0) {
-            container.innerHTML = '<div class="px-6 py-4 text-gray-500 text-center">No tariffs yet</div>';
+        const tbody = document.getElementById('tariffs-tbody');
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(tariffs) || tariffs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">No tariffs yet</td></tr>';
             return;
         }
 
-        container.innerHTML = tariffs.map(t => `
-            <div class="px-6 py-4 flex items-center justify-between">
-                <div>
+        const sortedTariffs = [...tariffs].sort((a, b) => {
+            const direction = currentTariffSortDir === 'asc' ? 1 : -1;
+            if (currentTariffSortBy === 'name') {
+                return direction * a.name.localeCompare(b.name);
+            }
+            if (currentTariffSortBy === 'description') {
+                return direction * (a.description || '').localeCompare(b.description || '');
+            }
+            if (currentTariffSortBy === 'package_count') {
+                return direction * (a.package_count - b.package_count);
+            }
+            return 0;
+        });
+
+        sortedTariffs.forEach(t => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-3">
                     <div class="font-medium">${escapeHtml(t.name)}</div>
-                    <div class="text-sm text-gray-500">${t.package_count} packages</div>
-                    ${t.description ? `<div class="text-sm text-gray-400">${escapeHtml(t.description)}</div>` : ''}
+                </td>
+                <td class="px-6 py-3">
+                    <div class="text-sm text-gray-500">${escapeHtml(t.description || '-')}</div>
+                </td>
+                <td class="px-6 py-3">
+                    <span class="text-gray-600">${t.package_count}</span>
+                </td>
+                <td class="px-6 py-3">
+                    <div class="flex items-center space-x-1">
+                        <button onclick="editTariff(${t.id})" class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
+                        <button onclick="deleteTariff(${t.id}, '${escapeHtml(t.name)}')" class="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    async function fetchPackageDetail(packageId) {
+        packageChannelsLoadError = false;
+        try {
+            const response = await fetch(`/api/v1/packages/${packageId}`);
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return null;
+            }
+            if (!response.ok) {
+                throw new Error('Failed to load package channels');
+            }
+            const data = await response.json();
+            return data.data;
+        } catch (error) {
+            packageChannelsLoadError = true;
+            showToast(error.message || 'Failed to load package channels', 'error');
+            return null;
+        }
+    }
+
+    function buildPackageChannelsList(channels) {
+        if (packageChannelsLoadError) {
+            return '<div class="px-3 py-3 text-sm text-red-600">Failed to load channels.</div>';
+        }
+        if (!Array.isArray(channels) || channels.length === 0) {
+            return '<div class="px-3 py-3 text-sm text-gray-500">No channels assigned.</div>';
+        }
+
+        const sortedChannels = [...channels].sort((a, b) => {
+            const nameA = (a.display_name || a.stream_name || a.tvg_name || '').toLowerCase();
+            const nameB = (b.display_name || b.stream_name || b.tvg_name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+
+        return sortedChannels.map(channel => {
+            const primary = escapeHtml(channel.display_name || channel.stream_name || channel.tvg_name || `Channel ${channel.id}`);
+            const secondary = channel.display_name && channel.stream_name && channel.display_name !== channel.stream_name
+                ? escapeHtml(channel.stream_name)
+                : (channel.tvg_name ? escapeHtml(channel.tvg_name) : '');
+
+            return `
+                <div class="flex items-center justify-between px-3 py-2">
+                    <div>
+                        <div class="text-sm text-gray-900">${primary}</div>
+                        ${secondary ? `<div class="text-xs text-gray-500">${secondary}</div>` : ''}
+                    </div>
+                    <button type="button"
+                            onclick="deassignPackageChannel(${channel.id})"
+                            class="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">
+                        Remove
+                    </button>
                 </div>
-                <div class="flex space-x-2">
-                    <button onclick="editTariff(${t.id})" class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                    <button onclick="deleteTariff(${t.id}, '${escapeHtml(t.name)}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    function renderPackageChannelsList() {
+        const container = document.getElementById('package-channels-list');
+        if (!container) return;
+        container.innerHTML = buildPackageChannelsList(currentPackageChannels);
+    }
+
+    function updatePackageChannelCount(packageId, delta) {
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) return;
+        const current = typeof pkg.channel_count === 'number' ? pkg.channel_count : 0;
+        pkg.channel_count = Math.max(0, current + delta);
+    }
+
+    async function deassignPackageChannel(channelId) {
+        if (!currentPackageId) return;
+
+        try {
+            const response = await fetch(`/api/v1/packages/${currentPackageId}/channels/${channelId}`, {
+                method: 'DELETE'
+            });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            if (!response.ok) {
+                let message = 'Failed to remove channel';
+                try {
+                    const data = await response.json();
+                    message = data.error?.message || message;
+                } catch (error) {
+                    // Ignore parse errors.
+                }
+                throw new Error(message);
+            }
+
+            currentPackageChannels = currentPackageChannels.filter(ch => ch.id !== channelId);
+            updatePackageChannelCount(currentPackageId, -1);
+            renderPackageChannelsList();
+            renderPackages();
+            showToast('Channel removed from package', 'success');
+        } catch (error) {
+            showToast(error.message || 'Failed to remove channel', 'error');
+        }
     }
 
     function showAddPackageModal() {
@@ -146,22 +401,38 @@
         ]);
     }
 
-    function editPackage(packageId) {
+    async function editPackage(packageId) {
         const pkg = packages.find(p => p.id === packageId);
         if (!pkg) return;
 
         currentPackageId = packageId;
+        currentPackageChannels = [];
+
+        const detail = await fetchPackageDetail(packageId);
+        if (detail && Array.isArray(detail.channels)) {
+            currentPackageChannels = detail.channels;
+        }
+
+        const nameValue = detail && detail.name !== undefined ? detail.name : pkg.name;
+        const descriptionValue = detail && detail.description !== undefined ? detail.description : (pkg.description || '');
+
         const content = `
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Name</label>
-                    <input type="text" id="package-name" value="${escapeHtml(pkg.name)}"
+                    <input type="text" id="package-name" value="${escapeHtml(nameValue)}"
                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Description</label>
                     <textarea id="package-description" rows="2"
-                              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">${escapeHtml(pkg.description || '')}</textarea>
+                              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">${escapeHtml(descriptionValue)}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Assigned Channels</label>
+                    <div id="package-channels-list" class="mt-2 max-h-48 overflow-y-auto border rounded-md divide-y">
+                        ${buildPackageChannelsList(currentPackageChannels)}
+                    </div>
                 </div>
             </div>
         `;

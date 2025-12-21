@@ -54,22 +54,49 @@ function showModal(title, content, buttons = []) {
     const modal = document.createElement('div');
     modal.className = 'bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto';
 
-    const buttonHtml = buttons.map(btn =>
-        `<button onclick="${btn.onclick}" class="px-4 py-2 rounded-md text-sm font-medium ${btn.class}">${btn.text}</button>`
-    ).join('');
-
     modal.innerHTML = `
         <div class="flex items-center justify-between px-6 py-4 border-b">
             <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(title)}</h3>
-            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+            <button type="button" class="text-gray-400 hover:text-gray-600" data-modal-close>
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
         </div>
-        <div class="px-6 py-4">${content}</div>
-        ${buttons.length > 0 ? `<div class="px-6 py-4 border-t flex justify-end space-x-3">${buttonHtml}</div>` : ''}
+        <div class="px-6 py-4" data-modal-content></div>
     `;
+
+    const contentContainer = modal.querySelector('[data-modal-content]');
+    if (contentContainer) {
+        contentContainer.innerHTML = content;
+    }
+
+    const closeButton = modal.querySelector('[data-modal-close]');
+    if (closeButton) {
+        closeButton.addEventListener('click', closeModal);
+    }
+
+    if (buttons.length > 0) {
+        const footer = document.createElement('div');
+        footer.className = 'px-6 py-4 border-t flex justify-end space-x-3';
+
+        buttons.forEach(btn => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `px-4 py-2 rounded-md text-sm font-medium ${btn.class || ''}`;
+            button.textContent = btn.text || '';
+
+            if (typeof btn.onclick === 'function') {
+                button.addEventListener('click', btn.onclick);
+            } else if (typeof btn.onclick === 'string' && btn.onclick) {
+                button.setAttribute('onclick', btn.onclick);
+            }
+
+            footer.appendChild(button);
+        });
+
+        modal.appendChild(footer);
+    }
 
     backdrop.appendChild(modal);
     document.getElementById('modal-container').appendChild(backdrop);
@@ -101,17 +128,147 @@ function showConfirm(title, message, details, onConfirm) {
     `;
 
     showModal(title, content, [
-        { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: 'closeModal()' },
-        { text: 'Delete', class: 'bg-red-600 text-white hover:bg-red-700', onclick: `closeModal(); (${onConfirm.toString()})()` }
+        { text: 'Cancel', class: 'bg-gray-200 text-gray-800 hover:bg-gray-300', onclick: closeModal },
+        {
+            text: 'Delete',
+            class: 'bg-red-600 text-white hover:bg-red-700',
+            onclick: async () => {
+                closeModal();
+                if (typeof onConfirm === 'function') {
+                    await onConfirm();
+                }
+            }
+        }
     ]);
 }
 
 // Utility functions
+function onDomReady(callback) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', callback, { once: true });
+    } else {
+        callback();
+    }
+}
+
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function initResizableTable(tableId, storageKey) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    const key = storageKey || `${tableId}:column-widths`;
+    let storedWidths = {};
+
+    try {
+        storedWidths = JSON.parse(localStorage.getItem(key) || '{}');
+    } catch (error) {
+        storedWidths = {};
+    }
+
+    const headers = table.querySelectorAll('thead th');
+    headers.forEach(th => {
+        const colKey = th.dataset.colKey;
+        if (colKey && storedWidths[colKey]) {
+            th.style.width = `${storedWidths[colKey]}px`;
+            return;
+        }
+        th.style.width = `${th.offsetWidth}px`;
+    });
+
+    const handles = table.querySelectorAll('.resize-handle');
+    handles.forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const th = handle.parentElement;
+            const startX = e.pageX;
+            const startWidth = th.offsetWidth;
+
+            handle.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            function onMouseMove(event) {
+                const newWidth = startWidth + (event.pageX - startX);
+                if (newWidth > 40) {
+                    th.style.width = `${newWidth}px`;
+                }
+            }
+
+            function onMouseUp() {
+                handle.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                const colKey = th.dataset.colKey;
+                if (!colKey) return;
+
+                const widths = { ...storedWidths, [colKey]: th.offsetWidth };
+                storedWidths = widths;
+                try {
+                    localStorage.setItem(key, JSON.stringify(widths));
+                } catch (error) {
+                    // Ignore storage failures (private mode or disabled storage).
+                }
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+}
+
+function initTableSort(tableId, options) {
+    const table = document.getElementById(tableId);
+    if (!table) return null;
+
+    const resolvedOptions = options || {};
+    let sortBy = resolvedOptions.sortBy || '';
+    let sortDir = resolvedOptions.sortDir || 'asc';
+    const onSortChange = resolvedOptions.onSortChange;
+
+    function updateIndicators() {
+        const indicators = table.querySelectorAll('[data-sort-indicator]');
+        indicators.forEach(indicator => {
+            const field = indicator.dataset.sortIndicator;
+            if (field === sortBy) {
+                indicator.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                indicator.textContent = '';
+            }
+        });
+    }
+
+    function setSort(field) {
+        if (sortBy === field) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortBy = field;
+            sortDir = 'asc';
+        }
+
+        updateIndicators();
+        if (onSortChange) {
+            onSortChange(sortBy, sortDir);
+        }
+    }
+
+    const sortButtons = table.querySelectorAll('[data-sort-key]');
+    sortButtons.forEach(button => {
+        button.addEventListener('click', () => setSort(button.dataset.sortKey));
+    });
+
+    updateIndicators();
+    return { getSort: () => ({ sortBy, sortDir }), setSort, updateIndicators };
 }
 
 // Handle 401 responses globally

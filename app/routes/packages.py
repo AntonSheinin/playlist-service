@@ -2,8 +2,10 @@ from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.schemas import (
+    MessageResponse,
     PackageCreate,
     PackageDeleteInfo,
+    PackageDetail,
     PackageResponse,
     PackageUpdate,
     PackageWithCount,
@@ -36,6 +38,18 @@ async def list_packages(
     ]
 
     return SuccessResponse(data=result)
+
+
+@router.get("/{package_id}", response_model=SuccessResponse[PackageDetail])
+async def get_package(
+    package_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+) -> SuccessResponse[PackageDetail]:
+    """Get a single package with assigned channels."""
+    service = PackageService(db)
+    package = await service.get_by_id(package_id)
+    return SuccessResponse(data=PackageDetail.model_validate(package))
 
 
 @router.post("", response_model=SuccessResponse[PackageResponse])
@@ -77,3 +91,16 @@ async def delete_package(
     service = PackageService(db)
     info = await service.delete(package_id)
     return SuccessResponse(data=PackageDeleteInfo(**info))
+
+
+@router.delete("/{package_id}/channels/{channel_id}", response_model=MessageResponse)
+async def remove_package_channel(
+    package_id: int,
+    channel_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+) -> MessageResponse:
+    """Remove a channel from a package."""
+    service = PackageService(db)
+    await service.remove_channel(package_id, channel_id)
+    return MessageResponse(message="Channel removed from package")

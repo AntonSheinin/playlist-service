@@ -103,3 +103,11 @@ class PackageService(BaseService[Package]):
             "tariffs": tariff_count,
             "users": user_count,
         }
+
+    async def remove_channel(self, package_id: int, channel_id: int) -> Package:
+        """Remove a single channel from a package."""
+        package = await self.get_by_id(package_id)
+        if package.channels:
+            package.channels = [ch for ch in package.channels if ch.id != channel_id]
+        await self.db.flush()
+        return await self.get_by_id(package_id)

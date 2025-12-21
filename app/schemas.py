@@ -239,6 +239,10 @@ class ChannelLookup(BaseModel):
     tvg_name: str | None = None
 
 
+class PackageDetail(PackageResponse):
+    channels: list[ChannelLookup] = []
+
+
 class ChannelResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

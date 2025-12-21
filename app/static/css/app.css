@@ -29,16 +29,6 @@
     animation: fade-out 0.3s ease-out forwards;
 }
 
-/* Sortable drag styles */
-.sortable-ghost {
-    opacity: 0.4;
-    background-color: #f3f4f6;
-}
-
-.sortable-chosen {
-    background-color: #eff6ff;
-}
-
 /* Tom Select customization */
 .ts-wrapper.multi .ts-control > div {
     background-color: #dbeafe;
@@ -60,6 +50,57 @@
 /* Table improvements */
 table tbody tr:hover {
     background-color: #f9fafb;
+}
+
+.resizable-table {
+    table-layout: fixed;
+}
+
+.resizable-table thead th {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+
+.resizable-table thead th button {
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+}
+
+.resizable-table th {
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-right: 1px solid #e5e7eb;
+}
+
+.resizable-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resizable-table th:last-child {
+    border-right: none;
+}
+
+.resizable-table th .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    background: linear-gradient(to right, transparent 0, transparent 6px, #cbd5e1 6px, #cbd5e1 7px, transparent 7px);
+    z-index: 10;
+}
+
+.resizable-table th .resize-handle:hover,
+.resizable-table th .resize-handle.resizing {
+    background: #3b82f6;
 }
 
 /* Modal backdrop */

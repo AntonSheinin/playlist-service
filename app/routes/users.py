@@ -32,6 +32,8 @@ async def list_users(
     search: str | None = None,
     status: UserStatus | None = None,
     tariff_id: int | None = None,
+    sort_by: str = "name",
+    sort_dir: str = "asc",
 ) -> PaginatedResponse[UserListItem]:
     """List users with pagination and filters."""
     service = UserService(db)
@@ -42,6 +44,8 @@ async def list_users(
         search=search,
         status=status,
         tariff_id=tariff_id,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
     items = []

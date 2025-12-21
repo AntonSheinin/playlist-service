@@ -51,6 +51,8 @@ class UserService(BaseService[User]):
         search: str | None = None,
         status: UserStatus | None = None,
         tariff_id: int | None = None,
+        sort_by: str = "name",
+        sort_dir: str = "asc",
     ) -> PaginatedResult[User]:
         """Get paginated users with filters."""
         stmt = select(User).options(
@@ -82,7 +84,20 @@ class UserService(BaseService[User]):
         total = result.scalar() or 0
 
         # Apply sorting and pagination
-        stmt = stmt.order_by(User.last_name, User.first_name)
+        sort_map = {
+            "name": (User.last_name, User.first_name),
+            "agreement_number": (User.agreement_number,),
+            "max_sessions": (User.max_sessions,),
+            "status": (User.status,),
+            "created_at": (User.created_at,),
+        }
+        sort_columns = sort_map.get(sort_by, sort_map["name"])
+        if sort_dir == "desc":
+            sort_columns = tuple(column.desc() for column in sort_columns)
+        else:
+            sort_columns = tuple(column.asc() for column in sort_columns)
+
+        stmt = stmt.order_by(*sort_columns)
         stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         result = await self.db.execute(stmt)

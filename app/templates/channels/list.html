@@ -47,48 +47,48 @@
 
     <!-- Channels table -->
     <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <style>
-            .resizable-table {
-                table-layout: fixed;
-            }
-            .resizable-table th {
-                position: relative;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .resizable-table td {
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .resizable-table th .resize-handle {
-                position: absolute;
-                right: 0;
-                top: 0;
-                bottom: 0;
-                width: 8px;
-                cursor: col-resize;
-                background: transparent;
-                z-index: 10;
-            }
-            .resizable-table th .resize-handle:hover,
-            .resizable-table th .resize-handle.resizing {
-                background: #3b82f6;
-            }
-        </style>
         <table id="channels-table" class="min-w-full divide-y divide-gray-200 resizable-table" style="width: 100%;">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="w-10 px-2 py-3"></th>
-                    <th class="w-16 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">#<span class="resize-handle"></span></th>
-                    <th class="w-14 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logo<span class="resize-handle"></span></th>
-                    <th class="min-w-[150px] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name<span class="resize-handle"></span></th>
-                    <th class="w-28 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">TVG ID<span class="resize-handle"></span></th>
-                    <th class="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group<span class="resize-handle"></span></th>
-                    <th class="w-16 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archive<span class="resize-handle"></span></th>
-                    <th class="w-40 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Packages<span class="resize-handle"></span></th>
-                    <th class="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status<span class="resize-handle"></span></th>
-                    <th class="w-24 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th data-col-key="number" class="w-16 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <button type="button" onclick="setSort('channel_number')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                            <span>#</span>
+                            <span class="sort-indicator text-gray-400" data-sort-indicator="channel_number"></span>
+                        </button>
+                        <span class="resize-handle"></span>
+                    </th>
+                    <th data-col-key="logo" class="w-14 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logo<span class="resize-handle"></span></th>
+                    <th data-col-key="name" class="min-w-[150px] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <button type="button" onclick="setSort('display_name')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                            <span>Name</span>
+                            <span class="sort-indicator text-gray-400" data-sort-indicator="display_name"></span>
+                        </button>
+                        <span class="resize-handle"></span>
+                    </th>
+                    <th data-col-key="tvg-id" class="w-28 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <button type="button" onclick="setSort('tvg_id')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                            <span>TVG ID</span>
+                            <span class="sort-indicator text-gray-400" data-sort-indicator="tvg_id"></span>
+                        </button>
+                        <span class="resize-handle"></span>
+                    </th>
+                    <th data-col-key="group" class="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group<span class="resize-handle"></span></th>
+                    <th data-col-key="archive" class="w-16 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <button type="button" onclick="setSort('catchup_days')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                            <span>Archive</span>
+                            <span class="sort-indicator text-gray-400" data-sort-indicator="catchup_days"></span>
+                        </button>
+                        <span class="resize-handle"></span>
+                    </th>
+                    <th data-col-key="packages" class="w-40 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Packages<span class="resize-handle"></span></th>
+                    <th data-col-key="status" class="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <button type="button" onclick="setSort('sync_status')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
+                            <span>Status</span>
+                            <span class="sort-indicator text-gray-400" data-sort-indicator="sync_status"></span>
+                        </button>
+                        <span class="resize-handle"></span>
+                    </th>
+                    <th data-col-key="actions" class="w-24 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
             </thead>
             <tbody id="channels-tbody" class="bg-white divide-y divide-gray-200">
@@ -106,16 +106,21 @@
 {% block scripts %}
 <script>
     let currentPage = 1;
+    let currentPerPage = 20;
+    let currentSortBy = 'sort_order';
+    let currentSortDir = 'asc';
     let currentChannelId = null;
     let groups = [];
     let packages = [];
     let searchTimeout = null;
     let pendingChanges = {};  // { channelId: { tvg_id, tvg_logo, channel_number } }
+    const COLUMN_WIDTHS_KEY = 'channelsTableWidths';
 
     document.addEventListener('DOMContentLoaded', async () => {
         await Promise.all([loadGroups(), loadPackages()]);
         loadChannels();
         initColumnResize();
+        updateSortIndicators();
 
         document.getElementById('filter-search').addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
@@ -149,7 +154,7 @@
         const status = document.getElementById('filter-status').value;
         const search = document.getElementById('filter-search').value;
 
-        let url = `/api/v1/channels?page=${page}&per_page=20`;
+        let url = `/api/v1/channels?page=${page}&per_page=${currentPerPage}&sort_by=${encodeURIComponent(currentSortBy)}&sort_dir=${currentSortDir}`;
         if (groupId) url += `&group_id=${groupId}`;
         if (status) url += `&sync_status=${status}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -180,13 +185,11 @@
             const currentCatchup = pending.catchup_days !== undefined ? pending.catchup_days : (channel.catchup_days || '');
             const hasChanges = pendingChanges[channel.id] !== undefined;
 
+            const assignedPackageIds = channel.packages.map(p => p.id);
             const row = document.createElement('tr');
             row.className = channel.sync_status === 'orphaned' ? 'bg-gray-50 text-gray-500' : '';
             if (hasChanges) row.classList.add('bg-yellow-50');
             row.innerHTML = `
-                <td class="px-2 py-2">
-                    <span class="cursor-move text-gray-400">&#9776;</span>
-                </td>
                 <td class="px-2 py-2">
                     <input type="number" min="0" max="9999"
                            value="${currentNumber}"
@@ -233,11 +236,14 @@
                            class="w-12 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </td>
                 <td class="px-2 py-2">
-                    <div onclick="editChannelPackages(${channel.id})" class="cursor-pointer hover:bg-gray-100 rounded p-1" title="Click to edit packages">
-                        ${channel.packages.length > 0
-                            ? channel.packages.map(p => `<span class="inline-block text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded mr-1 mb-1">${escapeHtml(p.name)}</span>`).join('')
-                            : '<span class="text-xs text-gray-400">-</span>'}
-                    </div>
+                    ${packages.length > 0
+                        ? `<select id="channel-packages-${channel.id}"
+                                   data-channel-id="${channel.id}"
+                                   class="channel-packages-select w-full"
+                                   multiple>
+                               ${packages.map(p => `<option value="${p.id}" ${assignedPackageIds.includes(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+                           </select>`
+                        : '<div class="text-xs text-gray-400">No packages</div>'}
                 </td>
                 <td class="px-2 py-2">
                     <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${channel.sync_status === 'synced' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
@@ -248,25 +254,119 @@
                     <div class="flex items-center space-x-1">
                         <button onclick="applyRowChanges(${channel.id})" class="text-xs px-2 py-1 rounded ${hasChanges ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}" title="Save changes" ${hasChanges ? '' : 'disabled'}>Apply</button>
                         <button onclick="editChannel(${channel.id})" class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700" title="Edit channel details">Edit</button>
-                        <button onclick="deleteChannel(${channel.id})" class="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Delete channel">Del</button>
+                        <button onclick="deleteChannel(${channel.id})" class="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Delete channel">Delete</button>
                     </div>
                 </td>
             `;
             tbody.appendChild(row);
         });
 
+        initChannelPackageSelects();
         renderPagination(data);
+    }
+
+    function normalizeMultiValues(values) {
+        if (Array.isArray(values)) {
+            return values;
+        }
+        if (!values) {
+            return [];
+        }
+        return String(values)
+            .split(',')
+            .map(value => value.trim())
+            .filter(Boolean);
+    }
+
+    function initChannelPackageSelects() {
+        const selects = document.querySelectorAll('.channel-packages-select');
+        if (!selects.length || typeof TomSelect === 'undefined') return;
+
+        selects.forEach(select => {
+            if (select.tomselect) {
+                select.tomselect.destroy();
+            }
+
+            const channelId = parseInt(select.dataset.channelId, 10);
+            let ready = false;
+
+            const instance = new TomSelect(select, {
+                plugins: ['remove_button'],
+                maxOptions: 1000,
+                dropdownParent: 'body',
+                onChange: (value) => {
+                    if (!ready) return;
+                    const ids = normalizeMultiValues(value).map(v => parseInt(v, 10)).filter(Boolean);
+                    updateChannelPackagesInline(channelId, ids);
+                }
+            });
+
+            ready = true;
+            select.tomselect = instance;
+        });
+    }
+
+    async function persistChannelPackages(channelId, packageIds) {
+        const response = await fetch(`/api/v1/channels/${channelId}/packages`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ package_ids: packageIds })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to update packages');
+        }
+
+        return data.data;
+    }
+
+    async function updateChannelPackagesInline(channelId, packageIds) {
+        try {
+            await persistChannelPackages(channelId, packageIds);
+            showToast('Packages updated', 'success');
+        } catch (error) {
+            showToast(error.message || 'Failed to update packages', 'error');
+            loadChannels(currentPage);
+        }
+    }
+
+    function setSort(field) {
+        if (currentSortBy === field) {
+            currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortBy = field;
+            currentSortDir = 'asc';
+        }
+        updateSortIndicators();
+        loadChannels(1);
+    }
+
+    function updateSortIndicators() {
+        const indicators = document.querySelectorAll('[data-sort-indicator]');
+        indicators.forEach(indicator => {
+            const field = indicator.dataset.sortIndicator;
+            if (field === currentSortBy) {
+                indicator.textContent = currentSortDir === 'asc' ? '▲' : '▼';
+            } else {
+                indicator.textContent = '';
+            }
+        });
     }
 
     function renderPagination(data) {
         const container = document.getElementById('pagination');
-        if (data.pages <= 1) {
-            container.innerHTML = '';
-            return;
-        }
+        const perPageOptions = [10, 20, 50, 100];
 
         let html = '<div class="flex items-center justify-between"><div class="text-sm text-gray-700">';
-        html += `Page ${data.page} of ${data.pages} (${data.total} channels)</div><div class="flex space-x-2">`;
+        html += `Page ${data.page} of ${data.pages} (${data.total} channels)</div>`;
+        html += '<div class="flex items-center space-x-4">';
+        html += '<div class="flex items-center space-x-2">';
+        html += '<span class="text-sm text-gray-700">Per page</span>';
+        html += `<select id="per-page-select" class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">`;
+        html += perPageOptions.map(value => `<option value="${value}" ${value === currentPerPage ? 'selected' : ''}>${value}</option>`).join('');
+        html += '</select></div>';
+        html += '<div class="flex space-x-2">';
 
         if (data.page > 1) {
             html += `<button onclick="loadChannels(${data.page - 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Previous</button>`;
@@ -275,8 +375,16 @@
             html += `<button onclick="loadChannels(${data.page + 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next</button>`;
         }
 
-        html += '</div></div>';
+        html += '</div></div></div>';
         container.innerHTML = html;
+
+        const perPageSelect = document.getElementById('per-page-select');
+        if (perPageSelect) {
+            perPageSelect.addEventListener('change', () => {
+                currentPerPage = parseInt(perPageSelect.value);
+                loadChannels(1);
+            });
+        }
     }
 
     function trackChange(channelId, field, value) {
@@ -566,13 +674,36 @@
     }
 
     // Column resize functionality
+    function loadColumnWidths() {
+        try {
+            const raw = localStorage.getItem(COLUMN_WIDTHS_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function saveColumnWidths(widths) {
+        try {
+            localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths));
+        } catch (error) {
+            // Ignore storage failures (private mode or disabled storage).
+        }
+    }
+
     function initColumnResize() {
         const table = document.getElementById('channels-table');
         if (!table) return;
 
         // Set initial widths based on computed styles
         const headers = table.querySelectorAll('thead th');
+        const storedWidths = loadColumnWidths();
         headers.forEach(th => {
+            const key = th.dataset.colKey;
+            if (key && storedWidths[key]) {
+                th.style.width = storedWidths[key] + 'px';
+                return;
+            }
             const width = th.offsetWidth;
             th.style.width = width + 'px';
         });
@@ -604,6 +735,13 @@
                     document.body.style.userSelect = '';
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
+
+                    const key = th.dataset.colKey;
+                    if (key) {
+                        const widths = loadColumnWidths();
+                        widths[key] = th.offsetWidth;
+                        saveColumnWidths(widths);
+                    }
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -765,22 +903,12 @@
         const packageIds = Array.from(select.selectedOptions).map(o => parseInt(o.value));
 
         try {
-            const response = await fetch(`/api/v1/channels/${currentChannelId}/packages`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ package_ids: packageIds })
-            });
-
-            if (response.ok) {
-                closeModal();
-                loadChannels(currentPage);
-                showToast('Packages updated', 'success');
-            } else {
-                const data = await response.json();
-                showToast(data.error?.message || 'Failed to update packages', 'error');
-            }
+            await persistChannelPackages(currentChannelId, packageIds);
+            closeModal();
+            loadChannels(currentPage);
+            showToast('Packages updated', 'success');
         } catch (error) {
-            showToast('Failed to update packages', 'error');
+            showToast(error.message || 'Failed to update packages', 'error');
         }
     }
 
