@@ -90,6 +90,7 @@ class Channel(Base, TimestampMixin):
     catchup_days: Mapped[int | None] = mapped_column(nullable=True)
     tvg_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     tvg_logo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_number: Mapped[int | None] = mapped_column(nullable=True)
     group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
     sort_order: Mapped[int] = mapped_column(default=0, index=True)
     sync_status: Mapped[SyncStatus] = mapped_column(Enum(SyncStatus, native_enum=False), default=SyncStatus.SYNCED, index=True)

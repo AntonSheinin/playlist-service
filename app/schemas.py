@@ -183,6 +183,19 @@ class TariffLookup(BaseModel):
 class ChannelUpdate(BaseModel):
     tvg_id: str | None = None
     tvg_logo: str | None = None
+    channel_number: int | None = None
+
+
+class ChannelBulkUpdateItem(BaseModel):
+    id: int
+    tvg_id: str | None = None
+    tvg_logo: str | None = None
+    channel_number: int | None = None
+    catchup_days: int | None = None
+
+
+class ChannelBulkUpdate(BaseModel):
+    channels: list[ChannelBulkUpdateItem]
 
 
 class ChannelGroupUpdate(BaseModel):
@@ -232,6 +245,7 @@ class ChannelResponse(BaseModel):
     catchup_days: int | None = None
     tvg_id: str | None = None
     tvg_logo: str | None = None
+    channel_number: int | None = None
     sort_order: int = 0
     sync_status: SyncStatus = SyncStatus.SYNCED
     group_id: int | None = None

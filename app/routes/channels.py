@@ -3,6 +3,7 @@ from fastapi import APIRouter, Query
 from app.dependencies import CurrentAdminId, DBSession
 from app.models import SyncStatus
 from app.schemas import (
+    ChannelBulkUpdate,
     ChannelCascadeInfo,
     ChannelGroupUpdate,
     ChannelPackagesUpdate,
@@ -77,14 +78,28 @@ async def update_channel(
     _admin_id: CurrentAdminId,
     db: DBSession,
 ) -> SuccessResponse[ChannelResponse]:
-    """Update channel (tvg_id, tvg_logo only)."""
+    """Update channel (tvg_id, tvg_logo, channel_number)."""
     service = ChannelService(db)
     channel = await service.update(
         channel_id,
         tvg_id=data.tvg_id,
         tvg_logo=data.tvg_logo,
+        channel_number=data.channel_number,
     )
     return SuccessResponse(data=ChannelResponse.model_validate(channel))
+
+
+@router.patch("", response_model=MessageResponse)
+async def bulk_update_channels(
+    data: ChannelBulkUpdate,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+) -> MessageResponse:
+    """Bulk update multiple channels."""
+    service = ChannelService(db)
+    updates = [item.model_dump(exclude_unset=True) for item in data.channels]
+    count = await service.bulk_update(updates)
+    return MessageResponse(message=f"{count} channels updated successfully")
 
 
 @router.delete("/{channel_id}", response_model=MessageResponse)
@@ -92,10 +107,11 @@ async def delete_channel(
     channel_id: int,
     _admin_id: CurrentAdminId,
     db: DBSession,
+    force: bool = Query(False, description="Force delete even if not orphaned"),
 ) -> MessageResponse:
-    """Delete an orphaned channel."""
+    """Delete a channel. Use force=true to delete non-orphaned channels."""
     service = ChannelService(db)
-    await service.delete(channel_id)
+    await service.delete(channel_id, force=force)
     return MessageResponse(message="Channel deleted successfully")
 
 

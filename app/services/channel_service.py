@@ -105,6 +105,7 @@ class ChannelService:
         channel_id: int,
         tvg_id: str | None = None,
         tvg_logo: str | None = None,
+        channel_number: int | None = None,
     ) -> Channel:
         """Update channel (UI-managed fields only)."""
         channel = await self.get_by_id(channel_id)
@@ -113,9 +114,45 @@ class ChannelService:
             channel.tvg_id = tvg_id if tvg_id else None
         if tvg_logo is not None:
             channel.tvg_logo = tvg_logo if tvg_logo else None
+        if channel_number is not None:
+            channel.channel_number = channel_number if channel_number > 0 else None
 
         await self.db.flush()
         return await self.get_by_id(channel_id)
+
+    async def bulk_update(
+        self,
+        updates: list[dict],
+    ) -> int:
+        """Bulk update multiple channels. Returns count of updated channels."""
+        updated_count = 0
+        for item in updates:
+            channel_id = item.get("id")
+            if not channel_id:
+                continue
+
+            stmt = select(Channel).where(Channel.id == channel_id)
+            result = await self.db.execute(stmt)
+            channel = result.scalar_one_or_none()
+
+            if channel is None:
+                continue
+
+            if "tvg_id" in item:
+                channel.tvg_id = item["tvg_id"] if item["tvg_id"] else None
+            if "tvg_logo" in item:
+                channel.tvg_logo = item["tvg_logo"] if item["tvg_logo"] else None
+            if "channel_number" in item:
+                val = item["channel_number"]
+                channel.channel_number = val if val and val > 0 else None
+            if "catchup_days" in item:
+                val = item["catchup_days"]
+                channel.catchup_days = val if val and val > 0 else None
+
+            updated_count += 1
+
+        await self.db.flush()
+        return updated_count
 
     async def update_group(self, channel_id: int, group_id: int | None) -> Channel:
         """Update channel's group assignment."""
@@ -137,11 +174,11 @@ class ChannelService:
         await self.db.flush()
         return await self.get_by_id(channel_id)
 
-    async def delete(self, channel_id: int) -> None:
-        """Delete an orphaned channel."""
+    async def delete(self, channel_id: int, force: bool = False) -> None:
+        """Delete a channel. By default only orphaned channels can be deleted."""
         channel = await self.get_by_id(channel_id)
 
-        if channel.sync_status != SyncStatus.ORPHANED:
+        if not force and channel.sync_status != SyncStatus.ORPHANED:
             raise ChannelNotOrphanedError()
 
         await self.db.delete(channel)
