@@ -61,7 +61,6 @@ class ChannelSyncService:
                     stream_name=stream.name,
                     tvg_name=stream.title,
                     display_name=stream.title,
-                    stream_base_url=self.flussonic.get_stream_url(stream.name),
                     catchup_days=stream.dvr,
                     sync_status=SyncStatus.SYNCED,
                     last_seen_at=now,
@@ -72,7 +71,6 @@ class ChannelSyncService:
                 # Update Flussonic fields only (preserve UI-managed fields)
                 channel.tvg_name = stream.title
                 channel.display_name = stream.title
-                channel.stream_base_url = self.flussonic.get_stream_url(stream.name)
                 channel.catchup_days = stream.dvr
                 channel.sync_status = SyncStatus.SYNCED
                 channel.last_seen_at = now

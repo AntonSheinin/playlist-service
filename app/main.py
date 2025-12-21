@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, status
@@ -42,8 +43,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+(MEDIA_ROOT / "logos").mkdir(parents=True, exist_ok=True)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 
 # Include routers
 app.include_router(api_router)

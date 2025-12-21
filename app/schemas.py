@@ -186,6 +186,10 @@ class ChannelUpdate(BaseModel):
     channel_number: int | None = None
 
 
+class LogoUploadResponse(BaseModel):
+    url: str
+
+
 class ChannelBulkUpdateItem(BaseModel):
     id: int
     tvg_id: str | None = None
@@ -241,7 +245,6 @@ class ChannelResponse(BaseModel):
     stream_name: str
     tvg_name: str | None = None
     display_name: str | None = None
-    stream_base_url: str
     catchup_days: int | None = None
     tvg_id: str | None = None
     tvg_logo: str | None = None

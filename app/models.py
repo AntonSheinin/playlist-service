@@ -86,7 +86,6 @@ class Channel(Base, TimestampMixin):
     stream_name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     tvg_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    stream_base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     catchup_days: Mapped[int | None] = mapped_column(nullable=True)
     tvg_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     tvg_logo: Mapped[str | None] = mapped_column(Text, nullable=True)

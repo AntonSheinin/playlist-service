@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Query
+import imghdr
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, File, Query, UploadFile
 
 from app.dependencies import CurrentAdminId, DBSession
+from app.exceptions import ValidationError
 from app.models import SyncStatus
 from app.schemas import (
     ChannelBulkUpdate,
@@ -10,6 +15,7 @@ from app.schemas import (
     ChannelReorderRequest,
     ChannelResponse,
     ChannelUpdate,
+    LogoUploadResponse,
     MessageResponse,
     PaginatedData,
     PaginatedResponse,
@@ -21,6 +27,36 @@ from app.services.channel_sync import ChannelSyncService
 from app.utils.pagination import PaginationParams
 
 router = APIRouter()
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+LOGO_DIR = BASE_DIR / "media" / "logos"
+MAX_LOGO_BYTES = 2 * 1024 * 1024
+ALLOWED_IMAGE_TYPES = {"png", "jpeg", "gif", "webp"}
+
+
+async def save_logo_file(upload: UploadFile) -> str:
+    if upload.content_type and not upload.content_type.startswith("image/"):
+        raise ValidationError("Only image uploads are allowed")
+
+    content = await upload.read(MAX_LOGO_BYTES + 1)
+    await upload.close()
+
+    if not content:
+        raise ValidationError("Uploaded file is empty")
+    if len(content) > MAX_LOGO_BYTES:
+        raise ValidationError("Logo exceeds 2MB limit")
+
+    image_type = imghdr.what(None, h=content)
+    if image_type not in ALLOWED_IMAGE_TYPES:
+        raise ValidationError("Unsupported image type")
+
+    extension = "jpg" if image_type == "jpeg" else image_type
+    LOGO_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}.{extension}"
+    logo_path = LOGO_DIR / filename
+    logo_path.write_bytes(content)
+
+    return f"/media/logos/{filename}"
 
 
 @router.get("", response_model=PaginatedResponse[ChannelResponse])
@@ -87,6 +123,20 @@ async def update_channel(
         channel_number=data.channel_number,
     )
     return SuccessResponse(data=ChannelResponse.model_validate(channel))
+
+
+@router.post("/{channel_id}/logo", response_model=SuccessResponse[LogoUploadResponse])
+async def upload_channel_logo(
+    channel_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+    file: UploadFile = File(...),
+) -> SuccessResponse[LogoUploadResponse]:
+    """Upload channel logo and return its URL."""
+    service = ChannelService(db)
+    logo_url = await save_logo_file(file)
+    channel = await service.update(channel_id, tvg_logo=logo_url)
+    return SuccessResponse(data=LogoUploadResponse(url=channel.tvg_logo or logo_url))
 
 
 @router.patch("", response_model=MessageResponse)

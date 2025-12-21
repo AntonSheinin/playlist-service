@@ -308,6 +308,38 @@
         }
     }
 
+    async function uploadChannelLogo(channelId, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/v1/channels/${channelId}/logo`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to upload logo');
+        }
+
+        return data.data.url || '';
+    }
+
+    async function setChannelLogo(channelId, logoUrl) {
+        const response = await fetch(`/api/v1/channels/${channelId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tvg_logo: logoUrl })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to update logo');
+        }
+
+        return data.data.tvg_logo || '';
+    }
+
     async function applyAllChanges() {
         const count = Object.keys(pendingChanges).length;
         if (count === 0) return;
@@ -414,7 +446,7 @@
                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Logo URL</label>
+                    <label class="block text-sm font-medium text-gray-700">Logo</label>
                     <div class="mt-1 flex items-center space-x-4">
                         <img id="edit-logo-preview" src="${channel.tvg_logo || ''}" alt="" class="w-16 h-16 object-contain border rounded ${channel.tvg_logo ? '' : 'hidden'}">
                         <input type="file" id="edit-logo-file" accept="image/*" class="hidden">
@@ -450,17 +482,22 @@
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const preview = document.getElementById('edit-logo-preview');
-            preview.src = e.target.result;
-            preview.classList.remove('hidden');
-        };
-        reader.readAsDataURL(file);
+        const preview = document.getElementById('edit-logo-preview');
+        if (preview.dataset.objectUrl) {
+            URL.revokeObjectURL(preview.dataset.objectUrl);
+        }
+        const objectUrl = URL.createObjectURL(file);
+        preview.dataset.objectUrl = objectUrl;
+        preview.src = objectUrl;
+        preview.classList.remove('hidden');
     }
 
     function clearEditLogo() {
         const preview = document.getElementById('edit-logo-preview');
+        if (preview.dataset.objectUrl) {
+            URL.revokeObjectURL(preview.dataset.objectUrl);
+            preview.dataset.objectUrl = '';
+        }
         preview.src = '';
         preview.classList.add('hidden');
         document.getElementById('edit-logo-file').value = '';
@@ -471,10 +508,22 @@
         const catchupDays = document.getElementById('edit-catchup-days').value;
         const tvgId = document.getElementById('edit-tvg-id').value;
         const preview = document.getElementById('edit-logo-preview');
-        const tvgLogo = preview.classList.contains('hidden') ? '' : preview.src;
+        const fileInput = document.getElementById('edit-logo-file');
+        let tvgLogo = preview.classList.contains('hidden') ? '' : preview.src;
         const groupId = document.getElementById('edit-group').value;
 
         try {
+            if (fileInput.files && fileInput.files[0]) {
+                tvgLogo = await uploadChannelLogo(currentChannelId, fileInput.files[0]);
+                if (preview.dataset.objectUrl) {
+                    URL.revokeObjectURL(preview.dataset.objectUrl);
+                    preview.dataset.objectUrl = '';
+                }
+                preview.src = tvgLogo;
+                preview.classList.remove('hidden');
+                fileInput.value = '';
+            }
+
             // Update channel fields
             const response = await fetch('/api/v1/channels', {
                 method: 'PATCH',
@@ -512,7 +561,7 @@
                 showToast(data.error?.message || 'Failed to update group', 'error');
             }
         } catch (error) {
-            showToast('Failed to update channel', 'error');
+            showToast(error.message || 'Failed to update channel', 'error');
         }
     }
 
@@ -600,33 +649,71 @@
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const preview = document.getElementById('logo-preview');
-            const placeholder = document.getElementById('logo-placeholder');
-            preview.src = e.target.result;
-            preview.classList.remove('hidden');
-            placeholder.classList.add('hidden');
-        };
-        reader.readAsDataURL(file);
+        const preview = document.getElementById('logo-preview');
+        const placeholder = document.getElementById('logo-placeholder');
+        if (preview.dataset.objectUrl) {
+            URL.revokeObjectURL(preview.dataset.objectUrl);
+        }
+        const objectUrl = URL.createObjectURL(file);
+        preview.dataset.objectUrl = objectUrl;
+        preview.src = objectUrl;
+        preview.classList.remove('hidden');
+        placeholder.classList.add('hidden');
     }
 
     function clearLogoPreview() {
         const preview = document.getElementById('logo-preview');
         const placeholder = document.getElementById('logo-placeholder');
+        if (preview.dataset.objectUrl) {
+            URL.revokeObjectURL(preview.dataset.objectUrl);
+            preview.dataset.objectUrl = '';
+        }
         preview.src = '';
         preview.classList.add('hidden');
         placeholder.classList.remove('hidden');
         document.getElementById('logo-file-input').value = '';
     }
 
-    function applyLogoChange() {
+    async function applyLogoChange() {
         const preview = document.getElementById('logo-preview');
-        const logoValue = preview.classList.contains('hidden') ? '' : preview.src;
+        const fileInput = document.getElementById('logo-file-input');
+        const placeholder = document.getElementById('logo-placeholder');
+        let logoValue = preview.classList.contains('hidden') ? '' : preview.src;
 
-        trackChange(currentChannelId, 'tvg_logo', logoValue);
+        try {
+            if (fileInput.files && fileInput.files[0]) {
+                logoValue = await uploadChannelLogo(currentChannelId, fileInput.files[0]);
+                if (preview.dataset.objectUrl) {
+                    URL.revokeObjectURL(preview.dataset.objectUrl);
+                    preview.dataset.objectUrl = '';
+                }
+                preview.src = logoValue;
+                preview.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                fileInput.value = '';
+            } else if (preview.classList.contains('hidden')) {
+                await setChannelLogo(currentChannelId, null);
+                logoValue = '';
+            } else {
+                closeModal();
+                return;
+            }
+        } catch (error) {
+            showToast(error.message || 'Failed to upload logo', 'error');
+            return;
+        }
+
+        if (pendingChanges[currentChannelId]) {
+            delete pendingChanges[currentChannelId].tvg_logo;
+            if (Object.keys(pendingChanges[currentChannelId]).length === 1) {
+                delete pendingChanges[currentChannelId];
+            }
+            updateApplyAllButton();
+        }
+
         closeModal();
         loadChannels(currentPage);
+        showToast('Logo updated', 'success');
     }
 
     async function updateChannelGroup(channelId, groupId) {
