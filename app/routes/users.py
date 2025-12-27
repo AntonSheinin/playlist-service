@@ -205,7 +205,7 @@ async def get_resolved_channels(
             stream_name=ch.stream_name,
             display_name=ch.display_name,
             tvg_name=ch.tvg_name,
-            group_name=ch.group.name if ch.group else None,
+            group_names=[g.name for g in sorted(ch.groups, key=lambda grp: (grp.sort_order, grp.name))],
         )
         for ch in channels
     ]

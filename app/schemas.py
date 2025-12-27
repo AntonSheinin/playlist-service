@@ -190,20 +190,23 @@ class LogoUploadResponse(BaseModel):
     url: str
 
 
+class LogoUrlRequest(BaseModel):
+    url: str
+
+
 class ChannelBulkUpdateItem(BaseModel):
     id: int
     tvg_id: str | None = None
     tvg_logo: str | None = None
     channel_number: int | None = None
-    catchup_days: int | None = None
 
 
 class ChannelBulkUpdate(BaseModel):
     channels: list[ChannelBulkUpdateItem]
 
 
-class ChannelGroupUpdate(BaseModel):
-    group_id: int | None = None
+class ChannelGroupsUpdate(BaseModel):
+    group_ids: list[int] = []
 
 
 class ChannelPackagesUpdate(BaseModel):
@@ -255,8 +258,7 @@ class ChannelResponse(BaseModel):
     channel_number: int | None = None
     sort_order: int = 0
     sync_status: SyncStatus = SyncStatus.SYNCED
-    group_id: int | None = None
-    group: GroupLookup | None = None
+    groups: list[GroupLookup] = []
     packages: list[PackageLookup] = []
     last_seen_at: datetime | None = None
     created_at: datetime
@@ -329,7 +331,7 @@ class ResolvedChannel(BaseModel):
     stream_name: str
     display_name: str | None = None
     tvg_name: str | None = None
-    group_name: str | None = None
+    group_names: list[str] = []
 
 
 class PlaylistPreview(BaseModel):

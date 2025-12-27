@@ -60,6 +60,13 @@ user_channels = Table(
     Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True),
 )
 
+group_channels = Table(
+    "group_channels",
+    Base.metadata,
+    Column("group_id", Integer, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
+    Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Admin(Base):
     __tablename__ = "admins"
@@ -76,7 +83,12 @@ class Group(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(default=0, index=True)
 
-    channels: Mapped[list["Channel"]] = relationship("Channel", back_populates="group", lazy="selectin")
+    channels: Mapped[list["Channel"]] = relationship(
+        "Channel",
+        secondary=group_channels,
+        back_populates="groups",
+        lazy="selectin",
+    )
 
 
 class Channel(Base, TimestampMixin):
@@ -90,12 +102,16 @@ class Channel(Base, TimestampMixin):
     tvg_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     tvg_logo: Mapped[str | None] = mapped_column(Text, nullable=True)
     channel_number: Mapped[int | None] = mapped_column(nullable=True)
-    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
     sort_order: Mapped[int] = mapped_column(default=0, index=True)
     sync_status: Mapped[SyncStatus] = mapped_column(Enum(SyncStatus, native_enum=False), default=SyncStatus.SYNCED, index=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    group: Mapped["Group | None"] = relationship("Group", back_populates="channels")
+    groups: Mapped[list["Group"]] = relationship(
+        "Group",
+        secondary=group_channels,
+        back_populates="channels",
+        lazy="selectin",
+    )
     packages: Mapped[list["Package"]] = relationship("Package", secondary=package_channels, back_populates="channels", lazy="selectin")
 
 

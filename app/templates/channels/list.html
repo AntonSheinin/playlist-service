@@ -72,7 +72,7 @@
                         </button>
                         <span class="resize-handle"></span>
                     </th>
-                    <th data-col-key="group" class="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group<span class="resize-handle"></span></th>
+                    <th data-col-key="group" class="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Groups<span class="resize-handle"></span></th>
                     <th data-col-key="archive" class="w-16 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         <button type="button" onclick="setSort('catchup_days')" class="flex items-center gap-1 text-left w-full hover:text-gray-700">
                             <span>Archive</span>
@@ -107,13 +107,15 @@
 <script>
     let currentPage = 1;
     let currentPerPage = 20;
-    let currentSortBy = 'sort_order';
+    let currentSortBy = 'channel_number';
     let currentSortDir = 'asc';
     let currentChannelId = null;
+    let editGroupSelect = null;
     let groups = [];
     let packages = [];
     let searchTimeout = null;
     let pendingChanges = {};  // { channelId: { tvg_id, tvg_logo, channel_number } }
+    let logoRemovalMode = null;
     const COLUMN_WIDTHS_KEY = 'channelsTableWidths';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -182,10 +184,14 @@
             const currentTvgId = pending.tvg_id !== undefined ? pending.tvg_id : (channel.tvg_id || '');
             const currentLogo = pending.tvg_logo !== undefined ? pending.tvg_logo : (channel.tvg_logo || '');
             const currentNumber = pending.channel_number !== undefined ? pending.channel_number : (channel.channel_number || '');
-            const currentCatchup = pending.catchup_days !== undefined ? pending.catchup_days : (channel.catchup_days || '');
+            const catchupDisplay = channel.catchup_days === null || channel.catchup_days === undefined
+                ? '-'
+                : String(channel.catchup_days);
+            const catchupClass = catchupDisplay === '-' ? 'text-gray-400' : 'text-gray-700';
             const hasChanges = pendingChanges[channel.id] !== undefined;
 
             const assignedPackageIds = channel.packages.map(p => p.id);
+            const assignedGroupIds = Array.isArray(channel.groups) ? channel.groups.map(g => g.id) : [];
             const row = document.createElement('tr');
             row.className = channel.sync_status === 'orphaned' ? 'bg-gray-50 text-gray-500' : '';
             if (hasChanges) row.classList.add('bg-yellow-50');
@@ -219,21 +225,17 @@
                            class="w-24 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </td>
                 <td class="px-2 py-2">
-                    <select onchange="updateChannelGroup(${channel.id}, this.value)"
-                            class="w-full px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">No Group</option>
-                        ${groups.map(g => `<option value="${g.id}" ${channel.group_id === g.id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
-                    </select>
+                    ${groups.length > 0
+                        ? `<select id="channel-groups-${channel.id}"
+                                   data-channel-id="${channel.id}"
+                                   class="channel-groups-select w-full"
+                                   multiple>
+                               ${groups.map(g => `<option value="${g.id}" ${assignedGroupIds.includes(g.id) ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
+                           </select>`
+                        : '<div class="text-xs text-gray-400">No groups</div>'}
                 </td>
                 <td class="px-2 py-2">
-                    <input type="number" min="0" max="365"
-                           value="${currentCatchup}"
-                           data-channel-id="${channel.id}"
-                           data-field="catchup_days"
-                           data-original="${channel.catchup_days || ''}"
-                           onchange="trackChange(${channel.id}, 'catchup_days', this.value)"
-                           placeholder="-"
-                           class="w-12 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <span class="text-sm ${catchupClass}">${escapeHtml(catchupDisplay)}</span>
                 </td>
                 <td class="px-2 py-2">
                     ${packages.length > 0
@@ -261,6 +263,7 @@
             tbody.appendChild(row);
         });
 
+        initChannelGroupSelects();
         initChannelPackageSelects();
         renderPagination(data);
     }
@@ -276,6 +279,34 @@
             .split(',')
             .map(value => value.trim())
             .filter(Boolean);
+    }
+
+    function initChannelGroupSelects() {
+        const selects = document.querySelectorAll('.channel-groups-select');
+        if (!selects.length || typeof TomSelect === 'undefined') return;
+
+        selects.forEach(select => {
+            if (select.tomselect) {
+                select.tomselect.destroy();
+            }
+
+            const channelId = parseInt(select.dataset.channelId, 10);
+            let ready = false;
+
+            const instance = new TomSelect(select, {
+                plugins: ['remove_button'],
+                maxOptions: 1000,
+                dropdownParent: 'body',
+                onChange: (value) => {
+                    if (!ready) return;
+                    const ids = normalizeMultiValues(value).map(v => parseInt(v, 10)).filter(Boolean);
+                    updateChannelGroupsInline(channelId, ids);
+                }
+            });
+
+            ready = true;
+            select.tomselect = instance;
+        });
     }
 
     function initChannelPackageSelects() {
@@ -304,6 +335,31 @@
             ready = true;
             select.tomselect = instance;
         });
+    }
+
+    async function persistChannelGroups(channelId, groupIds) {
+        const response = await fetch(`/api/v1/channels/${channelId}/groups`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_ids: groupIds })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to update groups');
+        }
+
+        return data.data;
+    }
+
+    async function updateChannelGroupsInline(channelId, groupIds) {
+        try {
+            await persistChannelGroups(channelId, groupIds);
+            showToast('Groups updated', 'success');
+        } catch (error) {
+            showToast(error.message || 'Failed to update groups', 'error');
+            loadChannels(currentPage);
+        }
     }
 
     async function persistChannelPackages(channelId, packageIds) {
@@ -369,10 +425,12 @@
         html += '<div class="flex space-x-2">';
 
         if (data.page > 1) {
+            html += `<button onclick="loadChannels(1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">First</button>`;
             html += `<button onclick="loadChannels(${data.page - 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Previous</button>`;
         }
         if (data.page < data.pages) {
             html += `<button onclick="loadChannels(${data.page + 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next</button>`;
+            html += `<button onclick="loadChannels(${data.pages})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Last</button>`;
         }
 
         html += '</div></div></div>';
@@ -392,7 +450,7 @@
             pendingChanges[channelId] = { id: channelId };
         }
 
-        if (field === 'channel_number' || field === 'catchup_days') {
+        if (field === 'channel_number') {
             pendingChanges[channelId][field] = value ? parseInt(value) : null;
         } else {
             pendingChanges[channelId][field] = value;
@@ -433,11 +491,27 @@
         return data.data.url || '';
     }
 
+    async function uploadChannelLogoByUrl(channelId, logoUrl) {
+        const response = await fetch(`/api/v1/channels/${channelId}/logo-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: logoUrl })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to upload logo');
+        }
+
+        return data.data.url || '';
+    }
+
     async function setChannelLogo(channelId, logoUrl) {
+        const payload = { tvg_logo: logoUrl == null ? '' : logoUrl };
         const response = await fetch(`/api/v1/channels/${channelId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tvg_logo: logoUrl })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
@@ -446,6 +520,19 @@
         }
 
         return data.data.tvg_logo || '';
+    }
+
+    async function removeChannelLogo(channelId, deleteFile) {
+        const response = await fetch(`/api/v1/channels/${channelId}/logo?delete_file=${deleteFile ? 'true' : 'false'}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to remove logo');
+        }
+
+        return data.message || 'Logo removed';
     }
 
     async function applyAllChanges() {
@@ -522,6 +609,10 @@
         const response = await fetch(`/api/v1/channels/${channelId}`);
         const data = await response.json();
         const channel = data.data;
+        const catchupDisplay = channel.catchup_days === null || channel.catchup_days === undefined
+            ? '-'
+            : String(channel.catchup_days);
+        const assignedGroupIds = Array.isArray(channel.groups) ? channel.groups.map(g => g.id) : [];
         currentChannelId = channelId;
 
         const content = `
@@ -544,8 +635,10 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Archive Days</label>
-                        <input type="number" id="edit-catchup-days" value="${channel.catchup_days || ''}" min="0" max="365"
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <div class="mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-sm">
+                            ${escapeHtml(catchupDisplay)}
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">Imported from Flussonic.</p>
                     </div>
                 </div>
                 <div>
@@ -569,10 +662,9 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Group</label>
-                    <select id="edit-group" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">No Group</option>
-                        ${groups.map(g => `<option value="${g.id}" ${channel.group_id === g.id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
+                    <label class="block text-sm font-medium text-gray-700">Groups</label>
+                    <select id="edit-group" multiple class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        ${groups.map(g => `<option value="${g.id}" ${assignedGroupIds.includes(g.id) ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -584,6 +676,14 @@
         ]);
 
         document.getElementById('edit-logo-file').addEventListener('change', handleEditLogoUpload);
+        if (editGroupSelect) {
+            editGroupSelect.destroy();
+        }
+        if (groups.length > 0 && typeof TomSelect !== 'undefined') {
+            editGroupSelect = new TomSelect('#edit-group', { plugins: ['remove_button'], dropdownParent: 'body' });
+        } else {
+            editGroupSelect = null;
+        }
     }
 
     function handleEditLogoUpload(e) {
@@ -613,12 +713,16 @@
 
     async function saveEditChannel() {
         const channelNumber = document.getElementById('edit-channel-number').value;
-        const catchupDays = document.getElementById('edit-catchup-days').value;
         const tvgId = document.getElementById('edit-tvg-id').value;
         const preview = document.getElementById('edit-logo-preview');
         const fileInput = document.getElementById('edit-logo-file');
         let tvgLogo = preview.classList.contains('hidden') ? '' : preview.src;
-        const groupId = document.getElementById('edit-group').value;
+        const groupSelect = document.getElementById('edit-group');
+        const groupIds = editGroupSelect
+            ? normalizeMultiValues(editGroupSelect.getValue()).map(v => parseInt(v, 10)).filter(Boolean)
+            : groupSelect
+                ? Array.from(groupSelect.selectedOptions).map(option => parseInt(option.value, 10)).filter(Boolean)
+                : [];
 
         try {
             if (fileInput.files && fileInput.files[0]) {
@@ -641,8 +745,7 @@
                         id: currentChannelId,
                         tvg_id: tvgId,
                         tvg_logo: tvgLogo,
-                        channel_number: channelNumber ? parseInt(channelNumber) : null,
-                        catchup_days: catchupDays ? parseInt(catchupDays) : null
+                        channel_number: channelNumber ? parseInt(channelNumber) : null
                     }]
                 })
             });
@@ -654,10 +757,10 @@
             }
 
             // Update group if changed
-            const groupResponse = await fetch(`/api/v1/channels/${currentChannelId}/group`, {
+            const groupResponse = await fetch(`/api/v1/channels/${currentChannelId}/groups`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_id: groupId ? parseInt(groupId) : null })
+                body: JSON.stringify({ group_ids: groupIds })
             });
 
             if (groupResponse.ok) {
@@ -666,7 +769,7 @@
                 showToast('Channel updated', 'success');
             } else {
                 const data = await groupResponse.json();
-                showToast(data.error?.message || 'Failed to update group', 'error');
+                showToast(data.error?.message || 'Failed to update groups', 'error');
             }
         } catch (error) {
             showToast(error.message || 'Failed to update channel', 'error');
@@ -752,6 +855,7 @@
 
     function editLogo(channelId, currentLogo) {
         currentChannelId = channelId;
+        logoRemovalMode = null;
 
         const content = `
             <div class="space-y-4">
@@ -767,10 +871,20 @@
                             class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
                         Choose File
                     </button>
-                    <button type="button" onclick="clearLogoPreview()"
+                    <button type="button" onclick="markLogoRemoval('db')"
                             class="px-4 py-2 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50">
-                        Remove
+                        Remove URL
                     </button>
+                    <button type="button" onclick="markLogoRemoval('delete')"
+                            class="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700">
+                        Remove + Delete File
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500">Or paste logo URL</label>
+                    <input type="text" id="logo-url-input" value="${escapeHtml(currentLogo || '')}"
+                           placeholder="https://example.com/logo.png"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
         `;
@@ -781,11 +895,18 @@
         ]);
 
         document.getElementById('logo-file-input').addEventListener('change', handleLogoPreview);
+        document.getElementById('logo-url-input').addEventListener('input', handleLogoUrlInput);
     }
 
     function handleLogoPreview(e) {
         const file = e.target.files[0];
         if (!file) return;
+        logoRemovalMode = null;
+
+        const urlInput = document.getElementById('logo-url-input');
+        if (urlInput) {
+            urlInput.value = '';
+        }
 
         const preview = document.getElementById('logo-preview');
         const placeholder = document.getElementById('logo-placeholder');
@@ -799,6 +920,32 @@
         placeholder.classList.add('hidden');
     }
 
+    function handleLogoUrlInput(e) {
+        const url = e.target.value.trim();
+        const preview = document.getElementById('logo-preview');
+        const placeholder = document.getElementById('logo-placeholder');
+        const fileInput = document.getElementById('logo-file-input');
+        logoRemovalMode = null;
+
+        if (preview.dataset.objectUrl) {
+            URL.revokeObjectURL(preview.dataset.objectUrl);
+            preview.dataset.objectUrl = '';
+        }
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
+        if (url) {
+            preview.src = url;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        } else {
+            preview.src = '';
+            preview.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+        }
+    }
+
     function clearLogoPreview() {
         const preview = document.getElementById('logo-preview');
         const placeholder = document.getElementById('logo-placeholder');
@@ -810,16 +957,31 @@
         preview.classList.add('hidden');
         placeholder.classList.remove('hidden');
         document.getElementById('logo-file-input').value = '';
+        const urlInput = document.getElementById('logo-url-input');
+        if (urlInput) {
+            urlInput.value = '';
+        }
+    }
+
+    function markLogoRemoval(mode) {
+        logoRemovalMode = mode;
+        clearLogoPreview();
     }
 
     async function applyLogoChange() {
         const preview = document.getElementById('logo-preview');
         const fileInput = document.getElementById('logo-file-input');
         const placeholder = document.getElementById('logo-placeholder');
+        const urlInput = document.getElementById('logo-url-input');
+        const urlValue = urlInput ? urlInput.value.trim() : '';
         let logoValue = preview.classList.contains('hidden') ? '' : preview.src;
+        let message = 'Logo updated';
 
         try {
-            if (fileInput.files && fileInput.files[0]) {
+            if (logoRemovalMode) {
+                message = await removeChannelLogo(currentChannelId, logoRemovalMode === 'delete');
+                logoValue = '';
+            } else if (fileInput.files && fileInput.files[0]) {
                 logoValue = await uploadChannelLogo(currentChannelId, fileInput.files[0]);
                 if (preview.dataset.objectUrl) {
                     URL.revokeObjectURL(preview.dataset.objectUrl);
@@ -829,8 +991,16 @@
                 preview.classList.remove('hidden');
                 placeholder.classList.add('hidden');
                 fileInput.value = '';
+                if (urlInput) {
+                    urlInput.value = '';
+                }
+            } else if (urlValue) {
+                logoValue = await uploadChannelLogoByUrl(currentChannelId, urlValue);
+                preview.src = logoValue;
+                preview.classList.remove('hidden');
+                placeholder.classList.add('hidden');
             } else if (preview.classList.contains('hidden')) {
-                await setChannelLogo(currentChannelId, null);
+                await setChannelLogo(currentChannelId, '');
                 logoValue = '';
             } else {
                 closeModal();
@@ -849,28 +1019,10 @@
             updateApplyAllButton();
         }
 
+        logoRemovalMode = null;
         closeModal();
         loadChannels(currentPage);
-        showToast('Logo updated', 'success');
-    }
-
-    async function updateChannelGroup(channelId, groupId) {
-        try {
-            const response = await fetch(`/api/v1/channels/${channelId}/group`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_id: groupId ? parseInt(groupId) : null })
-            });
-
-            if (response.ok) {
-                showToast('Group updated', 'success');
-            } else {
-                const data = await response.json();
-                showToast(data.error?.message || 'Failed to update group', 'error');
-            }
-        } catch (error) {
-            showToast('Failed to update group', 'error');
-        }
+        showToast(message, 'success');
     }
 
     async function editChannelPackages(channelId) {

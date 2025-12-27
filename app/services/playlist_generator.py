@@ -35,9 +35,15 @@ class PlaylistGenerator:
             if channel.catchup_days:
                 attrs.append(f'catchup-days="{channel.catchup_days}"')
 
-            # group-title
-            if channel.group:
-                attrs.append(f'group-title="{self._escape(channel.group.name)}"')
+            # group-title (comma-delimited groups by sort_order/name)
+            if channel.groups:
+                ordered_groups = sorted(
+                    (grp for grp in channel.groups if grp.name),
+                    key=lambda grp: (grp.sort_order, grp.name.lower()),
+                )
+                if ordered_groups:
+                    group_title = ",".join(self._escape(grp.name) for grp in ordered_groups)
+                    attrs.append(f'group-title="{group_title}"')
 
             # tvg-logo (base64 or URL)
             if channel.tvg_logo:

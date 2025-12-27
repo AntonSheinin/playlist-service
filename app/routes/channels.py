@@ -1,20 +1,25 @@
 import imghdr
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, File, Query, UploadFile
+from sqlalchemy import func, select
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.exceptions import ValidationError
-from app.models import SyncStatus
+from app.models import Channel, SyncStatus
 from app.schemas import (
     ChannelBulkUpdate,
     ChannelCascadeInfo,
-    ChannelGroupUpdate,
+    ChannelGroupsUpdate,
     ChannelPackagesUpdate,
     ChannelReorderRequest,
     ChannelResponse,
     ChannelUpdate,
+    LogoUrlRequest,
     LogoUploadResponse,
     MessageResponse,
     PaginatedData,
@@ -32,15 +37,64 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 LOGO_DIR = BASE_DIR / "media" / "logos"
 MAX_LOGO_BYTES = 2 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"png", "jpeg", "gif", "webp"}
+LOGO_URL_PREFIX = "/media/logos/"
 
 
-async def save_logo_file(upload: UploadFile) -> str:
-    if upload.content_type and not upload.content_type.startswith("image/"):
-        raise ValidationError("Only image uploads are allowed")
+def sanitize_logo_basename(value: str) -> str:
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    return base.strip("._-").lower()
 
-    content = await upload.read(MAX_LOGO_BYTES + 1)
-    await upload.close()
 
+def build_logo_filename(
+    stream_name: str | None,
+    channel_id: int | None,
+    extension: str,
+) -> str:
+    base = sanitize_logo_basename(stream_name or "")
+    if not base:
+        return f"{uuid4().hex}.{extension}"
+
+    candidate = f"{base}.{extension}"
+    if not (LOGO_DIR / candidate).exists():
+        return candidate
+
+    if channel_id is not None:
+        candidate = f"{base}-{channel_id}.{extension}"
+        if not (LOGO_DIR / candidate).exists():
+            return candidate
+
+    counter = 2
+    while True:
+        candidate = f"{base}-{counter}.{extension}"
+        if not (LOGO_DIR / candidate).exists():
+            return candidate
+        counter += 1
+
+
+def resolve_logo_path(logo_url: str | None) -> Path | None:
+    if not logo_url:
+        return None
+    path = urlparse(logo_url).path or ""
+    if not path.startswith(LOGO_URL_PREFIX):
+        return None
+    filename = Path(path).name
+    if not filename:
+        return None
+    return LOGO_DIR / filename
+
+
+def is_safe_logo_path(path: Path) -> bool:
+    try:
+        return path.resolve().is_relative_to(LOGO_DIR.resolve())
+    except OSError:
+        return False
+
+
+async def save_logo_bytes(
+    content: bytes,
+    stream_name: str | None = None,
+    channel_id: int | None = None,
+) -> str:
     if not content:
         raise ValidationError("Uploaded file is empty")
     if len(content) > MAX_LOGO_BYTES:
@@ -52,11 +106,52 @@ async def save_logo_file(upload: UploadFile) -> str:
 
     extension = "jpg" if image_type == "jpeg" else image_type
     LOGO_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid4().hex}.{extension}"
+    filename = build_logo_filename(stream_name, channel_id, extension)
     logo_path = LOGO_DIR / filename
     logo_path.write_bytes(content)
 
-    return f"/media/logos/{filename}"
+    return f"{LOGO_URL_PREFIX}{filename}"
+
+
+async def save_logo_file(
+    upload: UploadFile,
+    stream_name: str | None = None,
+    channel_id: int | None = None,
+) -> str:
+    if upload.content_type and not upload.content_type.startswith("image/"):
+        raise ValidationError("Only image uploads are allowed")
+
+    content = await upload.read(MAX_LOGO_BYTES + 1)
+    await upload.close()
+
+    return await save_logo_bytes(content, stream_name=stream_name, channel_id=channel_id)
+
+
+async def save_logo_url(
+    url: str,
+    stream_name: str | None = None,
+    channel_id: int | None = None,
+) -> str:
+    if not url:
+        raise ValidationError("Logo URL is required")
+
+    timeout = httpx.Timeout(10.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        async with client.stream("GET", url) as response:
+            if response.status_code >= 400:
+                raise ValidationError("Failed to download logo")
+
+            content_type = response.headers.get("Content-Type", "")
+            if content_type and not content_type.startswith("image/"):
+                raise ValidationError("Logo URL must point to an image")
+
+            data = bytearray()
+            async for chunk in response.aiter_bytes():
+                data.extend(chunk)
+                if len(data) > MAX_LOGO_BYTES:
+                    raise ValidationError("Logo exceeds 2MB limit")
+
+    return await save_logo_bytes(bytes(data), stream_name=stream_name, channel_id=channel_id)
 
 
 @router.get("", response_model=PaginatedResponse[ChannelResponse])
@@ -68,7 +163,7 @@ async def list_channels(
     search: str | None = None,
     group_id: int | None = None,
     sync_status: SyncStatus | None = None,
-    sort_by: str = "sort_order",
+    sort_by: str = "channel_number",
     sort_dir: str = "asc",
 ) -> PaginatedResponse[ChannelResponse]:
     """List channels with pagination and filters."""
@@ -134,9 +229,63 @@ async def upload_channel_logo(
 ) -> SuccessResponse[LogoUploadResponse]:
     """Upload channel logo and return its URL."""
     service = ChannelService(db)
-    logo_url = await save_logo_file(file)
+    channel = await service.get_by_id(channel_id)
+    logo_url = await save_logo_file(file, stream_name=channel.stream_name, channel_id=channel_id)
     channel = await service.update(channel_id, tvg_logo=logo_url)
     return SuccessResponse(data=LogoUploadResponse(url=channel.tvg_logo or logo_url))
+
+
+@router.post("/{channel_id}/logo-url", response_model=SuccessResponse[LogoUploadResponse])
+async def upload_channel_logo_url(
+    channel_id: int,
+    data: LogoUrlRequest,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+) -> SuccessResponse[LogoUploadResponse]:
+    """Download channel logo from URL and return its local URL."""
+    service = ChannelService(db)
+    channel = await service.get_by_id(channel_id)
+    logo_url = await save_logo_url(data.url, stream_name=channel.stream_name, channel_id=channel_id)
+    channel = await service.update(channel_id, tvg_logo=logo_url)
+    return SuccessResponse(data=LogoUploadResponse(url=channel.tvg_logo or logo_url))
+
+
+@router.delete("/{channel_id}/logo", response_model=MessageResponse)
+async def delete_channel_logo(
+    channel_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+    delete_file: bool = Query(False, description="Delete the logo file from disk if unused"),
+) -> MessageResponse:
+    """Remove a channel logo, optionally deleting the local file."""
+    service = ChannelService(db)
+    channel = await service.get_by_id(channel_id)
+    logo_url = channel.tvg_logo
+
+    if channel.tvg_logo:
+        await service.update(channel_id, tvg_logo="")
+
+    file_deleted = False
+    if delete_file and logo_url:
+        logo_path = resolve_logo_path(logo_url)
+        if logo_path and is_safe_logo_path(logo_path) and logo_path.exists():
+            result = await db.execute(
+                select(func.count(Channel.id)).where(
+                    Channel.id != channel_id,
+                    Channel.tvg_logo == logo_url,
+                )
+            )
+            references = result.scalar() or 0
+            if references == 0:
+                logo_path.unlink()
+                file_deleted = True
+
+    if delete_file:
+        message = "Logo removed and file deleted" if file_deleted else "Logo removed (file retained)"
+    else:
+        message = "Logo removed"
+
+    return MessageResponse(message=message)
 
 
 @router.patch("", response_model=MessageResponse)
@@ -165,16 +314,16 @@ async def delete_channel(
     return MessageResponse(message="Channel deleted successfully")
 
 
-@router.patch("/{channel_id}/group", response_model=SuccessResponse[ChannelResponse])
-async def update_channel_group(
+@router.patch("/{channel_id}/groups", response_model=SuccessResponse[ChannelResponse])
+async def update_channel_groups(
     channel_id: int,
-    data: ChannelGroupUpdate,
+    data: ChannelGroupsUpdate,
     _admin_id: CurrentAdminId,
     db: DBSession,
 ) -> SuccessResponse[ChannelResponse]:
-    """Update channel's group assignment."""
+    """Update channel's group assignments."""
     service = ChannelService(db)
-    channel = await service.update_group(channel_id, data.group_id)
+    channel = await service.update_groups(channel_id, data.group_ids)
     return SuccessResponse(data=ChannelResponse.model_validate(channel))
 
 

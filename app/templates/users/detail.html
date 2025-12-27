@@ -12,9 +12,18 @@
             </h1>
         </div>
         {% if user_id %}
-        <button onclick="downloadPlaylist()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-            Download Playlist
-        </button>
+        <div class="flex items-center space-x-2">
+            <span class="text-sm text-gray-600">Playlist URL:</span>
+            <input type="text" id="playlist-url" readonly
+                   class="w-72 px-2 py-1 text-xs border border-gray-200 rounded bg-gray-50 text-gray-600"
+                   aria-label="Playlist URL">
+            <button onclick="previewPlaylist()" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-md hover:bg-blue-50">
+                Preview Playlist
+            </button>
+            <button onclick="downloadPlaylist()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                Download Playlist
+            </button>
+        </div>
         {% endif %}
     </div>
 
@@ -106,9 +115,6 @@
                 <div>
                     <span class="text-sm text-gray-600">Resolved Channels: <strong id="resolved-count">0</strong> total</span>
                 </div>
-                <button type="button" onclick="previewPlaylist()" class="text-blue-600 hover:text-blue-800 text-sm">
-                    Preview Playlist
-                </button>
             </div>
             {% endif %}
         </div>
@@ -181,6 +187,14 @@
             await loadUser();
         }
 
+        const urlInputs = ['first-name', 'last-name', 'agreement-number'];
+        urlInputs.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', updatePlaylistUrlFromForm);
+            }
+        });
+
         // Form submit
         document.getElementById('user-form').addEventListener('submit', saveUser);
     });
@@ -241,6 +255,7 @@
 
             // Load resolved count
             loadResolvedCount();
+            updatePlaylistUrlFromValues(user.first_name, user.last_name, user.agreement_number);
         } catch (error) {
             console.error('Failed to load user:', error);
             showToast('Failed to load user', 'error');
@@ -307,6 +322,7 @@
                     window.location.href = `/users/${data.data.id}`;
                 } else {
                     loadResolvedCount();
+                    updatePlaylistUrlFromForm();
                 }
             } else {
                 const data = await response.json();
@@ -384,8 +400,41 @@
         }
     }
 
+    function sanitizePlaylistPart(value) {
+        if (!value) return '';
+        const withUnderscores = value.replace(/ /g, '_');
+        return Array.from(withUnderscores)
+            .filter(char => /[\p{L}\p{N}_-]/u.test(char))
+            .join('');
+    }
+
+    function buildPlaylistFilename(firstName, lastName, agreementNumber) {
+        const safeFirst = sanitizePlaylistPart(firstName);
+        const safeLast = sanitizePlaylistPart(lastName);
+        const safeAgreement = sanitizePlaylistPart(agreementNumber);
+        if (!safeFirst || !safeLast || !safeAgreement) return '';
+        return `${safeLast}_${safeFirst}_${safeAgreement}.m3u8`;
+    }
+
+    function updatePlaylistUrlFromValues(firstName, lastName, agreementNumber) {
+        const input = document.getElementById('playlist-url');
+        if (!input) return;
+        const filename = buildPlaylistFilename(firstName, lastName, agreementNumber);
+        input.value = filename ? `${window.location.origin}/${filename}` : '';
+    }
+
+    function updatePlaylistUrlFromForm() {
+        updatePlaylistUrlFromValues(
+            document.getElementById('first-name').value.trim(),
+            document.getElementById('last-name').value.trim(),
+            document.getElementById('agreement-number').value.trim(),
+        );
+    }
+
     function downloadPlaylist() {
-        window.open(`/api/v1/users/${userId}/playlist`, '_blank');
+        const input = document.getElementById('playlist-url');
+        const url = input && input.value ? input.value : `/api/v1/users/${userId}/playlist`;
+        window.open(url, '_blank');
     }
 </script>
 {% endblock %}

@@ -5,15 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import NotFoundError
-from app.models import (
-    Channel,
-    Group,
-    Package,
-    Tariff,
-    User,
-    UserStatus,
-    package_channels,
-)
+from app.models import Channel, Package, Tariff, User, UserStatus, package_channels
+from app.services.playlist_generator import PlaylistGenerator
 from app.services.base import BaseService
 from app.utils.pagination import PaginatedResult, PaginationParams
 from app.utils.token import generate_token
@@ -44,6 +37,30 @@ class UserService(BaseService[User]):
             raise NotFoundError(self.not_found_message)
 
         return user
+
+    async def get_by_playlist_name(self, playlist_name: str) -> User | None:
+        """Resolve a user by playlist filename without the .m3u8 extension."""
+        generator = PlaylistGenerator()
+        target_filename = f"{playlist_name}.m3u8"
+        target_key = target_filename.casefold()
+
+        if "_" in playlist_name:
+            agreement_candidate = playlist_name.rsplit("_", 1)[-1]
+            if agreement_candidate:
+                stmt = select(User).where(User.agreement_number == agreement_candidate)
+                result = await self.db.execute(stmt)
+                user = result.scalar_one_or_none()
+                if user and generator.get_filename(user).casefold() == target_key:
+                    return user
+
+        stmt = select(User)
+        result = await self.db.execute(stmt)
+        users = result.scalars().all()
+        for user in users:
+            if generator.get_filename(user).casefold() == target_key:
+                return user
+
+        return None
 
     async def get_paginated(
         self,
@@ -290,15 +307,15 @@ class UserService(BaseService[User]):
         if not channel_ids:
             return []
 
-        # Fetch all channels with proper ordering
+        # Fetch all channels ordered by channel number (fallback to sort_order for ties/nulls).
         stmt = (
             select(Channel)
             .where(Channel.id.in_(channel_ids))
-            .outerjoin(Group)
-            .options(selectinload(Channel.group))
+            .options(selectinload(Channel.groups))
             .order_by(
-                Group.sort_order.asc().nulls_last(),
+                Channel.channel_number.asc().nulls_last(),
                 Channel.sort_order.asc(),
+                Channel.id.asc(),
             )
         )
         result = await self.db.execute(stmt)

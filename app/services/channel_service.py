@@ -3,7 +3,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import ChannelNotOrphanedError, NotFoundError
-from app.models import Channel, Group, Package, SyncStatus, package_channels, user_channels
+from app.models import (
+    Channel,
+    Group,
+    Package,
+    SyncStatus,
+    group_channels,
+    package_channels,
+    user_channels,
+)
 from app.utils.pagination import PaginatedResult, PaginationParams
 
 
@@ -11,18 +19,29 @@ class ChannelService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    def _group_sort_subquery(self):
+        return (
+            select(
+                group_channels.c.channel_id.label("channel_id"),
+                func.min(Group.sort_order).label("group_sort"),
+            )
+            .select_from(group_channels.join(Group, group_channels.c.group_id == Group.id))
+            .group_by(group_channels.c.channel_id)
+            .subquery()
+        )
+
     async def get_paginated(
         self,
         pagination: PaginationParams,
         search: str | None = None,
         group_id: int | None = None,
         sync_status: SyncStatus | None = None,
-        sort_by: str = "sort_order",
+        sort_by: str = "channel_number",
         sort_dir: str = "asc",
     ) -> PaginatedResult[Channel]:
         """Get paginated channels with filters."""
         stmt = select(Channel).options(
-            selectinload(Channel.group),
+            selectinload(Channel.groups),
             selectinload(Channel.packages),
         )
 
@@ -39,7 +58,7 @@ class ChannelService:
             )
 
         if group_id is not None:
-            stmt = stmt.where(Channel.group_id == group_id)
+            stmt = stmt.where(Channel.groups.any(Group.id == group_id))
 
         if sync_status is not None:
             stmt = stmt.where(Channel.sync_status == sync_status)
@@ -51,13 +70,20 @@ class ChannelService:
 
         # Apply sorting
         sort_column = getattr(Channel, sort_by, Channel.sort_order)
-        if sort_dir == "desc":
+        if sort_by == "channel_number":
+            sort_column = (
+                sort_column.desc().nulls_last()
+                if sort_dir == "desc"
+                else sort_column.asc().nulls_last()
+            )
+        elif sort_dir == "desc":
             sort_column = sort_column.desc()
 
-        # For proper playlist ordering: group.sort_order (nulls last), then channel.sort_order
+        # For grouped sorting: group.sort_order (nulls last), then channel.sort_order.
         if sort_by == "sort_order":
-            stmt = stmt.outerjoin(Group).order_by(
-                Group.sort_order.asc().nulls_last(),
+            group_sort = self._group_sort_subquery()
+            stmt = stmt.outerjoin(group_sort, group_sort.c.channel_id == Channel.id).order_by(
+                group_sort.c.group_sort.asc().nulls_last(),
                 Channel.sort_order.asc(),
             )
         else:
@@ -82,7 +108,7 @@ class ChannelService:
             select(Channel)
             .where(Channel.id == channel_id)
             .options(
-                selectinload(Channel.group),
+                selectinload(Channel.groups),
                 selectinload(Channel.packages),
             )
         )
@@ -145,19 +171,24 @@ class ChannelService:
             if "channel_number" in item:
                 val = item["channel_number"]
                 channel.channel_number = val if val and val > 0 else None
-            if "catchup_days" in item:
-                val = item["catchup_days"]
-                channel.catchup_days = val if val and val > 0 else None
 
             updated_count += 1
 
         await self.db.flush()
         return updated_count
 
-    async def update_group(self, channel_id: int, group_id: int | None) -> Channel:
-        """Update channel's group assignment."""
+    async def update_groups(self, channel_id: int, group_ids: list[int]) -> Channel:
+        """Update channel's group assignments."""
         channel = await self.get_by_id(channel_id)
-        channel.group_id = group_id
+
+        if group_ids:
+            stmt = select(Group).where(Group.id.in_(group_ids))
+            result = await self.db.execute(stmt)
+            groups = list(result.scalars().all())
+        else:
+            groups = []
+
+        channel.groups = groups
         await self.db.flush()
         return await self.get_by_id(channel_id)
 
@@ -221,12 +252,13 @@ class ChannelService:
 
     async def get_all(self) -> list[Channel]:
         """Get all channels ordered by group and sort_order."""
+        group_sort = self._group_sort_subquery()
         stmt = (
             select(Channel)
-            .outerjoin(Group)
-            .options(selectinload(Channel.group))
+            .outerjoin(group_sort, group_sort.c.channel_id == Channel.id)
+            .options(selectinload(Channel.groups))
             .order_by(
-                Group.sort_order.asc().nulls_last(),
+                group_sort.c.group_sort.asc().nulls_last(),
                 Channel.sort_order.asc(),
             )
         )

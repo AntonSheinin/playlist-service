@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Channel, Group
+from app.models import Group, group_channels
 from app.services.base import BaseService
 
 
@@ -21,8 +21,8 @@ class GroupService(BaseService[Group]):
     async def get_all_with_counts(self) -> list[tuple[Group, int]]:
         """Get all groups with channel counts in a single query."""
         stmt = (
-            select(Group, func.count(Channel.id).label("channel_count"))
-            .outerjoin(Channel, Channel.group_id == Group.id)
+            select(Group, func.count(group_channels.c.channel_id).label("channel_count"))
+            .outerjoin(group_channels, group_channels.c.group_id == Group.id)
             .group_by(Group.id)
             .order_by(Group.sort_order, Group.name)
         )
@@ -57,7 +57,7 @@ class GroupService(BaseService[Group]):
         group = await self.get_by_id(group_id)
 
         # Count affected channels
-        stmt = select(func.count()).select_from(Channel).where(Channel.group_id == group_id)
+        stmt = select(func.count()).select_from(group_channels).where(group_channels.c.group_id == group_id)
         result = await self.db.execute(stmt)
         affected_count = result.scalar() or 0
 
