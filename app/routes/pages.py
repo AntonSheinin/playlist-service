@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import get_settings
 from app.dependencies import DBSession
 from app.exceptions import NotFoundError
 from app.services.playlist_generator import PlaylistGenerator
@@ -50,13 +51,21 @@ async def users_page(request: Request) -> HTMLResponse:
 @router.get("/users/new", response_class=HTMLResponse)
 async def user_new_page(request: Request) -> HTMLResponse:
     """Render new user page."""
-    return templates.TemplateResponse("users/detail.html", {"request": request, "user_id": None})
+    settings = get_settings()
+    return templates.TemplateResponse(
+        "users/detail.html",
+        {"request": request, "user_id": None, "base_url": settings.base_url.rstrip("/")},
+    )
 
 
 @router.get("/users/{user_id}", response_class=HTMLResponse)
 async def user_detail_page(request: Request, user_id: int) -> HTMLResponse:
     """Render user detail page."""
-    return templates.TemplateResponse("users/detail.html", {"request": request, "user_id": user_id})
+    settings = get_settings()
+    return templates.TemplateResponse(
+        "users/detail.html",
+        {"request": request, "user_id": user_id, "base_url": settings.base_url.rstrip("/")},
+    )
 
 
 @router.get("/{playlist_name}.m3u8", response_class=PlainTextResponse)

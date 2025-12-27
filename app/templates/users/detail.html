@@ -152,6 +152,7 @@
 {% block scripts %}
 <script>
     const userId = {{ user_id|tojson }};
+    const baseUrl = {{ base_url|tojson }} || window.location.origin;
     let tariffsSelect, packagesSelect, channelsSelect;
     let allTariffs = [], allPackages = [], allChannels = [];
 
@@ -420,7 +421,7 @@
         const input = document.getElementById('playlist-url');
         if (!input) return;
         const filename = buildPlaylistFilename(firstName, lastName, agreementNumber);
-        input.value = filename ? `${window.location.origin}/${filename}` : '';
+        input.value = filename ? `${baseUrl}/${filename}` : '';
     }
 
     function updatePlaylistUrlFromForm() {

@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     auth_service_timeout: float = 30.0
 
     # Server
+    base_url: str = "http://localhost:8080"
     api_host: str = "0.0.0.0"
     api_port: int = 8080
 

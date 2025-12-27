@@ -18,6 +18,7 @@ class PlaylistGenerator:
 
         settings = get_settings()
         base_url = settings.flussonic_url.rstrip("/")
+        logo_base_url = settings.base_url.rstrip("/")
 
         for channel in channels:
             # Build EXTINF attributes
@@ -47,7 +48,9 @@ class PlaylistGenerator:
 
             # tvg-logo (base64 or URL)
             if channel.tvg_logo:
-                attrs.append(f'tvg-logo="{channel.tvg_logo}"')
+                logo_url = self._build_logo_url(channel.tvg_logo, logo_base_url)
+                if logo_url:
+                    attrs.append(f'tvg-logo="{logo_url}"')
 
             # Display name for the channel
             display_name = channel.display_name or channel.tvg_name or channel.stream_name
@@ -85,3 +88,17 @@ class PlaylistGenerator:
         sanitized = value.replace(" ", "_")
         sanitized = "".join(c for c in sanitized if c.isalnum() or c in "_-")
         return sanitized
+
+    def _build_logo_url(self, logo: str, base_url: str) -> str:
+        """Ensure tvg-logo is a fully-qualified URL when possible."""
+        cleaned = logo.strip()
+        if not cleaned:
+            return ""
+        lowered = cleaned.lower()
+        if lowered.startswith(("http://", "https://", "data:")):
+            return cleaned
+        if not base_url:
+            return cleaned
+        if cleaned.startswith("/"):
+            return f"{base_url}{cleaned}"
+        return f"{base_url}/{cleaned}"
