@@ -278,8 +278,23 @@
                 throw new Error(data.error?.message || 'Failed to update status');
             }
 
+            // Update local data
+            user.status = nextStatus;
+
+            // Update the UI immediately without full reload
+            const rows = document.querySelectorAll('#users-tbody tr');
+            rows.forEach(row => {
+                const btn = row.querySelector(`button[onclick="toggleUserStatus(${userId})"]`);
+                if (btn) {
+                    // Update button text and classes
+                    btn.textContent = nextStatus;
+                    btn.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${nextStatus === 'enabled' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'}`;
+                    // Update row background
+                    row.className = nextStatus === 'disabled' ? 'bg-gray-50' : '';
+                }
+            });
+
             showToast(`Status set to ${nextStatus}`, 'success');
-            loadUsers(currentPage);
         } catch (error) {
             showToast(error.message || 'Failed to update status', 'error');
         }

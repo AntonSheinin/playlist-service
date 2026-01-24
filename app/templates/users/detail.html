@@ -89,6 +89,16 @@
                     </button>
                 </div>
             </div>
+            <div class="flex items-center space-x-3 pt-2">
+                <button type="button" onclick="showSessionsLog()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm">
+                    Sessions Log
+                </button>
+                <button type="button" onclick="showAccessLog()"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm">
+                    Access Log
+                </button>
+            </div>
             {% endif %}
         </div>
 
@@ -147,6 +157,117 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-xs"></textarea>
     </div>
 </template>
+
+<!-- Sessions Log Modal -->
+<div id="sessions-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Sessions Log</h3>
+                <button onclick="closeSessionsModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="px-6 py-4 border-b">
+                <div class="flex items-center space-x-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">From</label>
+                        <input type="text" id="sessions-from-date" class="px-3 py-2 border border-gray-300 rounded-md text-sm flatpickr-sessions">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">To</label>
+                        <input type="text" id="sessions-to-date" class="px-3 py-2 border border-gray-300 rounded-md text-sm flatpickr-sessions">
+                    </div>
+                    <div class="pt-5">
+                        <button onclick="loadSessions(1)" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                            Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto px-6 py-4">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortSessions('started_at')">
+                                Started <span id="sessions-sort-started_at" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortSessions('ended_at')">
+                                Ended <span id="sessions-sort-ended_at" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortSessions('duration')">
+                                Duration <span id="sessions-sort-duration" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortSessions('ip')">
+                                IP Address <span id="sessions-sort-ip" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortSessions('channel')">
+                                Channel <span id="sessions-sort-channel" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Protocol</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessions-tbody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+                <div id="sessions-empty" class="hidden py-8 text-center text-gray-500">No sessions found for this period</div>
+            </div>
+            <div id="sessions-pagination" class="px-6 py-3 border-t"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Access Log Modal -->
+<div id="access-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Access Log</h3>
+                <button onclick="closeAccessModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="px-6 py-4 border-b">
+                <div class="flex items-center space-x-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">From</label>
+                        <input type="text" id="access-from-date" class="px-3 py-2 border border-gray-300 rounded-md text-sm flatpickr-access">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">To</label>
+                        <input type="text" id="access-to-date" class="px-3 py-2 border border-gray-300 rounded-md text-sm flatpickr-access">
+                    </div>
+                    <div class="pt-5">
+                        <button onclick="loadAccessLogs(1)" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                            Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto px-6 py-4">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortAccess('accessed_at')">
+                                Timestamp <span id="access-sort-accessed_at" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortAccess('ip')">
+                                IP Address <span id="access-sort-ip" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortAccess('channel')">
+                                Channel <span id="access-sort-channel" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onclick="sortAccess('action')">
+                                Action <span id="access-sort-action" class="text-gray-400"></span>
+                            </th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Protocol</th>
+                        </tr>
+                    </thead>
+                    <tbody id="access-tbody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+                <div id="access-empty" class="hidden py-8 text-center text-gray-500">No access logs found for this period</div>
+            </div>
+            <div id="access-pagination" class="px-6 py-3 border-t"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -437,5 +558,308 @@
         const url = input && input.value ? input.value : `/api/v1/users/${userId}/playlist`;
         window.open(url, '_blank');
     }
+
+    // Sessions Log
+    let sessionsPage = 1;
+    let sessionsSortBy = 'started_at';
+    let sessionsSortDir = 'desc';
+    let sessionsDatePickers = [];
+
+    function showSessionsLog() {
+        const modal = document.getElementById('sessions-modal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        // Initialize date pickers if not already done
+        if (sessionsDatePickers.length === 0) {
+            const defaultFrom = new Date();
+            defaultFrom.setDate(defaultFrom.getDate() - 7);
+            const today = new Date();
+
+            const fromPicker = flatpickr('#sessions-from-date', {
+                dateFormat: 'Y-m-d',
+                defaultDate: defaultFrom
+            });
+            const toPicker = flatpickr('#sessions-to-date', {
+                dateFormat: 'Y-m-d',
+                defaultDate: today
+            });
+            sessionsDatePickers = [fromPicker, toPicker];
+
+            // Explicitly set input values (flatpickr defaultDate might not sync immediately)
+            document.getElementById('sessions-from-date').value = formatDate(defaultFrom);
+            document.getElementById('sessions-to-date').value = formatDate(today);
+        }
+
+        loadSessions(1);
+    }
+
+    function closeSessionsModal() {
+        document.getElementById('sessions-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function sortSessions(field) {
+        if (sessionsSortBy === field) {
+            sessionsSortDir = sessionsSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sessionsSortBy = field;
+            sessionsSortDir = 'desc';
+        }
+        updateSessionsSortIndicators();
+        loadSessions(sessionsPage);
+    }
+
+    function updateSessionsSortIndicators() {
+        const fields = ['started_at', 'ended_at', 'duration', 'ip', 'channel'];
+        fields.forEach(field => {
+            const el = document.getElementById(`sessions-sort-${field}`);
+            if (el) {
+                el.textContent = sessionsSortBy === field ? (sessionsSortDir === 'asc' ? '▲' : '▼') : '';
+            }
+        });
+    }
+
+    async function loadSessions(page = 1) {
+        sessionsPage = page;
+        const fromDate = document.getElementById('sessions-from-date').value;
+        const toDate = document.getElementById('sessions-to-date').value;
+        const today = formatDate(new Date());
+
+        let url = `/api/v1/users/${userId}/sessions?page=${page}&per_page=50&sort_by=${sessionsSortBy}&sort_dir=${sessionsSortDir}`;
+        if (fromDate) url += `&from_date=${fromDate}T00:00:00`;
+        // If toDate is today, don't send it - let backend use current time
+        // Otherwise send end of day
+        if (toDate && toDate !== today) {
+            url += `&to_date=${toDate}T23:59:59`;
+        }
+
+        console.log('loadSessions:', { fromDate, toDate, today, url });
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to load sessions');
+            const result = await response.json();
+            const data = result.data;
+
+            console.log('Sessions response:', data);
+
+            renderSessions(data);
+            updateSessionsSortIndicators();
+        } catch (error) {
+            console.error('Failed to load sessions:', error);
+            showToast('Failed to load sessions', 'error');
+        }
+    }
+
+    function renderSessions(data) {
+        const tbody = document.getElementById('sessions-tbody');
+        const empty = document.getElementById('sessions-empty');
+        const items = data.items || [];
+
+        if (items.length === 0) {
+            tbody.innerHTML = '';
+            empty.classList.remove('hidden');
+            document.getElementById('sessions-pagination').innerHTML = '';
+            return;
+        }
+
+        empty.classList.add('hidden');
+        tbody.innerHTML = items.map(session => `
+            <tr>
+                <td class="px-3 py-2 text-sm">${formatDateTime(session.started_at)}</td>
+                <td class="px-3 py-2 text-sm">${session.ended_at ? formatDateTime(session.ended_at) : '<span class="text-green-600">Active</span>'}</td>
+                <td class="px-3 py-2 text-sm">${formatDuration(session.duration)}</td>
+                <td class="px-3 py-2 text-sm font-mono">${escapeHtml(session.ip || '-')}</td>
+                <td class="px-3 py-2 text-sm">${escapeHtml(session.channel || '-')}</td>
+                <td class="px-3 py-2 text-sm text-gray-500 truncate max-w-xs" title="${escapeHtml(session.user_agent || '')}">${escapeHtml(truncateText(session.user_agent, 40) || '-')}</td>
+            </tr>
+        `).join('');
+
+        renderLogPagination('sessions', data);
+    }
+
+    // Access Log
+    let accessPage = 1;
+    let accessSortBy = 'accessed_at';
+    let accessSortDir = 'desc';
+    let accessDatePickers = [];
+
+    function showAccessLog() {
+        const modal = document.getElementById('access-modal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        // Initialize date pickers if not already done
+        if (accessDatePickers.length === 0) {
+            const defaultFrom = new Date();
+            defaultFrom.setDate(defaultFrom.getDate() - 7);
+            const today = new Date();
+
+            const fromPicker = flatpickr('#access-from-date', {
+                dateFormat: 'Y-m-d',
+                defaultDate: defaultFrom
+            });
+            const toPicker = flatpickr('#access-to-date', {
+                dateFormat: 'Y-m-d',
+                defaultDate: today
+            });
+            accessDatePickers = [fromPicker, toPicker];
+
+            // Explicitly set input values (flatpickr defaultDate might not sync immediately)
+            document.getElementById('access-from-date').value = formatDate(defaultFrom);
+            document.getElementById('access-to-date').value = formatDate(today);
+        }
+
+        loadAccessLogs(1);
+    }
+
+    function closeAccessModal() {
+        document.getElementById('access-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function sortAccess(field) {
+        if (accessSortBy === field) {
+            accessSortDir = accessSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            accessSortBy = field;
+            accessSortDir = 'desc';
+        }
+        updateAccessSortIndicators();
+        loadAccessLogs(accessPage);
+    }
+
+    function updateAccessSortIndicators() {
+        const fields = ['accessed_at', 'ip', 'channel', 'action'];
+        fields.forEach(field => {
+            const el = document.getElementById(`access-sort-${field}`);
+            if (el) {
+                el.textContent = accessSortBy === field ? (accessSortDir === 'asc' ? '▲' : '▼') : '';
+            }
+        });
+    }
+
+    async function loadAccessLogs(page = 1) {
+        accessPage = page;
+        const fromDate = document.getElementById('access-from-date').value;
+        const toDate = document.getElementById('access-to-date').value;
+        const today = formatDate(new Date());
+
+        let url = `/api/v1/users/${userId}/access-logs?page=${page}&per_page=50&sort_by=${accessSortBy}&sort_dir=${accessSortDir}`;
+        if (fromDate) url += `&from_date=${fromDate}T00:00:00`;
+        // If toDate is today, don't send it - let backend use current time
+        // Otherwise send end of day
+        if (toDate && toDate !== today) {
+            url += `&to_date=${toDate}T23:59:59`;
+        }
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to load access logs');
+            const result = await response.json();
+            const data = result.data;
+
+            renderAccessLogs(data);
+            updateAccessSortIndicators();
+        } catch (error) {
+            console.error('Failed to load access logs:', error);
+            showToast('Failed to load access logs', 'error');
+        }
+    }
+
+    function renderAccessLogs(data) {
+        const tbody = document.getElementById('access-tbody');
+        const empty = document.getElementById('access-empty');
+        const items = data.items || [];
+
+        if (items.length === 0) {
+            tbody.innerHTML = '';
+            empty.classList.remove('hidden');
+            document.getElementById('access-pagination').innerHTML = '';
+            return;
+        }
+
+        empty.classList.add('hidden');
+        tbody.innerHTML = items.map(log => `
+            <tr>
+                <td class="px-3 py-2 text-sm">${formatDateTime(log.accessed_at)}</td>
+                <td class="px-3 py-2 text-sm font-mono">${escapeHtml(log.ip || '-')}</td>
+                <td class="px-3 py-2 text-sm">${escapeHtml(log.channel || '-')}</td>
+                <td class="px-3 py-2 text-sm">${escapeHtml(log.action || '-')}</td>
+                <td class="px-3 py-2 text-sm text-gray-500 truncate max-w-xs" title="${escapeHtml(log.user_agent || '')}">${escapeHtml(truncateText(log.user_agent, 40) || '-')}</td>
+            </tr>
+        `).join('');
+
+        renderLogPagination('access', data);
+    }
+
+    function renderLogPagination(type, data) {
+        const container = document.getElementById(`${type}-pagination`);
+        if (!data.pages || data.pages <= 1) {
+            container.innerHTML = `<div class="text-sm text-gray-600">Total: ${data.total || 0} records</div>`;
+            return;
+        }
+
+        const loadFn = type === 'sessions' ? 'loadSessions' : 'loadAccessLogs';
+        let html = `<div class="flex items-center justify-between">`;
+        html += `<div class="text-sm text-gray-600">Page ${data.page} of ${data.pages} (${data.total} records)</div>`;
+        html += `<div class="flex space-x-2">`;
+
+        if (data.page > 1) {
+            html += `<button onclick="${loadFn}(1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">First</button>`;
+            html += `<button onclick="${loadFn}(${data.page - 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Previous</button>`;
+        }
+        if (data.page < data.pages) {
+            html += `<button onclick="${loadFn}(${data.page + 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next</button>`;
+            html += `<button onclick="${loadFn}(${data.pages})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Last</button>`;
+        }
+
+        html += `</div></div>`;
+        container.innerHTML = html;
+    }
+
+    // Utility functions
+    function formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    function formatDateTime(isoString) {
+        if (!isoString) return '-';
+        const date = new Date(isoString);
+        return date.toLocaleString();
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds && seconds !== 0) return '-';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if (h > 0) return `${h}h ${m}m ${s}s`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+    }
+
+    function truncateText(text, maxLength) {
+        if (!text) return '';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    // Close modals on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeSessionsModal();
+            closeAccessModal();
+        }
+    });
+
+    // Close modals on backdrop click
+    document.getElementById('sessions-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'sessions-modal') closeSessionsModal();
+    });
+    document.getElementById('access-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'access-modal') closeAccessModal();
+    });
 </script>
 {% endblock %}

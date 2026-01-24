@@ -18,7 +18,15 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/playlist_service"
+    database_url: str = "postgresql://user:password@localhost:5432/playlist_service"
+
+    @property
+    def async_database_url(self) -> str:
+        """Convert standard postgresql:// URL to async driver format."""
+        url = self.database_url
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
