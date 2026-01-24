@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import InvalidCredentialsError, NotFoundError
+from app.exceptions import NotFoundError, UnauthorizedError
 from app.models import Admin
 from app.utils.password import hash_password, verify_password
 
@@ -17,7 +17,7 @@ class AdminAuthService:
         admin = result.scalar_one_or_none()
 
         if admin is None or not verify_password(password, admin.password_hash):
-            raise InvalidCredentialsError()
+            raise UnauthorizedError("Invalid credentials")
 
         return admin
 

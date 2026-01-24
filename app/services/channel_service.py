@@ -1,8 +1,7 @@
 from sqlalchemy import func, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import ChannelNotOrphanedError, NotFoundError
+from app.exceptions import NotFoundError, ValidationError
 from app.models import (
     Channel,
     Group,
@@ -12,12 +11,13 @@ from app.models import (
     package_channels,
     user_channels,
 )
+from app.services.base import BaseService
 from app.utils.pagination import PaginatedResult, PaginationParams
 
 
-class ChannelService:
-    def __init__(self, db: AsyncSession) -> None:
-        self.db = db
+class ChannelService(BaseService[Channel]):
+    model_class = Channel
+    not_found_message = "Channel not found"
 
     def _group_sort_subquery(self):
         return (
@@ -210,19 +210,9 @@ class ChannelService:
         channel = await self.get_by_id(channel_id)
 
         if not force and channel.sync_status != SyncStatus.ORPHANED:
-            raise ChannelNotOrphanedError()
+            raise ValidationError("Can only delete orphaned channels")
 
         await self.db.delete(channel)
-        await self.db.flush()
-
-    async def reorder(self, order: list[dict[str, int]]) -> None:
-        """Reorder channels. order is list of {id, sort_order}."""
-        for item in order:
-            stmt = select(Channel).where(Channel.id == item["id"])
-            result = await self.db.execute(stmt)
-            channel = result.scalar_one_or_none()
-            if channel:
-                channel.sort_order = item["sort_order"]
         await self.db.flush()
 
     async def get_cascade_info(self, channel_id: int) -> dict[str, int]:
@@ -267,17 +257,16 @@ class ChannelService:
 
     async def search(self, search: str, limit: int = 50) -> list[Channel]:
         """Search channels for dropdown."""
-        search_filter = f"%{search}%"
-        stmt = (
-            select(Channel)
-            .where(
+        stmt = select(Channel)
+        if search:
+            search_filter = f"%{search}%"
+            stmt = stmt.where(
                 or_(
                     Channel.stream_name.ilike(search_filter),
                     Channel.display_name.ilike(search_filter),
                     Channel.tvg_name.ilike(search_filter),
                 )
             )
-            .limit(limit)
-        )
+        stmt = stmt.order_by(Channel.sort_order.asc()).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

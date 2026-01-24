@@ -3,22 +3,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings, setup_logging
-from app.exceptions import (
-    AuthServiceError,
-    ChannelNotOrphanedError,
-    DuplicateEntryError,
-    FlussonicError,
-    InvalidCredentialsError,
-    NotFoundError,
-    PlaylistServiceError,
-    UnauthorizedError,
-    ValidationError,
-)
+from app.exceptions import PlaylistServiceError
 from app.routes import api_router, pages_router
 from app.services.database import engine
 
@@ -57,84 +47,14 @@ app.include_router(api_router)
 app.include_router(pages_router)
 
 
-# Exception handlers
-@app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(ValidationError)
-async def validation_error_handler(request: Request, exc: ValidationError) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(DuplicateEntryError)
-async def duplicate_entry_handler(request: Request, exc: DuplicateEntryError) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(UnauthorizedError)
-async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(InvalidCredentialsError)
-async def invalid_credentials_handler(
-    request: Request, exc: InvalidCredentialsError
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(ChannelNotOrphanedError)
-async def channel_not_orphaned_handler(
-    request: Request, exc: ChannelNotOrphanedError
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(FlussonicError)
-async def flussonic_error_handler(request: Request, exc: FlussonicError) -> JSONResponse:
-    logger.error("Flussonic error: %s", exc.message)
-    return JSONResponse(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
-@app.exception_handler(AuthServiceError)
-async def auth_service_error_handler(request: Request, exc: AuthServiceError) -> JSONResponse:
-    logger.error("Auth service error: %s", exc.message)
-    return JSONResponse(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        content={"success": False, "error": {"code": exc.code, "message": exc.message}},
-    )
-
-
 @app.exception_handler(PlaylistServiceError)
 async def playlist_service_error_handler(
     request: Request, exc: PlaylistServiceError
 ) -> JSONResponse:
-    logger.error("Internal error: %s", exc.message)
+    if exc.status_code >= 500:
+        logger.error("%s: %s", exc.__class__.__name__, exc.message)
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=exc.status_code,
         content={"success": False, "error": {"code": exc.code, "message": exc.message}},
     )
 

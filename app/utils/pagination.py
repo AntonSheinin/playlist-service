@@ -30,11 +30,3 @@ class PaginatedResult(Generic[T]):
         if self.total == 0:
             return 1
         return (self.total + self.per_page - 1) // self.per_page
-
-    @property
-    def has_prev(self) -> bool:
-        return self.page > 1
-
-    @property
-    def has_next(self) -> bool:
-        return self.page < self.pages

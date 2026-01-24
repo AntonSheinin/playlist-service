@@ -1,5 +1,4 @@
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Group, group_channels
 from app.services.base import BaseService
@@ -8,9 +7,6 @@ from app.services.base import BaseService
 class GroupService(BaseService[Group]):
     model_class = Group
     not_found_message = "Group not found"
-
-    def __init__(self, db: AsyncSession) -> None:
-        super().__init__(db)
 
     async def get_all(self) -> list[Group]:
         """Get all groups ordered by sort_order."""

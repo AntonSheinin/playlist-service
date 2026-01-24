@@ -18,7 +18,6 @@ class FlussonicStream(BaseModel):
     name: str  # stream_name (unique identifier)
     title: str | None = None  # display_name
     dvr: int | None = None  # catchup_days
-    static: bool = True
 
 
 class FlussonicClient:
@@ -150,7 +149,6 @@ class FlussonicClient:
                     name=item.get("name", item.get("stream_name", "")),
                     title=item.get("title", item.get("display_name")),
                     dvr=self._extract_dvr_days(item),
-                    static=item.get("static", True),
                 )
                 if stream.name:
                     streams.append(stream)
@@ -169,7 +167,6 @@ class FlussonicClient:
                         name=name,
                         title=config.get("title", config.get("display_name")),
                         dvr=self._extract_dvr_days(config),
-                        static=config.get("static", True),
                     )
                     streams.append(stream)
         elif isinstance(data, list):
@@ -179,7 +176,6 @@ class FlussonicClient:
                         name=item.get("name", ""),
                         title=item.get("title"),
                         dvr=self._extract_dvr_days(item),
-                        static=item.get("static", True),
                     )
                     if stream.name:
                         streams.append(stream)
@@ -207,7 +203,3 @@ class FlussonicClient:
                                 return depth // MINUTES_PER_DAY
                             return depth
         return None
-
-    def get_stream_url(self, stream_name: str) -> str:
-        """Get the base URL for a stream."""
-        return f"{self.base_url}/{stream_name}"

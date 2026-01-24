@@ -15,12 +15,34 @@ class AuthSyncService:
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
-        self.auth_client = AuthServiceClient()
         self.user_service = UserService(db)
 
     def _map_status(self, status: UserStatus) -> str:
         """Map internal status to Auth Service status."""
         return "active" if status == UserStatus.ENABLED else "suspended"
+
+    async def _do_create(self, client: AuthServiceClient, user: User) -> None:
+        """Create token in Auth Service and store auth_token_id."""
+        channels = await self.user_service.resolve_channels(user.id)
+        allowed_streams = [ch.stream_name for ch in channels]
+
+        data = AuthTokenCreate(
+            token=user.token,
+            user_id=user.agreement_number,
+            status=self._map_status(user.status),
+            max_sessions=user.max_sessions,
+            valid_from=user.valid_from,
+            valid_until=user.valid_until,
+            allowed_streams=allowed_streams,
+            meta={
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+        )
+
+        auth_token_id = await client.create_token(data)
+        await self.user_service.set_auth_token_id(user.id, auth_token_id)
+        logger.info("Synced user %d to Auth Service with token_id %d", user.id, auth_token_id)
 
     async def sync_user_create(self, user: User) -> None:
         """
@@ -29,30 +51,8 @@ class AuthSyncService:
         Failures are logged but don't prevent user creation.
         """
         try:
-            # Resolve channels for this user
-            channels = await self.user_service.resolve_channels(user.id)
-            allowed_streams = [ch.stream_name for ch in channels]
-
-            # Create token in Auth Service
-            data = AuthTokenCreate(
-                token=user.token,
-                user_id=user.agreement_number,
-                status=self._map_status(user.status),
-                max_sessions=user.max_sessions,
-                valid_from=user.valid_from,
-                valid_until=user.valid_until,
-                allowed_streams=allowed_streams,
-                meta={
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                },
-            )
-
-            auth_token_id = await self.auth_client.create_token(data)
-
-            # Store auth_token_id
-            await self.user_service.set_auth_token_id(user.id, auth_token_id)
-            logger.info("Synced user %d to Auth Service with token_id %d", user.id, auth_token_id)
+            async with AuthServiceClient() as client:
+                await self._do_create(client, user)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d to Auth Service: %s", user.id, e)
 
@@ -63,30 +63,28 @@ class AuthSyncService:
         Failures are logged but don't prevent user update.
         """
         try:
-            if user.auth_token_id is None:
-                # User not synced yet, create instead
-                await self.sync_user_create(user)
-                return
+            async with AuthServiceClient() as client:
+                if user.auth_token_id is None:
+                    await self._do_create(client, user)
+                    return
 
-            # Resolve channels for this user
-            channels = await self.user_service.resolve_channels(user.id)
-            allowed_streams = [ch.stream_name for ch in channels]
+                channels = await self.user_service.resolve_channels(user.id)
+                allowed_streams = [ch.stream_name for ch in channels]
 
-            # Update token in Auth Service
-            data = AuthTokenUpdate(
-                status=self._map_status(user.status),
-                max_sessions=user.max_sessions,
-                valid_from=user.valid_from,
-                valid_until=user.valid_until,
-                allowed_streams=allowed_streams,
-                meta={
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                },
-            )
+                data = AuthTokenUpdate(
+                    status=self._map_status(user.status),
+                    max_sessions=user.max_sessions,
+                    valid_from=user.valid_from,
+                    valid_until=user.valid_until,
+                    allowed_streams=allowed_streams,
+                    meta={
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                    },
+                )
 
-            await self.auth_client.update_token(user.auth_token_id, data)
-            logger.info("Updated user %d in Auth Service", user.id)
+                await client.update_token(user.auth_token_id, data)
+                logger.info("Updated user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)
 
@@ -97,7 +95,8 @@ class AuthSyncService:
         """
         try:
             if user.auth_token_id is not None:
-                await self.auth_client.delete_token(user.auth_token_id)
+                async with AuthServiceClient() as client:
+                    await client.delete_token(user.auth_token_id)
                 logger.info("Deleted user %d from Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to delete user %d from Auth Service: %s", user.id, e)
@@ -109,12 +108,10 @@ class AuthSyncService:
         Failures are logged but don't prevent token regeneration.
         """
         try:
-            # Delete old token if exists
-            if user.auth_token_id is not None:
-                await self.auth_client.delete_token(user.auth_token_id)
-
-            # Create new token
-            await self.sync_user_create(user)
+            async with AuthServiceClient() as client:
+                if user.auth_token_id is not None:
+                    await client.delete_token(user.auth_token_id)
+                await self._do_create(client, user)
             logger.info("Regenerated token for user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to regenerate token for user %d in Auth Service: %s", user.id, e)

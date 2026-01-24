@@ -44,6 +44,16 @@ class MessageResponse(BaseModel):
     message: str
 
 
+# Common
+class ReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class ReorderRequest(BaseModel):
+    order: list[ReorderItem]
+
+
 # Auth
 class LoginRequest(BaseModel):
     username: str
@@ -90,15 +100,6 @@ class GroupResponse(BaseModel):
 
 class GroupWithCount(GroupResponse):
     channel_count: int
-
-
-class GroupReorderItem(BaseModel):
-    id: int
-    sort_order: int
-
-
-class GroupReorderRequest(BaseModel):
-    order: list[GroupReorderItem]
 
 
 class GroupLookup(BaseModel):
@@ -211,15 +212,6 @@ class ChannelGroupsUpdate(BaseModel):
 
 class ChannelPackagesUpdate(BaseModel):
     package_ids: list[int]
-
-
-class ChannelReorderItem(BaseModel):
-    id: int
-    sort_order: int
-
-
-class ChannelReorderRequest(BaseModel):
-    order: list[ChannelReorderItem]
 
 
 class ChannelCascadeInfo(BaseModel):

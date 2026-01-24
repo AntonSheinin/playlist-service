@@ -3,11 +3,11 @@ from fastapi import APIRouter
 from app.dependencies import CurrentAdminId, DBSession
 from app.schemas import (
     GroupCreate,
-    GroupReorderRequest,
     GroupResponse,
     GroupUpdate,
     GroupWithCount,
     MessageResponse,
+    ReorderRequest,
     SuccessResponse,
 )
 from app.services.group_service import GroupService
@@ -78,7 +78,7 @@ async def delete_group(
 
 @router.post("/reorder", response_model=MessageResponse)
 async def reorder_groups(
-    data: GroupReorderRequest,
+    data: ReorderRequest,
     _admin_id: CurrentAdminId,
     db: DBSession,
 ) -> MessageResponse:

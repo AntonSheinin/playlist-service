@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Time constants (seconds)
 SECONDS_PER_DAY = 86400
-SECONDS_PER_HOUR = 3600
 MINUTES_PER_DAY = 1440
 
 
@@ -27,6 +26,7 @@ class Settings(BaseSettings):
         if url.startswith("postgresql://"):
             return url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
+
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_timeout: int = 30

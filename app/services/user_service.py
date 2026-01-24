@@ -1,13 +1,12 @@
 from datetime import datetime
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import NotFoundError
 from app.models import Channel, Package, Tariff, User, UserStatus, package_channels
-from app.services.playlist_generator import PlaylistGenerator
 from app.services.base import BaseService
+from app.services.playlist_generator import PlaylistGenerator
 from app.utils.pagination import PaginatedResult, PaginationParams
 from app.utils.token import generate_token
 
@@ -15,9 +14,6 @@ from app.utils.token import generate_token
 class UserService(BaseService[User]):
     model_class = User
     not_found_message = "User not found"
-
-    def __init__(self, db: AsyncSession) -> None:
-        super().__init__(db)
 
     async def get_by_id(self, user_id: int) -> User:
         """Get user by ID with all relationships."""
@@ -44,22 +40,11 @@ class UserService(BaseService[User]):
         target_filename = f"{playlist_name}.m3u8"
         target_key = target_filename.casefold()
 
-        if "_" in playlist_name:
-            agreement_candidate = playlist_name.rsplit("_", 1)[-1]
-            if agreement_candidate:
-                stmt = select(User).where(User.agreement_number == agreement_candidate)
-                result = await self.db.execute(stmt)
-                user = result.scalar_one_or_none()
-                if user and generator.get_filename(user).casefold() == target_key:
-                    return user
-
         stmt = select(User)
         result = await self.db.execute(stmt)
-        users = result.scalars().all()
-        for user in users:
+        for user in result.scalars():
             if generator.get_filename(user).casefold() == target_key:
                 return user
-
         return None
 
     async def get_paginated(

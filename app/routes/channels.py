@@ -1,4 +1,3 @@
-import imghdr
 import re
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,7 +15,6 @@ from app.schemas import (
     ChannelCascadeInfo,
     ChannelGroupsUpdate,
     ChannelPackagesUpdate,
-    ChannelReorderRequest,
     ChannelResponse,
     ChannelUpdate,
     LogoUrlRequest,
@@ -24,6 +22,7 @@ from app.schemas import (
     MessageResponse,
     PaginatedData,
     PaginatedResponse,
+    ReorderRequest,
     SuccessResponse,
     SyncResultResponse,
 )
@@ -36,8 +35,26 @@ router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parents[2]
 LOGO_DIR = BASE_DIR / "media" / "logos"
 MAX_LOGO_BYTES = 2 * 1024 * 1024
-ALLOWED_IMAGE_TYPES = {"png", "jpeg", "gif", "webp"}
 LOGO_URL_PREFIX = "/media/logos/"
+
+# Magic byte signatures for image type detection
+_IMAGE_SIGNATURES: list[tuple[bytes, str]] = [
+    (b"\x89PNG\r\n\x1a\n", "png"),
+    (b"\xff\xd8\xff", "jpeg"),
+    (b"GIF87a", "gif"),
+    (b"GIF89a", "gif"),
+]
+
+
+def _detect_image_type(data: bytes) -> str | None:
+    """Detect image type from file header bytes."""
+    for signature, image_type in _IMAGE_SIGNATURES:
+        if data[:len(signature)] == signature:
+            return image_type
+    # WebP: RIFF....WEBP
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
 
 
 def sanitize_logo_basename(value: str) -> str:
@@ -100,8 +117,8 @@ async def save_logo_bytes(
     if len(content) > MAX_LOGO_BYTES:
         raise ValidationError("Logo exceeds 2MB limit")
 
-    image_type = imghdr.what(None, h=content)
-    if image_type not in ALLOWED_IMAGE_TYPES:
+    image_type = _detect_image_type(content)
+    if image_type is None:
         raise ValidationError("Unsupported image type")
 
     extension = "jpg" if image_type == "jpeg" else image_type
@@ -342,7 +359,7 @@ async def update_channel_packages(
 
 @router.post("/reorder", response_model=MessageResponse)
 async def reorder_channels(
-    data: ChannelReorderRequest,
+    data: ReorderRequest,
     _admin_id: CurrentAdminId,
     db: DBSession,
 ) -> MessageResponse:

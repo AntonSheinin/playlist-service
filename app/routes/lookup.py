@@ -58,12 +58,7 @@ async def lookup_channels(
 ) -> SuccessResponse[list[ChannelLookup]]:
     """Search channels for dropdown."""
     service = ChannelService(db)
-
-    if search:
-        channels = await service.search(search, limit)
-    else:
-        channels = await service.get_all()
-        channels = channels[:limit]
+    channels = await service.search(search, limit)
 
     return SuccessResponse(
         data=[

@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +45,7 @@ class ChannelSyncService:
         streams = await self.flussonic.get_streams()
         stream_names = {s.name for s in streams}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         new_count = 0
         updated_count = 0
 
@@ -70,7 +70,6 @@ class ChannelSyncService:
             else:
                 # Update Flussonic fields only (preserve UI-managed fields)
                 channel.tvg_name = stream.title
-                channel.display_name = stream.title
                 channel.catchup_days = stream.dvr
                 channel.sync_status = SyncStatus.SYNCED
                 channel.last_seen_at = now

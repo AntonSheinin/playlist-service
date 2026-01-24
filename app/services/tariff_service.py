@@ -1,5 +1,4 @@
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import NotFoundError
@@ -10,9 +9,6 @@ from app.services.base import BaseService
 class TariffService(BaseService[Tariff]):
     model_class = Tariff
     not_found_message = "Tariff not found"
-
-    def __init__(self, db: AsyncSession) -> None:
-        super().__init__(db)
 
     async def get_by_id(self, tariff_id: int) -> Tariff:
         """Get tariff by ID with packages."""

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -7,7 +7,6 @@ from fastapi.responses import PlainTextResponse
 from app.clients.auth_service import AuthServiceClient
 from app.dependencies import CurrentAdminId, DBSession
 from app.models import UserStatus
-
 from app.schemas import (
     MessageResponse,
     PaginatedData,
@@ -23,110 +22,19 @@ from app.schemas import (
 from app.services.auth_sync import AuthSyncService
 from app.services.playlist_generator import PlaylistGenerator
 from app.services.user_service import UserService
+from app.utils.log_mapping import (
+    ACCESS_LOG_SORT_FIELDS,
+    SESSION_LOG_SORT_FIELDS,
+    map_access_log_entry,
+    map_session_log_entry,
+    normalize_datetime,
+    normalize_sort_dir,
+    parse_datetime,
+    sort_items,
+)
 from app.utils.pagination import PaginationParams
 
 router = APIRouter()
-
-ACCESS_LOG_SORT_FIELDS = {"accessed_at", "ip", "channel", "action"}
-SESSION_LOG_SORT_FIELDS = {"started_at", "ended_at", "duration", "ip", "channel"}
-
-
-def _normalize_sort_dir(sort_dir: str) -> str:
-    return "asc" if sort_dir and sort_dir.lower() == "asc" else "desc"
-
-
-def _parse_datetime(value: str) -> datetime | None:
-    if not value:
-        return None
-    candidate = value.replace("Z", "+00:00", 1)
-    try:
-        return datetime.fromisoformat(candidate)
-    except ValueError:
-        return None
-
-
-def _normalize_datetime(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
-
-
-def _parse_sort_value(value: Any, sort_by: str, date_fields: set[str]) -> Any:
-    if value is None:
-        return None
-    if sort_by in date_fields and isinstance(value, str):
-        parsed = _parse_datetime(value)
-        if parsed is None:
-            return value
-        return _normalize_datetime(parsed)
-    return value
-
-
-def _sort_items(
-    items: list[dict[str, Any]],
-    sort_by: str,
-    sort_dir: str,
-    date_fields: set[str],
-) -> list[dict[str, Any]]:
-    if not items:
-        return items
-
-    with_value: list[tuple[Any, dict[str, Any]]] = []
-    without_value: list[dict[str, Any]] = []
-
-    for item in items:
-        value = item.get(sort_by)
-        if value is None:
-            without_value.append(item)
-            continue
-        parsed = _parse_sort_value(value, sort_by, date_fields)
-        with_value.append((parsed, item))
-
-    with_value.sort(key=lambda pair: pair[0], reverse=sort_dir == "desc")
-    return [item for _, item in with_value] + without_value
-
-
-def _build_access_action(result: str | None, reason: str | None) -> str:
-    if not result:
-        return "-"
-    if reason:
-        return f"{result}: {reason}"
-    return result
-
-
-def _map_access_log_entry(log: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "accessed_at": log.get("timestamp"),
-        "ip": log.get("client_ip"),
-        "channel": log.get("stream_name"),
-        "action": _build_access_action(log.get("result"), log.get("reason")),
-        "user_agent": log.get("protocol"),
-    }
-
-
-def _map_session_log_entry(log: dict[str, Any]) -> dict[str, Any]:
-    started_at = log.get("started_at")
-    duration = None
-    if isinstance(started_at, str):
-        started_dt = _normalize_datetime(_parse_datetime(started_at))
-    elif isinstance(started_at, datetime):
-        started_dt = _normalize_datetime(started_at)
-    else:
-        started_dt = None
-    if started_dt:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        duration = max(0, int((now - started_dt).total_seconds()))
-
-    return {
-        "started_at": started_at,
-        "ended_at": None,
-        "duration": duration,
-        "ip": log.get("client_ip"),
-        "channel": log.get("stream_name"),
-        "user_agent": log.get("protocol"),
-    }
 
 
 @router.get("", response_model=PaginatedResponse[UserListItem])
@@ -154,23 +62,9 @@ async def list_users(
         sort_dir=sort_dir,
     )
 
-    items = []
-    for user in result.items:
-        item = UserListItem(
-            id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            agreement_number=user.agreement_number,
-            status=user.status,
-            max_sessions=user.max_sessions,
-            created_at=user.created_at,
-            tariffs=[{"id": t.id, "name": t.name} for t in user.tariffs],
-        )
-        items.append(item)
-
     return PaginatedResponse(
         data=PaginatedData(
-            items=items,
+            items=[UserListItem.model_validate(user) for user in result.items],
             total=result.total,
             page=result.page,
             per_page=result.per_page,
@@ -383,26 +277,26 @@ async def get_user_sessions(
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
 
-    sort_dir = _normalize_sort_dir(sort_dir)
+    sort_dir = normalize_sort_dir(sort_dir)
     if sort_by not in SESSION_LOG_SORT_FIELDS:
         sort_by = "started_at"
 
-    auth_client = AuthServiceClient()
-    sessions = await auth_client.get_user_sessions(
-        user_id=user.agreement_number,
-        skip=0,
-        limit=1000,
-    )
+    async with AuthServiceClient() as auth_client:
+        sessions = await auth_client.get_user_sessions(
+            user_id=user.agreement_number,
+            skip=0,
+            limit=1000,
+        )
 
-    from_dt = _normalize_datetime(from_date)
-    to_dt = _normalize_datetime(to_date)
+    from_dt = normalize_datetime(from_date)
+    to_dt = normalize_datetime(to_date)
     filtered_sessions: list[dict[str, Any]] = []
     for session in sessions:
         started_at = session.get("started_at")
         if isinstance(started_at, str):
-            started_dt = _normalize_datetime(_parse_datetime(started_at))
+            started_dt = normalize_datetime(parse_datetime(started_at))
         elif isinstance(started_at, datetime):
-            started_dt = _normalize_datetime(started_at)
+            started_dt = normalize_datetime(started_at)
         else:
             started_dt = None
 
@@ -412,9 +306,9 @@ async def get_user_sessions(
             continue
         filtered_sessions.append(session)
 
-    items = [_map_session_log_entry(session) for session in filtered_sessions]
+    items = [map_session_log_entry(session) for session in filtered_sessions]
     if sort_by != "started_at" or sort_dir != "desc":
-        items = _sort_items(items, sort_by, sort_dir, {"started_at", "ended_at"})
+        items = sort_items(items, sort_by, sort_dir, {"started_at", "ended_at"})
 
     total = len(items)
     pages = 0 if total == 0 else (total + per_page - 1) // per_page
@@ -449,26 +343,26 @@ async def get_user_access_logs(
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
 
-    sort_dir = _normalize_sort_dir(sort_dir)
+    sort_dir = normalize_sort_dir(sort_dir)
     if sort_by not in ACCESS_LOG_SORT_FIELDS:
         sort_by = "accessed_at"
 
-    auth_client = AuthServiceClient()
     skip = (page - 1) * per_page
-    logs = await auth_client.get_access_logs(
-        user_id=user.agreement_number,
-        start_time=from_date,
-        end_time=to_date,
-        skip=skip,
-        limit=per_page + 1,
-    )
+    async with AuthServiceClient() as auth_client:
+        logs = await auth_client.get_access_logs(
+            user_id=user.agreement_number,
+            start_time=from_date,
+            end_time=to_date,
+            skip=skip,
+            limit=per_page + 1,
+        )
 
     has_more = len(logs) > per_page
     logs = logs[:per_page]
 
-    items = [_map_access_log_entry(log) for log in logs]
+    items = [map_access_log_entry(log) for log in logs]
     if sort_by != "accessed_at" or sort_dir != "desc":
-        items = _sort_items(items, sort_by, sort_dir, {"accessed_at"})
+        items = sort_items(items, sort_by, sort_dir, {"accessed_at"})
 
     total = skip + len(items) + (1 if has_more else 0)
     pages = 0 if total == 0 else (page + 1 if has_more else page)
