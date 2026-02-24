@@ -33,7 +33,10 @@
       "Bash(.venv/Scripts/python.exe:*)",
       "Bash(.venvScriptspython.exe -c \"from app.clients.auth_service import AuthServiceClient; from app.services.auth_sync import AuthSyncService; from app.services.channel_sync import ChannelSyncService; from app.services.user_service import UserService; from app.services.channel_service import ChannelService; from app.routes.users import router; print\\(''All imports OK''\\)\")",
       "Bash(d:\\\\Private\\\\Python\\\\playlists-service\\\\.venv\\\\Scripts\\\\python.exe:*)",
-      "Bash(\"d:/Private/Python/playlists-service/.venv/Scripts/python.exe\" -c \"import sys; sys.path.insert\\(0, ''d:/Private/Python/playlists-service''\\); from app.main import app; print\\(f''App loaded OK, {len\\(app.routes\\)} routes''\\)\")"
+      "Bash(\"d:/Private/Python/playlists-service/.venv/Scripts/python.exe\" -c \"import sys; sys.path.insert\\(0, ''d:/Private/Python/playlists-service''\\); from app.main import app; print\\(f''App loaded OK, {len\\(app.routes\\)} routes''\\)\")",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

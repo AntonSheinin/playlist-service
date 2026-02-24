@@ -38,11 +38,15 @@ MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 (MEDIA_ROOT / "logos").mkdir(parents=True, exist_ok=True)
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 
-# Include routers
+# Mount static files
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
+if FRONTEND_ASSETS.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="assets")
+
+# Include routers (API first, then pages with SPA catch-all last)
 app.include_router(api_router)
 app.include_router(pages_router)
 

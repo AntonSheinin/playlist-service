@@ -1,4 +1,12 @@
-# syntax=docker/dockerfile:1
+# ---- Stage 1: Build frontend ----
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+# ---- Stage 2: Python app ----
 FROM python:3.12-slim
 
 # ---- env ----
@@ -25,6 +33,9 @@ RUN uv pip compile pyproject.toml -o requirements.txt \
 
 # ---- copy app code ----
 COPY . .
+
+# ---- copy built frontend ----
+COPY --from=frontend-build /frontend/dist /app/frontend/dist
 
 EXPOSE 8080
 

@@ -47,3 +47,7 @@ docker-compose*.yml
 
 .claude
 .vscode
+
+# Frontend (node_modules excluded, source needed for build)
+frontend/node_modules
+frontend/dist
