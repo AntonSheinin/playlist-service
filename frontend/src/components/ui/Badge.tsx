@@ -1,11 +1,11 @@
 import { cn } from "../../utils/cn";
 
 const variants = {
-  green: "bg-green-100 text-green-800",
-  red: "bg-red-100 text-red-800",
-  blue: "bg-blue-100 text-blue-800",
-  yellow: "bg-yellow-100 text-yellow-800",
-  gray: "bg-gray-100 text-gray-800",
+  green: "bg-emerald-100 text-emerald-800",
+  red: "bg-rose-100 text-rose-800",
+  blue: "bg-sky-100 text-sky-800",
+  yellow: "bg-amber-100 text-amber-800",
+  gray: "bg-slate-100 text-slate-800",
 };
 
 interface BadgeProps {
@@ -23,7 +23,8 @@ export function Badge({ variant = "gray", className, children, onClick }: BadgeP
       className={cn(
         "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
         variants[variant],
-        onClick && "cursor-pointer hover:opacity-80",
+        onClick &&
+          "cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-sky-200",
         className
       )}
     >

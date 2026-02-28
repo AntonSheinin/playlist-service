@@ -34,6 +34,30 @@ export interface DashboardStats {
   last_sync: string | null;
 }
 
+export type ServiceHealth = "up" | "degraded" | "down";
+
+export interface FlussonicDashboardStats {
+  health: ServiceHealth;
+  checked_at: string;
+  incoming_kbit: number | null;
+  outgoing_kbit: number | null;
+  total_clients: number | null;
+  total_sources: number | null;
+  good_sources: number | null;
+  broken_sources: number | null;
+  error: string | null;
+}
+
+export interface EpgDashboardStats {
+  health: ServiceHealth;
+  checked_at: string;
+  next_fetch_at: string | null;
+  last_epg_update_at: string | null;
+  sources_total: number | null;
+  last_updated_channels_count: number | null;
+  error: string | null;
+}
+
 // Lookup types (used in dropdowns and nested responses)
 export interface GroupLookup {
   id: number;

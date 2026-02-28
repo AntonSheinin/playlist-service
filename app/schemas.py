@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -78,6 +78,28 @@ class DashboardStats(BaseModel):
     users_enabled: int
     users_disabled: int
     last_sync: datetime | None
+
+
+class FlussonicDashboardStats(BaseModel):
+    health: Literal["up", "degraded", "down"]
+    checked_at: datetime
+    incoming_kbit: int | None = None
+    outgoing_kbit: int | None = None
+    total_clients: int | None = None
+    total_sources: int | None = None
+    good_sources: int | None = None
+    broken_sources: int | None = None
+    error: str | None = None
+
+
+class EpgDashboardStats(BaseModel):
+    health: Literal["up", "degraded", "down"]
+    checked_at: datetime
+    next_fetch_at: datetime | None = None
+    last_epg_update_at: datetime | None = None
+    sources_total: int | None = None
+    last_updated_channels_count: int | None = None
+    error: str | None = None
 
 
 # Group

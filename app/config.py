@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     auth_service_api_key: str = ""
     auth_service_timeout: float = 30.0
 
+    # EPG Service
+    epg_service_url: str = "http://localhost:8000"
+    epg_service_timeout: float = 30.0
+    epg_service_fetch_timeout: float = 300.0
+
     # Server
     base_url: str = "http://localhost:8080"
     api_host: str = "0.0.0.0"

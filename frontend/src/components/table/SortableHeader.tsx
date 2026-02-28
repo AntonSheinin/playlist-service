@@ -24,13 +24,13 @@ export function SortableHeader({
       type="button"
       onClick={() => onSort(field)}
       className={cn(
-        "flex items-center gap-1 text-left w-full hover:text-gray-700",
+        "flex w-full items-center gap-1 text-left hover:text-slate-700",
         className
       )}
     >
       <span>{label}</span>
-      <span className="text-gray-400">
-        {active ? (sortDir === "asc" ? "▲" : "▼") : ""}
+      <span className="text-slate-400" aria-hidden="true">
+        {active ? (sortDir === "asc" ? "^" : "v") : ""}
       </span>
     </button>
   );

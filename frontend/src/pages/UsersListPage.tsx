@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useUsers, useUpdateUser, useDeleteUser } from "../hooks/useUsers";
 import { useLookupTariffs } from "../hooks/useLookup";
 import { useToast } from "../hooks/useToast";
@@ -12,20 +12,62 @@ import { Spinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Pagination } from "../components/ui/Pagination";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { Card } from "../components/ui/Card";
+import { FilterBar } from "../components/ui/FilterBar";
+import { PageHeader } from "../components/ui/PageHeader";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { UserListItem } from "../api/types";
+
+function parsePage(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
 
 export function UsersListPage() {
   const { showToast } = useToast();
   const { sortBy, sortDir, toggleSort } = useSortable("name");
   const { widths, onResize } = useColumnResize("usersTableWidths");
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [tariffFilter, setTariffFilter] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const page = parsePage(searchParams.get("page"));
+  const statusFilter = searchParams.get("status") ?? "";
+  const tariffFilter = searchParams.get("tariff") ?? "";
+  const urlSearch = searchParams.get("search") ?? "";
+
+  const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
+
+  useEffect(() => {
+    setSearchInput(urlSearch);
+  }, [urlSearch]);
+
+  function updateFilters(patch: Record<string, string | undefined>) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) {
+      if (!value) {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+    }
+    setSearchParams(next);
+  }
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === urlSearch) return;
+    const next = new URLSearchParams(searchParams);
+    if (trimmed) {
+      next.set("search", trimmed);
+    } else {
+      next.delete("search");
+    }
+    next.set("page", "1");
+    setSearchParams(next);
+  }, [search, searchParams, setSearchParams, urlSearch]);
 
   const { data, isLoading } = useUsers({
     page,
@@ -81,58 +123,61 @@ export function UsersListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Users</h1>
-        <Link to="/users/new">
-          <Button>+ Add User</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Users"
+        description="Manage users, status, and tariff assignments."
+        actions={
+          <Link to="/users/new">
+            <Button>+ Add User</Button>
+          </Link>
+        }
+      />
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Tariff</label>
-            <select
-              value={tariffFilter}
-              onChange={(e) => { setTariffFilter(e.target.value); setPage(1); }}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Tariffs</option>
-              {(tariffs || []).map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Search</label>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-              placeholder="Search by name or agreement number..."
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+      <FilterBar>
+        <Select
+          label="Status"
+          value={statusFilter}
+          onChange={(e) =>
+            updateFilters({ status: e.target.value || undefined, page: "1" })
+          }
+        >
+          <option value="">All Status</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </Select>
+
+        <Select
+          label="Tariff"
+          value={tariffFilter}
+          onChange={(e) =>
+            updateFilters({ tariff: e.target.value || undefined, page: "1" })
+          }
+        >
+          <option value="">All Tariffs</option>
+          {(tariffs || []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </Select>
+
+        <div className="md:col-span-2">
+          <Input
+            label="Search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name or agreement number..."
+          />
         </div>
-      </div>
+      </FilterBar>
 
-      {/* Users table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 resizable-table" style={{ width: "100%" }}>
-          <thead className="bg-gray-50">
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table
+            className="resizable-table min-w-full divide-y divide-slate-200"
+            style={{ width: "100%" }}
+          >
+            <thead className="bg-slate-50">
             <tr>
               <ResizableHeader colKey="name" width={widths.name} onResize={onResize}>
                 <SortableHeader label="Name" field="name" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
@@ -149,22 +194,27 @@ export function UsersListPage() {
               <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="w-24">
                 <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-24">
+              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
                 Actions
               </ResizableHeader>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-slate-200 bg-white">
             {users.length === 0 ? (
               <EmptyState message="No users found" colSpan={6} />
             ) : (
               users.map((user) => (
-                <tr key={user.id} className={user.status === "disabled" ? "bg-gray-50" : ""}>
+                <tr
+                  key={user.id}
+                  className={user.status === "disabled" ? "bg-slate-50/60" : ""}
+                >
                   <td className="px-4 py-3">
-                    <div className="font-medium">{user.last_name} {user.first_name}</div>
+                    <div className="font-medium text-slate-900">
+                      {user.last_name} {user.first_name}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-gray-600">{user.agreement_number}</span>
+                    <span className="text-sm text-slate-600">{user.agreement_number}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap">
@@ -174,7 +224,7 @@ export function UsersListPage() {
                               {t.name}
                             </Badge>
                           ))
-                        : <span className="text-xs text-gray-400">-</span>
+                        : <span className="text-xs text-slate-400">-</span>
                       }
                     </div>
                   </td>
@@ -190,9 +240,9 @@ export function UsersListPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-1">
                       <Link to={`/users/${user.id}`}>
-                        <Button size="sm">Edit</Button>
+                        <Button size="sm" variant="secondary">Edit</Button>
                       </Link>
                       <Button size="sm" variant="danger" onClick={() => setDeleteTarget(user)}>
                         Delete
@@ -203,18 +253,18 @@ export function UsersListPage() {
               ))
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         <Pagination
           page={data?.page || 1}
           pages={totalPages}
           total={total}
-          onPageChange={setPage}
+          onPageChange={(nextPage) => updateFilters({ page: String(nextPage) })}
           label="users"
         />
-      </div>
+      </Card>
 
-      {/* Delete Confirmation */}
       {!!deleteTarget && (
         <ConfirmDialog
           open={!!deleteTarget}

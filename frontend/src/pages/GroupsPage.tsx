@@ -8,6 +8,9 @@ import { Modal } from "../components/ui/Modal";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Spinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
+import { Card } from "../components/ui/Card";
+import { Input } from "../components/ui/Input";
+import { PageHeader } from "../components/ui/PageHeader";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { GroupWithCount } from "../api/types";
@@ -90,14 +93,16 @@ export function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Channel Groups</h1>
-        <Button onClick={openAddModal}>+ Add Group</Button>
-      </div>
+      <PageHeader
+        title="Channel Groups"
+        description="Create and maintain channel grouping used across channel assignments."
+        actions={<Button onClick={openAddModal}>+ Add Group</Button>}
+      />
 
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 resizable-table" style={{ width: "100%" }}>
-          <thead className="bg-gray-50">
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
+            <thead className="bg-slate-50">
             <tr>
               <ResizableHeader colKey="name" width={widths.name} onResize={onResize}>
                 <SortableHeader label="Name" field="name" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
@@ -105,12 +110,12 @@ export function GroupsPage() {
               <ResizableHeader colKey="channels" width={widths.channels} onResize={onResize} className="w-32">
                 <SortableHeader label="Channels" field="channel_count" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-28">
+              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
                 Actions
               </ResizableHeader>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-slate-200">
             {sortedGroups.length === 0 ? (
               <EmptyState message="No groups yet" colSpan={3} />
             ) : (
@@ -120,11 +125,11 @@ export function GroupsPage() {
                     <span className="font-medium">{group.name}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-gray-600">{group.channel_count}</span>
+                    <span className="text-slate-600">{group.channel_count}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center space-x-1">
-                      <Button size="sm" onClick={() => openEditModal(group)}>Edit</Button>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="secondary" onClick={() => openEditModal(group)}>Edit</Button>
                       <Button size="sm" variant="danger" onClick={() => setDeleteTarget(group)}>Delete</Button>
                     </div>
                   </td>
@@ -132,10 +137,10 @@ export function GroupsPage() {
               ))
             )}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      </Card>
 
-      {/* Add/Edit Modal */}
       {modalOpen && (
         <Modal
           open={modalOpen}
@@ -148,21 +153,17 @@ export function GroupsPage() {
             </>
           }
         >
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Group Name</label>
-            <input
+          <Input
+            label="Group Name"
               type="text"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
               autoFocus
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          />
         </Modal>
       )}
 
-      {/* Delete Confirmation */}
       {!!deleteTarget && (
         <ConfirmDialog
           open={!!deleteTarget}

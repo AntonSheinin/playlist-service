@@ -2,15 +2,19 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../../utils/cn";
 
 const variants = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
-  danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
-  secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400",
-  ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-400",
+  primary:
+    "bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-200 border border-sky-600",
+  danger:
+    "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-200 border border-rose-600",
+  secondary:
+    "bg-white text-slate-800 hover:bg-slate-50 focus:ring-slate-200 border border-slate-300",
+  ghost:
+    "text-slate-700 hover:text-slate-900 hover:bg-slate-100 focus:ring-slate-200 border border-transparent",
 };
 
 const sizes = {
-  sm: "px-2 py-1 text-xs",
-  md: "px-4 py-2 text-sm",
+  sm: "h-8 px-3 text-xs",
+  md: "h-10 px-4 text-sm",
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -33,11 +37,13 @@ export function Button({
     <button
       className={cn(
         "inline-flex items-center justify-center rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed",
+        "transition-colors",
         variants[variant],
         sizes[size],
         className
       )}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
       {loading && (
@@ -45,6 +51,7 @@ export function Button({
           className="animate-spin -ml-1 mr-2 h-4 w-4"
           fill="none"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

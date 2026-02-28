@@ -39,8 +39,8 @@ export function ConfirmDialog({
       }
     >
       <div className="flex items-start space-x-4">
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-          <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-100">
+          <svg className="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -50,8 +50,8 @@ export function ConfirmDialog({
           </svg>
         </div>
         <div>
-          <p className="text-gray-900">{message}</p>
-          {details && <p className="mt-2 text-sm text-gray-600">{details}</p>}
+          <p className="text-slate-900">{message}</p>
+          {details && <p className="mt-2 text-sm text-slate-600">{details}</p>}
         </div>
       </div>
     </Modal>

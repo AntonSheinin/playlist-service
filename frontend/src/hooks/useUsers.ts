@@ -12,6 +12,7 @@ import {
   getUserAccessLogs,
 } from "../api/users";
 import type { UserCreate, UserUpdate } from "../api/types";
+import { queryKeys } from "./queryKeys";
 
 interface ListParams {
   page?: number;
@@ -25,7 +26,7 @@ interface ListParams {
 
 export function useUsers(params: ListParams) {
   return useQuery({
-    queryKey: ["users", params],
+    queryKey: queryKeys.users.list(params),
     queryFn: () => listUsers(params),
     placeholderData: keepPreviousData,
   });
@@ -33,7 +34,7 @@ export function useUsers(params: ListParams) {
 
 export function useUser(id: number | undefined) {
   return useQuery({
-    queryKey: ["users", id],
+    queryKey: queryKeys.users.detail(id),
     queryFn: () => getUser(id!),
     enabled: !!id,
   });
@@ -43,7 +44,11 @@ export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: UserCreate) => createUser(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(created.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
+    },
   });
 }
 
@@ -52,8 +57,11 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UserUpdate }) => updateUser(id, data),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["users", vars.id] });
-      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(vars.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.resolvedChannels(vars.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.playlist(vars.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     },
   });
 }
@@ -62,7 +70,13 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteUser(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.resolvedChannels(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.playlist(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
+    },
   });
 }
 
@@ -70,13 +84,16 @@ export function useRegenerateToken() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => regenerateToken(id),
-    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: ["users", id] }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.playlist(id) });
+    },
   });
 }
 
 export function useResolvedChannels(userId: number | undefined) {
   return useQuery({
-    queryKey: ["users", userId, "channels"],
+    queryKey: queryKeys.users.resolvedChannels(userId),
     queryFn: () => getResolvedChannels(userId!),
     enabled: !!userId,
   });
@@ -84,7 +101,7 @@ export function useResolvedChannels(userId: number | undefined) {
 
 export function usePlaylistPreview(userId: number | undefined) {
   return useQuery({
-    queryKey: ["users", userId, "playlist"],
+    queryKey: queryKeys.users.playlist(userId),
     queryFn: () => previewPlaylist(userId!),
     enabled: !!userId,
   });
@@ -97,7 +114,7 @@ interface SessionParams {
 
 export function useUserSessions(userId: number | undefined, params: SessionParams) {
   return useQuery({
-    queryKey: ["users", userId, "sessions", params],
+    queryKey: queryKeys.users.sessions(userId, params),
     queryFn: () => getUserSessions(userId!, params),
     enabled: !!userId,
   });
@@ -105,7 +122,7 @@ export function useUserSessions(userId: number | undefined, params: SessionParam
 
 export function useUserAccessLogs(userId: number | undefined, params: SessionParams) {
   return useQuery({
-    queryKey: ["users", userId, "access-logs", params],
+    queryKey: queryKeys.users.accessLogs(userId, params),
     queryFn: () => getUserAccessLogs(userId!, params),
     enabled: !!userId,
   });

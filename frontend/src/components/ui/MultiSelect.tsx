@@ -1,5 +1,6 @@
 import ReactSelect from "react-select";
 import type { MultiValue } from "react-select";
+import { fieldLabelClass } from "./fieldStyles";
 
 export interface SelectOption {
   value: number;
@@ -28,7 +29,7 @@ export function MultiSelect({
   return (
     <div>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className={`${fieldLabelClass} mb-1`}>
           {label}
         </label>
       )}
@@ -44,19 +45,23 @@ export function MultiSelect({
         styles={{
           control: (base) => ({
             ...base,
-            borderColor: "#d1d5db",
-            "&:hover": { borderColor: "#9ca3af" },
+            borderColor: "#cbd5e1",
+            borderRadius: 8,
+            minHeight: "40px",
             boxShadow: "none",
-            minHeight: "38px",
+            "&:hover": { borderColor: "#94a3b8" },
           }),
+          valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
           multiValue: (base) => ({
             ...base,
-            backgroundColor: "#dbeafe",
+            backgroundColor: "#e0f2fe",
+            borderRadius: 6,
           }),
           multiValueLabel: (base) => ({
             ...base,
-            color: "#1e40af",
+            color: "#075985",
           }),
+          menu: (base) => ({ ...base, zIndex: 60 }),
         }}
       />
     </div>

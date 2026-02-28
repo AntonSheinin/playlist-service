@@ -1,9 +1,20 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter
 from sqlalchemy import func, select
 
+from app.clients.epg_service import EpgServiceClient
+from app.clients.flussonic import FlussonicClient
 from app.dependencies import CurrentAdminId, DBSession
+from app.exceptions import EpgServiceError, FlussonicError
 from app.models import Channel, Group, Package, SyncStatus, Tariff, User, UserStatus
-from app.schemas import DashboardStats, SuccessResponse
+from app.schemas import (
+    DashboardStats,
+    EpgDashboardStats,
+    FlussonicDashboardStats,
+    MessageResponse,
+    SuccessResponse,
+)
 
 router = APIRouter()
 
@@ -70,3 +81,71 @@ async def get_stats(
     )
 
     return SuccessResponse(data=stats)
+
+
+@router.get("/flussonic", response_model=SuccessResponse[FlussonicDashboardStats])
+async def get_flussonic_stats(_admin_id: CurrentAdminId) -> SuccessResponse[FlussonicDashboardStats]:
+    """Get Flussonic health and runtime traffic/source stats for dashboard."""
+    checked_at = datetime.now(UTC)
+    client = FlussonicClient()
+
+    try:
+        payload = await client.get_dashboard_stats()
+        stats = FlussonicDashboardStats(
+            health=payload["health"],
+            checked_at=checked_at,
+            incoming_kbit=payload["incoming_kbit"],
+            outgoing_kbit=payload["outgoing_kbit"],
+            total_clients=payload["total_clients"],
+            total_sources=payload["total_sources"],
+            good_sources=payload["good_sources"],
+            broken_sources=payload["broken_sources"],
+        )
+    except FlussonicError as e:
+        stats = FlussonicDashboardStats(
+            health="down",
+            checked_at=checked_at,
+            error=str(e),
+        )
+
+    return SuccessResponse(data=stats)
+
+
+@router.get("/epg", response_model=SuccessResponse[EpgDashboardStats])
+async def get_epg_stats(_admin_id: CurrentAdminId) -> SuccessResponse[EpgDashboardStats]:
+    """Get EPG service health and update stats for dashboard."""
+    client = EpgServiceClient()
+
+    try:
+        payload = await client.get_dashboard_stats()
+        stats = EpgDashboardStats(
+            health=payload["health"],
+            checked_at=payload["checked_at"],
+            next_fetch_at=payload["next_fetch_at"],
+            last_epg_update_at=payload["last_epg_update_at"],
+            sources_total=payload["sources_total"],
+            last_updated_channels_count=payload["last_updated_channels_count"],
+            error=payload.get("error"),
+        )
+    except EpgServiceError as e:
+        checked_at = datetime.now(UTC)
+        stats = EpgDashboardStats(
+            health="down",
+            checked_at=checked_at,
+            error=str(e),
+        )
+
+    return SuccessResponse(data=stats)
+
+
+@router.post("/epg/update", response_model=MessageResponse)
+async def update_epg_now(_admin_id: CurrentAdminId) -> MessageResponse:
+    """Trigger EPG service update immediately."""
+    client = EpgServiceClient()
+    payload = await client.trigger_fetch()
+
+    message = payload.get("message")
+    if not isinstance(message, str) or not message.strip():
+        message = "EPG update request completed"
+
+    return MessageResponse(message=message)

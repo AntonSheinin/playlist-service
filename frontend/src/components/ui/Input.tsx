@@ -1,29 +1,48 @@
 import type { InputHTMLAttributes } from "react";
 import { cn } from "../../utils/cn";
+import {
+  fieldControlClass,
+  fieldErrorClass,
+  fieldHintClass,
+  fieldLabelClass,
+} from "./fieldStyles";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
 }
 
-export function Input({ label, error, className, id, ...props }: InputProps) {
+export function Input({
+  label,
+  error,
+  hint,
+  className,
+  id,
+  ...props
+}: InputProps) {
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+        <label htmlFor={id} className={fieldLabelClass}>
           {label}
         </label>
       )}
       <input
         id={id}
         className={cn(
-          "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500",
-          error && "border-red-500",
+          fieldControlClass,
+          error && "border-rose-500 focus:border-rose-500 focus:ring-rose-100",
           className
         )}
+        aria-invalid={!!error}
         {...props}
       />
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      {error ? (
+        <p className={fieldErrorClass}>{error}</p>
+      ) : (
+        hint && <p className={fieldHintClass}>{hint}</p>
+      )}
     </div>
   );
 }

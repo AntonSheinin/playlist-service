@@ -1,3 +1,5 @@
+import { Button } from "./Button";
+
 interface PaginationProps {
   page: number;
   pages: number;
@@ -22,16 +24,16 @@ export function Pagination({
   if (pages <= 1 && !onPerPageChange) return null;
 
   return (
-    <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <span className="text-sm text-gray-700">
+    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:space-x-4">
+        <span className="text-sm text-slate-700">
           Page {page} of {pages} ({total} {label})
         </span>
         {onPerPageChange && perPage && (
           <select
             value={perPage}
             onChange={(e) => onPerPageChange(Number(e.target.value))}
-            className="text-sm border border-gray-300 rounded px-2 py-1"
+            className="rounded-md border border-slate-300 px-2 py-1 text-sm"
           >
             {perPageOptions.map((n) => (
               <option key={n} value={n}>
@@ -41,57 +43,63 @@ export function Pagination({
           </select>
         )}
       </div>
-      <div className="flex space-x-2">
+      <div className="flex flex-wrap gap-2">
         {onPerPageChange ? (
           // Full pagination: First/Previous/Next/Last
           <>
-            <button
+            <Button
               onClick={() => onPageChange(1)}
               disabled={page <= 1}
-              className="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+              variant="secondary"
             >
               First
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => onPageChange(page - 1)}
               disabled={page <= 1}
-              className="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+              variant="secondary"
             >
               Previous
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= pages}
-              className="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+              variant="secondary"
             >
               Next
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => onPageChange(pages)}
               disabled={page >= pages}
-              className="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+              variant="secondary"
             >
               Last
-            </button>
+            </Button>
           </>
         ) : (
           // Simple pagination: Previous/Next only
           <>
             {page > 1 && (
-              <button
+              <Button
                 onClick={() => onPageChange(page - 1)}
-                className="px-3 py-1 border rounded text-sm hover:bg-gray-50"
+                size="sm"
+                variant="secondary"
               >
                 Previous
-              </button>
+              </Button>
             )}
             {page < pages && (
-              <button
+              <Button
                 onClick={() => onPageChange(page + 1)}
-                className="px-3 py-1 border rounded text-sm hover:bg-gray-50"
+                size="sm"
+                variant="secondary"
               >
                 Next
-              </button>
+              </Button>
             )}
           </>
         )}

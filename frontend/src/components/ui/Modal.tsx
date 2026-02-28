@@ -34,16 +34,17 @@ export function Modal({
         <div className="flex min-h-full items-center justify-center p-4">
           <DialogPanel
             transition
-            className={`w-full ${maxWidth} bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto transition duration-200 data-[closed]:opacity-0 data-[closed]:scale-95`}
+            className={`w-full ${maxWidth} max-h-[90vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl transition duration-200 data-[closed]:scale-95 data-[closed]:opacity-0`}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <DialogTitle className="text-lg font-semibold text-gray-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <DialogTitle className="text-lg font-semibold text-slate-900">
                 {title}
               </DialogTitle>
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-600"
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-200"
                 onClick={onClose}
+                aria-label="Close dialog"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -52,7 +53,7 @@ export function Modal({
             </div>
             <div className="px-6 py-4">{children}</div>
             {footer && (
-              <div className="px-6 py-4 border-t flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 border-t border-slate-200 px-6 py-4">
                 {footer}
               </div>
             )}

@@ -71,3 +71,10 @@ export default defineConfig([
   },
 ])
 ```
+
+## Environment
+
+Frontend uses Vite environment variables from `frontend/.env`:
+
+- `VITE_BASE_URL` - API base URL.
+- `VITE_FLUSSONIC_DASHBOARD_REFRESH_MS` - Flussonic dashboard polling interval in milliseconds (default `30000`).

@@ -25,10 +25,10 @@ const iconMap: Record<ToastType, JSX.Element> = {
 };
 
 const colorMap: Record<ToastType, string> = {
-  success: "bg-green-500 text-white",
-  error: "bg-red-500 text-white",
-  warning: "bg-yellow-500 text-white",
-  info: "bg-blue-500 text-white",
+  success: "bg-emerald-600 text-white",
+  error: "bg-rose-600 text-white",
+  warning: "bg-amber-500 text-white",
+  info: "bg-sky-600 text-white",
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
@@ -36,15 +36,17 @@ function ToastItem({ toast }: { toast: Toast }) {
 
   return (
     <div
+      role={toast.type === "error" ? "alert" : "status"}
       className={`px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 ${
         toast.exiting ? "toast-exit" : "toast-enter"
       } ${colorMap[toast.type]}`}
     >
-      <span>{iconMap[toast.type]}</span>
+      <span aria-hidden="true">{iconMap[toast.type]}</span>
       <span className="flex-1">{toast.message}</span>
       <button
         onClick={() => removeToast(toast.id)}
         className="opacity-70 hover:opacity-100"
+        aria-label="Dismiss notification"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -60,7 +62,11 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div
+      className="fixed right-4 top-4 z-50 space-y-2"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { MultiValue } from "react-select";
 import ReactSelect from "react-select";
+import { useSearchParams } from "react-router-dom";
 import {
   useChannels,
   useBulkUpdateChannels,
@@ -25,6 +26,12 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Spinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Pagination } from "../components/ui/Pagination";
+import { Card } from "../components/ui/Card";
+import { FilterBar } from "../components/ui/FilterBar";
+import { Input } from "../components/ui/Input";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Select } from "../components/ui/Select";
+import { fieldLabelClass } from "../components/ui/fieldStyles";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { ChannelResponse, ChannelBulkUpdateItem } from "../api/types";
@@ -36,17 +43,67 @@ interface PendingChange {
   channel_number?: number | null;
 }
 
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const compactCellInputClass =
+  "h-8 rounded-md border border-slate-300 px-1.5 py-1 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100";
+
+const compactMultiSelectStyles = {
+  menuPortal: (base: object) => ({ ...base, zIndex: 50 }),
+  control: (base: object) => ({
+    ...base,
+    minHeight: "30px",
+    fontSize: "12px",
+    borderColor: "#cbd5e1",
+    boxShadow: "none",
+  }),
+  multiValue: (base: object) => ({ ...base, fontSize: "11px" }),
+};
+
+const portalOnlySelectStyles = {
+  menuPortal: (base: object) => ({ ...base, zIndex: 50 }),
+};
+
 export function ChannelsPage() {
   const { showToast } = useToast();
   const { sortBy, sortDir, toggleSort } = useSortable("channel_number");
   const { widths, onResize } = useColumnResize("channelsTableWidths");
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
-  const [groupFilter, setGroupFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const page = parsePositiveInt(searchParams.get("page"), 1);
+  const perPage = parsePositiveInt(searchParams.get("perPage"), 20);
+  const groupFilter = searchParams.get("group") ?? "";
+  const statusFilter = searchParams.get("status") ?? "";
+  const urlSearch = searchParams.get("search") ?? "";
+
+  const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
+
+  useEffect(() => {
+    setSearchInput(urlSearch);
+  }, [urlSearch]);
+
+  function updateParams(patch: Record<string, string | undefined>) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) {
+      if (!value) next.delete(key);
+      else next.set(key, value);
+    }
+    setSearchParams(next);
+  }
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === urlSearch) return;
+    const next = new URLSearchParams(searchParams);
+    if (trimmed) next.set("search", trimmed);
+    else next.delete("search");
+    next.set("page", "1");
+    setSearchParams(next);
+  }, [search, searchParams, setSearchParams, urlSearch]);
 
   const { data, isLoading } = useChannels({
     page,
@@ -173,7 +230,7 @@ export function ChannelsPage() {
     try {
       const result = await syncMut.mutateAsync();
       showToast(`Sync complete: ${result.new} new, ${result.updated} updated, ${result.orphaned} orphaned`, "success");
-      setPage(1);
+      updateParams({ page: "1" });
     } catch {
       showToast("Failed to sync channels", "error");
     }
@@ -302,14 +359,16 @@ export function ChannelsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Channels</h1>
-        <div className="flex space-x-2">
+      <PageHeader
+        title="Channels"
+        description="Manage channel metadata, logos, groups, and package assignments."
+        actions={
+          <div className="flex flex-wrap gap-2">
           {pendingCount > 0 && (
             <Button
               onClick={handleApplyAll}
               loading={bulkUpdate.isPending}
-              className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
+              className="border-emerald-600 bg-emerald-600 hover:bg-emerald-700"
             >
               Apply All ({pendingCount})
             </Button>
@@ -317,54 +376,44 @@ export function ChannelsPage() {
           <Button onClick={handleSync} loading={syncMut.isPending}>
             Sync from Flussonic
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Group</label>
-            <select
-              value={groupFilter}
-              onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Groups</option>
-              {(groups || []).map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="synced">Synced</option>
-              <option value="orphaned">Orphaned</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Search</label>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-              placeholder="Search channels..."
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+      <FilterBar>
+        <Select
+          label="Group"
+          value={groupFilter}
+          onChange={(e) => updateParams({ group: e.target.value || undefined, page: "1" })}
+        >
+          <option value="">All Groups</option>
+          {(groups || []).map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </Select>
+        <Select
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => updateParams({ status: e.target.value || undefined, page: "1" })}
+        >
+          <option value="">All Status</option>
+          <option value="synced">Synced</option>
+          <option value="orphaned">Orphaned</option>
+        </Select>
+        <div className="md:col-span-2">
+          <Input
+            label="Search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search channels..."
+          />
         </div>
-      </div>
+      </FilterBar>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 resizable-table" style={{ width: "100%" }}>
-          <thead className="bg-gray-50">
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
+            <thead className="bg-slate-50">
             <tr>
               <ResizableHeader colKey="number" width={widths.number} onResize={onResize} className="w-16">
                 <SortableHeader label="#" field="channel_number" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
@@ -390,12 +439,12 @@ export function ChannelsPage() {
               <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="w-20">
                 <SortableHeader label="Status" field="sync_status" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-24">
+              <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
                 Actions
               </ResizableHeader>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-slate-200">
             {channels.length === 0 ? (
               <EmptyState message="No channels found" colSpan={9} />
             ) : (
@@ -409,7 +458,7 @@ export function ChannelsPage() {
                 const catchupDisplay = ch.catchup_days == null ? "-" : String(ch.catchup_days);
 
                 return (
-                  <tr key={ch.id} className={`${isOrphaned ? "bg-gray-50 text-gray-500" : ""} ${hasChanges ? "bg-yellow-50" : ""}`}>
+                  <tr key={ch.id} className={`${isOrphaned ? "bg-slate-50 text-slate-500" : ""} ${hasChanges ? "bg-amber-50" : ""}`}>
                     <td className="px-2 py-2">
                       <input
                         type="number"
@@ -417,22 +466,32 @@ export function ChannelsPage() {
                         max={9999}
                         value={currentNumber}
                         onChange={(e) => trackChange(ch.id, "channel_number", e.target.value)}
-                        className="w-14 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className={`${compactCellInputClass} w-14`}
+                        aria-label={`Channel number for ${ch.display_name || ch.stream_name}`}
                       />
                     </td>
                     <td className="px-2 py-2">
                       {currentLogo ? (
-                        <img
-                          src={currentLogo}
-                          className="w-8 h-8 object-contain cursor-pointer"
+                        <button
+                          type="button"
                           onClick={() => openLogoModal(ch)}
-                          title="Click to change"
-                        />
+                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent hover:border-sky-200 hover:bg-sky-50"
+                          title="Edit logo"
+                          aria-label={`Edit logo for ${ch.display_name || ch.stream_name}`}
+                        >
+                          <img
+                            src={currentLogo}
+                            className="h-8 w-8 object-contain"
+                            alt=""
+                          />
+                        </button>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => openLogoModal(ch)}
-                          className="w-8 h-8 border border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 text-xs"
+                          className="flex h-8 w-8 items-center justify-center rounded border border-dashed border-slate-300 text-xs text-slate-400 hover:border-sky-500 hover:text-sky-500"
                           title="Add logo"
+                          aria-label={`Add logo for ${ch.display_name || ch.stream_name}`}
                         >
                           +
                         </button>
@@ -440,7 +499,7 @@ export function ChannelsPage() {
                     </td>
                     <td className="px-2 py-2">
                       <div className="font-medium text-sm">{ch.display_name || ch.stream_name}</div>
-                      <div className="text-xs text-gray-500">{ch.stream_name}</div>
+                      <div className="text-xs text-slate-500">{ch.stream_name}</div>
                     </td>
                     <td className="px-2 py-2">
                       <input
@@ -448,7 +507,8 @@ export function ChannelsPage() {
                         value={currentTvgId}
                         onChange={(e) => trackChange(ch.id, "tvg_id", e.target.value)}
                         placeholder="-"
-                        className="w-24 px-1 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className={`${compactCellInputClass} w-24`}
+                        aria-label={`TVG ID for ${ch.display_name || ch.stream_name}`}
                       />
                     </td>
                     <td className="px-2 py-2">
@@ -460,12 +520,12 @@ export function ChannelsPage() {
                           handleGroupChange(ch.id, selected.map((s) => s.value));
                         }}
                         menuPortalTarget={document.body}
-                        styles={{ menuPortal: (base) => ({ ...base, zIndex: 50 }), control: (base) => ({ ...base, minHeight: "30px", fontSize: "12px" }), multiValue: (base) => ({ ...base, fontSize: "11px" }) }}
+                        styles={compactMultiSelectStyles}
                         classNamePrefix="react-select"
                       />
                     </td>
                     <td className="px-2 py-2">
-                      <span className={`text-sm ${catchupDisplay === "-" ? "text-gray-400" : "text-gray-700"}`}>{catchupDisplay}</span>
+                      <span className={`text-sm ${catchupDisplay === "-" ? "text-slate-400" : "text-slate-700"}`}>{catchupDisplay}</span>
                     </td>
                     <td className="px-2 py-2">
                       <ReactSelect
@@ -476,7 +536,7 @@ export function ChannelsPage() {
                           handlePackageChange(ch.id, selected.map((s) => s.value));
                         }}
                         menuPortalTarget={document.body}
-                        styles={{ menuPortal: (base) => ({ ...base, zIndex: 50 }), control: (base) => ({ ...base, minHeight: "30px", fontSize: "12px" }), multiValue: (base) => ({ ...base, fontSize: "11px" }) }}
+                        styles={compactMultiSelectStyles}
                         classNamePrefix="react-select"
                       />
                     </td>
@@ -486,17 +546,17 @@ export function ChannelsPage() {
                       </Badge>
                     </td>
                     <td className="px-2 py-2">
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center gap-1">
                         <Button
                           size="sm"
                           variant={hasChanges ? "primary" : "ghost"}
                           disabled={!hasChanges}
                           onClick={() => handleApplyRow(ch.id)}
-                          className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}
+                          className={hasChanges ? "border-emerald-600 bg-emerald-600 hover:bg-emerald-700" : ""}
                         >
                           Apply
                         </Button>
-                        <Button size="sm" onClick={() => openEditModal(ch)}>Edit</Button>
+                        <Button size="sm" variant="secondary" onClick={() => openEditModal(ch)}>Edit</Button>
                         <Button size="sm" variant="danger" onClick={() => setDeleteTarget(ch)}>Del</Button>
                       </div>
                     </td>
@@ -505,18 +565,19 @@ export function ChannelsPage() {
               })
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         <Pagination
           page={data?.page || 1}
           pages={data?.pages || 0}
           total={data?.total || 0}
-          onPageChange={setPage}
+          onPageChange={(nextPage) => updateParams({ page: String(nextPage) })}
           perPage={perPage}
-          onPerPageChange={(pp) => { setPerPage(pp); setPage(1); }}
+          onPerPageChange={(pp) => { updateParams({ perPage: String(pp), page: "1" }); }}
           label="channels"
         />
-      </div>
+      </Card>
 
       {/* Delete Confirmation */}
       {!!deleteTarget && (
@@ -547,33 +608,46 @@ export function ChannelsPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-center">
               {logoRemovalMode || (!logoFile && !logoUrl) ? (
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400">No logo</div>
+                <div className="flex h-32 w-32 items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-400">No logo</div>
               ) : (
                 <img
                   src={logoFilePreview || logoUrl}
-                  className="w-32 h-32 object-contain border rounded"
+                  className="h-32 w-32 rounded-lg border border-slate-200 object-contain"
+                  alt="Channel logo preview"
                 />
               )}
             </div>
-            <div className="flex justify-center space-x-2">
+            <div className="flex flex-wrap justify-center gap-2">
               <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) { setLogoFile(f); setLogoFilePreview(URL.createObjectURL(f)); setLogoRemovalMode(null); setLogoUrl(""); }
               }} />
-              <button type="button" onClick={() => logoFileRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">Choose File</button>
-              <button type="button" onClick={() => { setLogoRemovalMode("db"); setLogoFile(null); setLogoFilePreview(""); setLogoUrl(""); }} className="px-4 py-2 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50">Remove URL</button>
-              <button type="button" onClick={() => { setLogoRemovalMode("delete"); setLogoFile(null); setLogoFilePreview(""); setLogoUrl(""); }} className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700">Remove + Delete File</button>
+              <Button type="button" variant="secondary" onClick={() => logoFileRef.current?.click()}>
+                Choose File
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                onClick={() => { setLogoRemovalMode("db"); setLogoFile(null); setLogoFilePreview(""); setLogoUrl(""); }}
+              >
+                Remove URL
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => { setLogoRemovalMode("delete"); setLogoFile(null); setLogoFilePreview(""); setLogoUrl(""); }}
+              >
+                Remove + Delete File
+              </Button>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500">Or paste logo URL</label>
-              <input
-                type="text"
-                value={logoUrl}
-                onChange={(e) => { setLogoUrl(e.target.value); setLogoFile(null); setLogoFilePreview(""); setLogoRemovalMode(null); }}
-                placeholder="https://example.com/logo.png"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            <Input
+              label="Or paste logo URL"
+              type="text"
+              value={logoUrl}
+              onChange={(e) => { setLogoUrl(e.target.value); setLogoFile(null); setLogoFilePreview(""); setLogoRemovalMode(null); }}
+              placeholder="https://example.com/logo.png"
+            />
           </div>
         </Modal>
       )}
@@ -592,54 +666,58 @@ export function ChannelsPage() {
           }
         >
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Stream Name</label>
-              <input type="text" readOnly value={editChannel.stream_name} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Display Name</label>
-              <input type="text" readOnly value={editChannel.display_name || ""} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500" />
-            </div>
+            <Input label="Stream Name" type="text" readOnly value={editChannel.stream_name} className="bg-slate-50 text-slate-500" />
+            <Input label="Display Name" type="text" readOnly value={editChannel.display_name || ""} className="bg-slate-50 text-slate-500" />
             <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Channel #"
+                type="number"
+                min={0}
+                max={9999}
+                value={editNumber}
+                onChange={(e) => setEditNumber(e.target.value)}
+              />
               <div>
-                <label className="block text-sm font-medium text-gray-700">Channel #</label>
-                <input type="number" min={0} max={9999} value={editNumber} onChange={(e) => setEditNumber(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Archive Days</label>
-                <div className="mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-sm">
+                <label className={fieldLabelClass}>Archive Days</label>
+                <div className="mt-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                   {editChannel.catchup_days == null ? "-" : String(editChannel.catchup_days)}
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Imported from Flussonic.</p>
+                <p className="mt-1 text-xs text-slate-400">Imported from Flussonic.</p>
               </div>
             </div>
+            <Input label="TVG ID (EPG ID)" type="text" value={editTvgId} onChange={(e) => setEditTvgId(e.target.value)} />
             <div>
-              <label className="block text-sm font-medium text-gray-700">TVG ID (EPG ID)</label>
-              <input type="text" value={editTvgId} onChange={(e) => setEditTvgId(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Logo</label>
-              <div className="mt-1 flex items-center space-x-4">
+              <label className={fieldLabelClass}>Logo</label>
+              <div className="mt-1 flex flex-wrap items-center gap-4">
                 {!editLogoRemoved && editLogoPreview && (
-                  <img src={editLogoPreview} className="w-16 h-16 object-contain border rounded" />
+                  <img src={editLogoPreview} className="h-16 w-16 rounded border border-slate-200 object-contain" alt="Edit logo preview" />
                 )}
                 <input ref={editLogoFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) { setEditLogoFile(f); setEditLogoPreview(URL.createObjectURL(f)); setEditLogoRemoved(false); }
                 }} />
-                <button type="button" onClick={() => editLogoFileRef.current?.click()} className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">Choose File</button>
-                <button type="button" onClick={() => { setEditLogoRemoved(true); setEditLogoFile(null); setEditLogoPreview(""); }} className="px-3 py-2 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50">Remove</button>
+                <Button type="button" variant="secondary" onClick={() => editLogoFileRef.current?.click()}>
+                  Choose File
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                  onClick={() => { setEditLogoRemoved(true); setEditLogoFile(null); setEditLogoPreview(""); }}
+                >
+                  Remove
+                </Button>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Groups</label>
+              <label className={fieldLabelClass}>Groups</label>
               <ReactSelect
                 isMulti
                 options={groupOptions}
                 value={groupOptions.filter((o) => editGroupIds.includes(o.value))}
                 onChange={(selected: MultiValue<{ value: number; label: string }>) => setEditGroupIds(selected.map((s) => s.value))}
                 menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 50 }) }}
+                styles={portalOnlySelectStyles}
                 className="mt-1"
                 classNamePrefix="react-select"
               />

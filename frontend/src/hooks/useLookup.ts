@@ -5,10 +5,11 @@ import {
   lookupTariffs,
   lookupChannels,
 } from "../api/lookup";
+import { queryKeys } from "./queryKeys";
 
 export function useLookupGroups() {
   return useQuery({
-    queryKey: ["lookup", "groups"],
+    queryKey: queryKeys.lookup.groups(),
     queryFn: lookupGroups,
     staleTime: 30_000,
   });
@@ -16,7 +17,7 @@ export function useLookupGroups() {
 
 export function useLookupPackages() {
   return useQuery({
-    queryKey: ["lookup", "packages"],
+    queryKey: queryKeys.lookup.packages(),
     queryFn: lookupPackages,
     staleTime: 30_000,
   });
@@ -24,7 +25,7 @@ export function useLookupPackages() {
 
 export function useLookupTariffs() {
   return useQuery({
-    queryKey: ["lookup", "tariffs"],
+    queryKey: queryKeys.lookup.tariffs(),
     queryFn: lookupTariffs,
     staleTime: 30_000,
   });
@@ -32,7 +33,7 @@ export function useLookupTariffs() {
 
 export function useLookupChannels() {
   return useQuery({
-    queryKey: ["lookup", "channels"],
+    queryKey: queryKeys.lookup.channels(),
     queryFn: () => lookupChannels(),
     staleTime: 30_000,
   });

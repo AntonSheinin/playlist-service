@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Threshold for distinguishing minutes from days in DVR depth
 DVR_DEPTH_MINUTES_THRESHOLD = 365
+V3_READINESS_ENDPOINT = "/streamer/api/v3/monitoring/readiness"
+V3_LIVENESS_ENDPOINT = "/streamer/api/v3/monitoring/liveness"
+V3_STATS_ENDPOINT = "/streamer/api/v3/config/stats"
 
 
 class FlussonicStream(BaseModel):
@@ -38,6 +42,40 @@ class FlussonicClient:
         self.timeout = settings.flussonic_timeout
         self.page_limit = settings.flussonic_page_limit
 
+    async def get_dashboard_stats(self) -> dict[str, int | str | None]:
+        """
+        Fetch Flussonic dashboard stats.
+
+        Includes health status, incoming/outgoing traffic and source counters.
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            auth = httpx.BasicAuth(self.username, self.password)
+            health_probe_ok = await self._check_v3_health(client, auth)
+            stats = await self._get_v3_server_stats(client, auth)
+
+        total_sources = self._as_int(stats.get("total_streams"))
+        good_sources = self._as_int(stats.get("online_streams"))
+        broken_sources: int | None = None
+        if total_sources is not None and good_sources is not None:
+            broken_sources = max(total_sources - good_sources, 0)
+
+        streamer_status = stats.get("streamer_status")
+        health = "up"
+        if not health_probe_ok:
+            health = "down"
+        elif isinstance(streamer_status, str) and streamer_status != "running":
+            health = "degraded"
+
+        return {
+            "health": health,
+            "incoming_kbit": self._as_int(stats.get("input_kbit")),
+            "outgoing_kbit": self._as_int(stats.get("output_kbit")),
+            "total_clients": self._as_int(stats.get("total_clients")),
+            "total_sources": total_sources,
+            "good_sources": good_sources,
+            "broken_sources": broken_sources,
+        }
+
     async def get_streams(self) -> list[FlussonicStream]:
         """
         Fetch all streams from Flussonic.
@@ -59,6 +97,77 @@ class FlussonicClient:
                     return streams
 
             raise FlussonicError("Failed to fetch streams from any Flussonic API endpoint")
+
+    async def _check_v3_health(
+        self, client: httpx.AsyncClient, auth: httpx.BasicAuth
+    ) -> bool:
+        """Check Flussonic health endpoints. Returns True if any probe succeeds."""
+        endpoints = [V3_READINESS_ENDPOINT, V3_LIVENESS_ENDPOINT]
+
+        for endpoint in endpoints:
+            url = f"{self.base_url}{endpoint}"
+            try:
+                response = await client.get(url, auth=auth)
+                if response.status_code == 200:
+                    return True
+                logger.debug(
+                    "Flussonic health probe %s returned status %d",
+                    endpoint,
+                    response.status_code,
+                )
+            except httpx.TimeoutException:
+                logger.warning("Timeout during Flussonic health probe at %s", url)
+            except httpx.RequestError as e:
+                logger.debug("Flussonic health probe failed at %s: %s", url, e)
+
+        return False
+
+    async def _get_v3_server_stats(
+        self, client: httpx.AsyncClient, auth: httpx.BasicAuth
+    ) -> dict[str, Any]:
+        """Fetch server stats from Flussonic v3 API."""
+        url = f"{self.base_url}{V3_STATS_ENDPOINT}"
+
+        try:
+            response = await client.get(url, auth=auth)
+            if response.status_code != 200:
+                logger.error(
+                    "Flussonic stats endpoint returned status %d: %s",
+                    response.status_code,
+                    response.text,
+                )
+                raise FlussonicError(
+                    f"Failed to fetch Flussonic stats: {response.status_code}"
+                )
+
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise FlussonicError("Unexpected Flussonic stats response format")
+            return payload
+
+        except httpx.TimeoutException:
+            logger.error("Timeout connecting to Flussonic stats endpoint at %s", url)
+            raise FlussonicError(
+                f"Timeout connecting to Flussonic stats endpoint at {url}"
+            ) from None
+        except httpx.RequestError as e:
+            logger.error("Failed to connect to Flussonic stats endpoint: %s", e)
+            raise FlussonicError(f"Failed to connect to Flussonic stats endpoint: {e}") from e
+
+    def _as_int(self, value: Any) -> int | None:
+        """Convert API value to int when possible."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(float(value))
+            except ValueError:
+                return None
+        return None
 
     async def _try_v3_api(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth

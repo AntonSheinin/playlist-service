@@ -51,6 +51,12 @@ app.include_router(api_router)
 app.include_router(pages_router)
 
 
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Lightweight unauthenticated liveness probe."""
+    return {"status": "up", "service": "playlist-service"}
+
+
 @app.exception_handler(PlaylistServiceError)
 async def playlist_service_error_handler(
     request: Request, exc: PlaylistServiceError

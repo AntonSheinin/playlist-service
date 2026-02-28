@@ -7,7 +7,7 @@ export function EmptyState({ message = "No data found", colSpan }: EmptyStatePro
   if (colSpan) {
     return (
       <tr>
-        <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
+        <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
           {message}
         </td>
       </tr>
@@ -15,6 +15,6 @@ export function EmptyState({ message = "No data found", colSpan }: EmptyStatePro
   }
 
   return (
-    <div className="px-4 py-8 text-center text-gray-500">{message}</div>
+    <div className="px-4 py-8 text-center text-slate-500">{message}</div>
   );
 }

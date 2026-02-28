@@ -1,4 +1,5 @@
 import { useCallback, useRef, type ReactNode } from "react";
+import { cn } from "../../utils/cn";
 
 interface ResizableHeaderProps {
   colKey: string;
@@ -6,6 +7,7 @@ interface ResizableHeaderProps {
   onResize: (colKey: string, width: number) => void;
   children: ReactNode;
   className?: string;
+  minWidth?: number;
 }
 
 export function ResizableHeader({
@@ -14,6 +16,7 @@ export function ResizableHeader({
   onResize,
   children,
   className,
+  minWidth = 56,
 }: ResizableHeaderProps) {
   const thRef = useRef<HTMLTableCellElement>(null);
 
@@ -35,7 +38,7 @@ export function ResizableHeader({
 
       function onMouseMove(ev: MouseEvent) {
         const newWidth = startWidth + (ev.pageX - startX);
-        if (newWidth > 40 && th) {
+        if (newWidth > minWidth && th) {
           th.style.width = `${newWidth}px`;
         }
       }
@@ -48,7 +51,7 @@ export function ResizableHeader({
         document.removeEventListener("mouseup", onMouseUp);
 
         if (th) {
-          onResize(colKey, th.offsetWidth);
+          onResize(colKey, Math.max(th.offsetWidth, minWidth));
         }
       }
 
@@ -62,8 +65,11 @@ export function ResizableHeader({
     <th
       ref={thRef}
       data-col-key={colKey}
-      style={width ? { width: `${width}px` } : undefined}
-      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase relative overflow-hidden text-ellipsis whitespace-nowrap border-r border-gray-200 last:border-r-0 ${className || ""}`}
+      style={width ? { width: `${Math.max(width, minWidth)}px` } : { minWidth: `${minWidth}px` }}
+      className={cn(
+        "relative overflow-hidden whitespace-nowrap border-r border-slate-200 px-4 py-3 text-left text-xs font-medium uppercase text-slate-500 last:border-r-0",
+        className
+      )}
     >
       {children}
       <span className="resize-handle" onMouseDown={handleMouseDown} />

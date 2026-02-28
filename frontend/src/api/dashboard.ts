@@ -1,6 +1,18 @@
-import { get } from "./client";
-import type { DashboardStats } from "./types";
+import { fetchMessage, get } from "./client";
+import type { DashboardStats, EpgDashboardStats, FlussonicDashboardStats } from "./types";
 
 export function getStats(): Promise<DashboardStats> {
   return get<DashboardStats>("/api/v1/dashboard/stats");
+}
+
+export function getFlussonicStats(): Promise<FlussonicDashboardStats> {
+  return get<FlussonicDashboardStats>("/api/v1/dashboard/flussonic");
+}
+
+export function getEpgStats(): Promise<EpgDashboardStats> {
+  return get<EpgDashboardStats>("/api/v1/dashboard/epg");
+}
+
+export function triggerEpgUpdate(): Promise<string> {
+  return fetchMessage("/api/v1/dashboard/epg/update", { method: "POST" });
 }

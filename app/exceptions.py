@@ -61,3 +61,12 @@ class AuthServiceError(PlaylistServiceError):
 
     def __init__(self, message: str = "Auth Service error") -> None:
         super().__init__(message, code="AUTH_SERVICE_ERROR")
+
+
+class EpgServiceError(PlaylistServiceError):
+    """EPG Service API error."""
+
+    status_code = 502
+
+    def __init__(self, message: str = "EPG Service error") -> None:
+        super().__init__(message, code="EPG_SERVICE_ERROR")

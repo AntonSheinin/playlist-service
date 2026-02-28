@@ -21,6 +21,10 @@ import { Modal } from "../components/ui/Modal";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Spinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
+import { Card } from "../components/ui/Card";
+import { Input } from "../components/ui/Input";
+import { PageHeader } from "../components/ui/PageHeader";
+import { fieldControlClass, fieldLabelClass } from "../components/ui/fieldStyles";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { PackageWithCount, TariffWithCount } from "../api/types";
@@ -222,18 +226,20 @@ export function PackagesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Packages & Tariffs</h1>
+      <PageHeader
+        title="Packages & Tariffs"
+        description="Manage channel packages and compose tariffs from those packages."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Packages */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Packages</h2>
+        <Card>
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Packages</h2>
             <Button size="sm" onClick={openAddPkg}>+ Add</Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 resizable-table" style={{ width: "100%" }}>
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
+              <thead className="bg-slate-50">
                 <tr>
                   <ResizableHeader colKey="name" width={pkgResize.widths.name} onResize={pkgResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={pkgSort.sortBy} sortDir={pkgSort.sortDir} onSort={pkgSort.toggleSort} />
@@ -244,23 +250,23 @@ export function PackagesPage() {
                   <ResizableHeader colKey="channels" width={pkgResize.widths.channels} onResize={pkgResize.onResize} className="w-28">
                     <SortableHeader label="Channels" field="channel_count" sortBy={pkgSort.sortBy} sortDir={pkgSort.sortDir} onSort={pkgSort.toggleSort} />
                   </ResizableHeader>
-                  <ResizableHeader colKey="actions" width={pkgResize.widths.actions} onResize={pkgResize.onResize} className="w-28">
+                  <ResizableHeader colKey="actions" width={pkgResize.widths.actions} onResize={pkgResize.onResize} className="w-40" minWidth={160}>
                     Actions
                   </ResizableHeader>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {sortedPackages.length === 0 ? (
                   <EmptyState message="No packages yet" colSpan={4} />
                 ) : (
                   sortedPackages.map((p) => (
                     <tr key={p.id}>
                       <td className="px-6 py-3"><div className="font-medium">{p.name}</div></td>
-                      <td className="px-6 py-3"><div className="text-sm text-gray-500">{p.description || "-"}</div></td>
-                      <td className="px-6 py-3"><span className="text-gray-600">{p.channel_count}</span></td>
+                      <td className="px-6 py-3"><div className="text-sm text-slate-500">{p.description || "-"}</div></td>
+                      <td className="px-6 py-3"><span className="text-slate-600">{p.channel_count}</span></td>
                       <td className="px-6 py-3">
-                        <div className="flex items-center space-x-1">
-                          <Button size="sm" onClick={() => openEditPkg(p)}>Edit</Button>
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="secondary" onClick={() => openEditPkg(p)}>Edit</Button>
                           <Button size="sm" variant="danger" onClick={() => setDeletePkgTarget(p)}>Delete</Button>
                         </div>
                       </td>
@@ -270,17 +276,16 @@ export function PackagesPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
 
-        {/* Tariffs */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Tariffs</h2>
+        <Card>
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Tariffs</h2>
             <Button size="sm" onClick={openAddTariff}>+ Add</Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 resizable-table" style={{ width: "100%" }}>
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
+              <thead className="bg-slate-50">
                 <tr>
                   <ResizableHeader colKey="name" width={tariffResize.widths.name} onResize={tariffResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
@@ -291,23 +296,23 @@ export function PackagesPage() {
                   <ResizableHeader colKey="packages" width={tariffResize.widths.packages} onResize={tariffResize.onResize} className="w-28">
                     <SortableHeader label="Packages" field="package_count" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
                   </ResizableHeader>
-                  <ResizableHeader colKey="actions" width={tariffResize.widths.actions} onResize={tariffResize.onResize} className="w-28">
+                  <ResizableHeader colKey="actions" width={tariffResize.widths.actions} onResize={tariffResize.onResize} className="w-40" minWidth={160}>
                     Actions
                   </ResizableHeader>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {sortedTariffs.length === 0 ? (
                   <EmptyState message="No tariffs yet" colSpan={4} />
                 ) : (
                   sortedTariffs.map((t) => (
                     <tr key={t.id}>
                       <td className="px-6 py-3"><div className="font-medium">{t.name}</div></td>
-                      <td className="px-6 py-3"><div className="text-sm text-gray-500">{t.description || "-"}</div></td>
-                      <td className="px-6 py-3"><span className="text-gray-600">{t.package_count}</span></td>
+                      <td className="px-6 py-3"><div className="text-sm text-slate-500">{t.description || "-"}</div></td>
+                      <td className="px-6 py-3"><span className="text-slate-600">{t.package_count}</span></td>
                       <td className="px-6 py-3">
-                        <div className="flex items-center space-x-1">
-                          <Button size="sm" onClick={() => openEditTariff(t)}>Edit</Button>
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="secondary" onClick={() => openEditTariff(t)}>Edit</Button>
                           <Button size="sm" variant="danger" onClick={() => setDeleteTariffTarget(t)}>Delete</Button>
                         </div>
                       </td>
@@ -317,10 +322,9 @@ export function PackagesPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Package Add/Edit Modal */}
       {pkgModalOpen && (
         <Modal
           open={pkgModalOpen}
@@ -332,33 +336,30 @@ export function PackagesPage() {
               <Button onClick={handleSavePkg} loading={createPkg.isPending || updatePkg.isPending}>Save</Button>
             </>
           }
-        >
+      >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
-            <input
+          <Input
+            label="Name"
               type="text"
               value={pkgName}
               onChange={(e) => setPkgName(e.target.value)}
               autoFocus
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          />
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className={fieldLabelClass}>Description</label>
             <textarea
               value={pkgDescription}
               onChange={(e) => setPkgDescription(e.target.value)}
               rows={2}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={fieldControlClass}
             />
           </div>
           {editingPkg ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700">Assigned Channels</label>
-              <div className="mt-2 max-h-48 overflow-y-auto border rounded-md divide-y">
+              <label className={fieldLabelClass}>Assigned Channels</label>
+              <div className="mt-2 max-h-48 overflow-y-auto divide-y rounded-md border border-slate-200">
                 {pkgChannels.length === 0 ? (
-                  <div className="px-3 py-3 text-sm text-gray-500">No channels assigned.</div>
+                  <div className="px-3 py-3 text-sm text-slate-500">No channels assigned.</div>
                 ) : (
                   [...pkgChannels]
                     .sort((a, b) => {
@@ -375,16 +376,17 @@ export function PackagesPage() {
                       return (
                         <div key={ch.id} className="flex items-center justify-between px-3 py-2">
                           <div>
-                            <div className="text-sm text-gray-900">{primary}</div>
-                            {secondary && <div className="text-xs text-gray-500">{secondary}</div>}
+                            <div className="text-sm text-slate-900">{primary}</div>
+                            {secondary && <div className="text-xs text-slate-500">{secondary}</div>}
                           </div>
-                          <button
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="danger"
                             onClick={() => handleRemoveChannel(ch.id)}
-                            className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100"
                           >
                             Remove
-                          </button>
+                          </Button>
                         </div>
                       );
                     })
@@ -392,13 +394,12 @@ export function PackagesPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Note: Channels are assigned from the Channels page.</p>
+            <p className="text-sm text-slate-500">Note: Channels are assigned from the Channels page.</p>
           )}
         </div>
       </Modal>
       )}
 
-      {/* Package Delete */}
       {!!deletePkgTarget && (
         <ConfirmDialog
         open={!!deletePkgTarget}
@@ -411,7 +412,6 @@ export function PackagesPage() {
       />
       )}
 
-      {/* Tariff Add/Edit Modal */}
       {tariffModalOpen && (
         <Modal
         open={tariffModalOpen}
@@ -425,35 +425,32 @@ export function PackagesPage() {
         }
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
-            <input
+          <Input
+            label="Name"
               type="text"
               value={tariffName}
               onChange={(e) => setTariffName(e.target.value)}
               autoFocus
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          />
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className={fieldLabelClass}>Description</label>
             <textarea
               value={tariffDescription}
               onChange={(e) => setTariffDescription(e.target.value)}
               rows={2}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={fieldControlClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Packages</label>
-            <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
+            <label className={`${fieldLabelClass} mb-2`}>Packages</label>
+            <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-2">
               {(packages || []).map((p) => (
                 <label key={p.id} className="flex items-center">
                   <input
                     type="checkbox"
                     checked={selectedPkgIds.includes(p.id)}
                     onChange={() => togglePkgId(p.id)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                   />
                   <span className="ml-2 text-sm">{p.name}</span>
                 </label>
@@ -464,7 +461,6 @@ export function PackagesPage() {
       </Modal>
       )}
 
-      {/* Tariff Delete */}
       {!!deleteTariffTarget && (
         <ConfirmDialog
         open={!!deleteTariffTarget}
