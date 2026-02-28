@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
+  useAuthDashboardStats,
   useDashboardStats,
   useEpgDashboardStats,
   useFlussonicDashboardStats,
@@ -73,6 +74,7 @@ function getHealthBadgeVariant(health: "up" | "degraded" | "down" | undefined): 
 export function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: flussonicStats, isLoading: isFlussonicLoading } = useFlussonicDashboardStats();
+  const { data: authStats, isLoading: isAuthLoading } = useAuthDashboardStats();
   const { data: epgStats, isLoading: isEpgLoading } = useEpgDashboardStats();
   const epgUpdateMutation = useTriggerEpgUpdate();
   const syncMutation = useSyncChannels();
@@ -282,6 +284,39 @@ export function DashboardPage() {
                 Sync completed: {syncResult.total} total, {syncResult.new} new,{" "}
                 {syncResult.updated} updated, {syncResult.orphaned} orphaned
               </p>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          className="xl:col-span-1"
+          title={(
+            <div className="flex items-center gap-2">
+              <Badge variant={getHealthBadgeVariant(authStats?.health)}>
+                {authStats?.health?.toUpperCase() ?? (isAuthLoading ? "LOADING" : "N/A")}
+              </Badge>
+              <span>Auth Service</span>
+            </div>
+          )}
+          bodyClassName="flex flex-col gap-4"
+        >
+          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col">
+              <div className="space-y-2 text-sm text-slate-700">
+                <p>
+                  Active tokens:{" "}
+                  <span className="font-semibold text-slate-900">{authStats?.active_tokens ?? "N/A"}</span>
+                </p>
+                <p>
+                  Active sessions:{" "}
+                  <span className="font-semibold text-slate-900">{authStats?.active_sessions ?? "N/A"}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          {authStats?.error && (
+            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm text-rose-800">{authStats.error}</p>
             </div>
           )}
         </SectionCard>

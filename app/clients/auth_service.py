@@ -188,3 +188,63 @@ class AuthServiceClient:
         if response.status_code == 404:
             return []
         return response.json()
+
+    async def get_health(self) -> dict[str, Any]:
+        """Get Auth Service health payload."""
+        response = await self._request(
+            "GET",
+            "/health",
+            accept_statuses={200},
+            operation="get auth health",
+        )
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise AuthServiceError("Unexpected Auth health response format")
+        return payload
+
+    async def get_stats(self) -> dict[str, Any]:
+        """Get Auth Service stats payload."""
+        response = await self._request(
+            "GET",
+            "/stats",
+            accept_statuses={200},
+            operation="get auth stats",
+        )
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise AuthServiceError("Unexpected Auth stats response format")
+        return payload
+
+    async def get_dashboard_stats(self) -> dict[str, Any]:
+        """Fetch normalized Auth Service dashboard stats."""
+        health_payload = await self.get_health()
+
+        raw_status = str(health_payload.get("status", "")).strip().lower()
+        if raw_status in {"up", "degraded", "down"}:
+            health = raw_status
+        elif raw_status in {"ok", "healthy", "running"}:
+            health = "up"
+        else:
+            health = "degraded"
+
+        active_tokens: int | None = None
+        active_sessions: int | None = None
+        error: str | None = None
+
+        try:
+            stats_payload = await self.get_stats()
+            active_tokens_raw = stats_payload.get("active_tokens")
+            active_sessions_raw = stats_payload.get("active_sessions")
+            active_tokens = int(active_tokens_raw) if isinstance(active_tokens_raw, int) else None
+            active_sessions = int(active_sessions_raw) if isinstance(active_sessions_raw, int) else None
+            raw_error = stats_payload.get("error")
+            error = str(raw_error) if isinstance(raw_error, str) and raw_error.strip() else None
+        except AuthServiceError as e:
+            error = str(e)
+
+        return {
+            "health": health,
+            "active_tokens": active_tokens,
+            "active_sessions": active_sessions,
+            "error": error,
+        }

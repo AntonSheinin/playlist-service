@@ -92,6 +92,14 @@ class FlussonicDashboardStats(BaseModel):
     error: str | None = None
 
 
+class AuthDashboardStats(BaseModel):
+    health: Literal["up", "degraded", "down"]
+    checked_at: datetime
+    active_tokens: int | None = None
+    active_sessions: int | None = None
+    error: str | None = None
+
+
 class EpgDashboardStats(BaseModel):
     health: Literal["up", "degraded", "down"]
     checked_at: datetime

@@ -3,12 +3,14 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 from sqlalchemy import func, select
 
+from app.clients.auth_service import AuthServiceClient
 from app.clients.epg_service import EpgServiceClient
 from app.clients.flussonic import FlussonicClient
 from app.dependencies import CurrentAdminId, DBSession
-from app.exceptions import EpgServiceError, FlussonicError
+from app.exceptions import AuthServiceError, EpgServiceError, FlussonicError
 from app.models import Channel, Group, Package, SyncStatus, Tariff, User, UserStatus
 from app.schemas import (
+    AuthDashboardStats,
     DashboardStats,
     EpgDashboardStats,
     FlussonicDashboardStats,
@@ -103,6 +105,32 @@ async def get_flussonic_stats(_admin_id: CurrentAdminId) -> SuccessResponse[Flus
         )
     except FlussonicError as e:
         stats = FlussonicDashboardStats(
+            health="down",
+            checked_at=checked_at,
+            error=str(e),
+        )
+
+    return SuccessResponse(data=stats)
+
+
+@router.get("/auth", response_model=SuccessResponse[AuthDashboardStats])
+async def get_auth_stats(_admin_id: CurrentAdminId) -> SuccessResponse[AuthDashboardStats]:
+    """Get Auth service health and active token/session stats for dashboard."""
+    checked_at = datetime.now(UTC)
+
+    try:
+        async with AuthServiceClient() as client:
+            payload = await client.get_dashboard_stats()
+
+        stats = AuthDashboardStats(
+            health=payload["health"],
+            checked_at=checked_at,
+            active_tokens=payload["active_tokens"],
+            active_sessions=payload["active_sessions"],
+            error=payload.get("error"),
+        )
+    except AuthServiceError as e:
+        stats = AuthDashboardStats(
             health="down",
             checked_at=checked_at,
             error=str(e),

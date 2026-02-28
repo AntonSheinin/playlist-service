@@ -48,6 +48,14 @@ export interface FlussonicDashboardStats {
   error: string | null;
 }
 
+export interface AuthDashboardStats {
+  health: ServiceHealth;
+  checked_at: string;
+  active_tokens: number | null;
+  active_sessions: number | null;
+  error: string | null;
+}
+
 export interface EpgDashboardStats {
   health: ServiceHealth;
   checked_at: string;

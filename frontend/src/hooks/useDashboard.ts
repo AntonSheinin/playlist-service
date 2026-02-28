@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getEpgStats, getFlussonicStats, getStats, triggerEpgUpdate } from "../api/dashboard";
+import { getAuthStats, getEpgStats, getFlussonicStats, getStats, triggerEpgUpdate } from "../api/dashboard";
 
 const parsedServiceRefreshMs = Number(import.meta.env.VITE_FLUSSONIC_DASHBOARD_REFRESH_MS);
 const SERVICE_REFRESH_MS =
@@ -18,6 +18,17 @@ export function useFlussonicDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-flussonic-stats"],
     queryFn: getFlussonicStats,
+    refetchInterval: SERVICE_REFRESH_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+}
+
+export function useAuthDashboardStats() {
+  return useQuery({
+    queryKey: ["dashboard-auth-stats"],
+    queryFn: getAuthStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
