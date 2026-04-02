@@ -1,48 +1,54 @@
 import {
-  createContext,
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import { getMe, login as apiLogin, logout as apiLogout } from "../api/auth";
-import type { AdminResponse, LoginRequest } from "../api/types";
-
-interface AuthState {
-  admin: AdminResponse | null;
-  loading: boolean;
-}
-
-interface AuthContextValue extends AuthState {
-  login: (credentials: LoginRequest) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import type { LoginRequest } from "../api/types";
+import { AuthContext, type AuthState } from "./auth-context";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     admin: null,
     loading: true,
   });
+  const authRequestIdRef = useRef(0);
 
   useEffect(() => {
+    const requestId = ++authRequestIdRef.current;
+    let active = true;
+
     getMe()
-      .then((admin) => setState({ admin, loading: false }))
-      .catch(() => setState({ admin: null, loading: false }));
+      .then((admin) => {
+        if (active && requestId === authRequestIdRef.current) {
+          setState({ admin, loading: false });
+        }
+      })
+      .catch(() => {
+        if (active && requestId === authRequestIdRef.current) {
+          setState({ admin: null, loading: false });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const login = useCallback(async (credentials: LoginRequest) => {
-    await apiLogin(credentials);
-    const admin = await getMe();
+    authRequestIdRef.current += 1;
+    const admin = await apiLogin(credentials);
     setState({ admin, loading: false });
   }, []);
 
   const logout = useCallback(async () => {
+    authRequestIdRef.current += 1;
     try {
       await apiLogout();
     } catch {
-      // Ignore errors — clear local state regardless
+      // Ignore errors; clear local state regardless.
     }
     setState({ admin: null, loading: false });
   }, []);

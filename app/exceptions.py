@@ -70,3 +70,12 @@ class EpgServiceError(PlaylistServiceError):
 
     def __init__(self, message: str = "EPG Service error") -> None:
         super().__init__(message, code="EPG_SERVICE_ERROR")
+
+
+class RutvServiceError(PlaylistServiceError):
+    """RUTV API error."""
+
+    status_code = 502
+
+    def __init__(self, message: str = "RUTV Service error") -> None:
+        super().__init__(message, code="RUTV_SERVICE_ERROR")

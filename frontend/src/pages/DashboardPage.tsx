@@ -5,6 +5,7 @@ import {
   useDashboardStats,
   useEpgDashboardStats,
   useFlussonicDashboardStats,
+  useRutvDashboardStats,
   useTriggerEpgUpdate,
 } from "../hooks/useDashboard";
 import { useSyncChannels } from "../hooks/useChannels";
@@ -76,6 +77,7 @@ export function DashboardPage() {
   const { data: flussonicStats, isLoading: isFlussonicLoading } = useFlussonicDashboardStats();
   const { data: authStats, isLoading: isAuthLoading } = useAuthDashboardStats();
   const { data: epgStats, isLoading: isEpgLoading } = useEpgDashboardStats();
+  const { data: rutvStats, isLoading: isRutvLoading } = useRutvDashboardStats();
   const epgUpdateMutation = useTriggerEpgUpdate();
   const syncMutation = useSyncChannels();
   const { showToast } = useToast();
@@ -221,6 +223,49 @@ export function DashboardPage() {
           {epgStats?.error && (
             <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
               <p className="text-sm text-rose-800">{epgStats.error}</p>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          className="xl:col-span-1"
+          title={(
+            <div className="flex items-center gap-2">
+              <Badge variant={getHealthBadgeVariant(rutvStats?.health)}>
+                {rutvStats?.health?.toUpperCase() ?? (isRutvLoading ? "LOADING" : "N/A")}
+              </Badge>
+              <span>RUTV Site</span>
+            </div>
+          )}
+          bodyClassName="flex flex-col gap-4"
+        >
+          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col">
+              <div className="space-y-2 text-sm text-slate-700">
+                <p>
+                  Unique visits:{" "}
+                  <span className="font-semibold text-slate-900">{rutvStats?.unique_visits ?? "N/A"}</span>
+                </p>
+                <p>
+                  Contact forms:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {rutvStats?.successful_contact_forms ?? "N/A"}
+                  </span>
+                </p>
+                <p>
+                  Window start:{" "}
+                  <span className="font-semibold text-slate-900">{formatDateTime(rutvStats?.from_at)}</span>
+                </p>
+                <p>
+                  Window end:{" "}
+                  <span className="font-semibold text-slate-900">{formatDateTime(rutvStats?.to_at)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          {rutvStats?.error && (
+            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm text-rose-800">{rutvStats.error}</p>
             </div>
           )}
         </SectionCard>

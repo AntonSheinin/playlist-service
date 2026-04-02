@@ -110,6 +110,17 @@ class EpgDashboardStats(BaseModel):
     error: str | None = None
 
 
+class RutvDashboardStats(BaseModel):
+    health: Literal["up", "degraded", "down"]
+    checked_at: datetime
+    window_seconds: int | None = None
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    unique_visits: int | None = None
+    successful_contact_forms: int | None = None
+    error: str | None = None
+
+
 # Group
 class GroupCreate(BaseModel):
     name: str

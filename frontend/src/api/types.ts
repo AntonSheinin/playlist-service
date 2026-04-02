@@ -66,6 +66,17 @@ export interface EpgDashboardStats {
   error: string | null;
 }
 
+export interface RutvDashboardStats {
+  health: ServiceHealth;
+  checked_at: string;
+  window_seconds: number | null;
+  from_at: string | null;
+  to_at: string | null;
+  unique_visits: number | null;
+  successful_contact_forms: number | null;
+  error: string | null;
+}
+
 // Lookup types (used in dropdowns and nested responses)
 export interface GroupLookup {
   id: number;

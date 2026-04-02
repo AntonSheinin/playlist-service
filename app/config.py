@@ -2,6 +2,7 @@ import logging
 import sys
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Time constants (seconds)
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql://user:password@localhost:5432/playlist_service"
+    database_url: str = Field(min_length=1)
 
     @property
     def async_database_url(self) -> str:
@@ -27,48 +28,53 @@ class Settings(BaseSettings):
             return url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
 
-    db_pool_size: int = 5
-    db_max_overflow: int = 10
-    db_pool_timeout: int = 30
-    db_echo: bool = False
+    db_pool_size: int
+    db_max_overflow: int
+    db_pool_timeout: int
+    db_echo: bool
 
     # Security
-    secret_key: str = "change-me-in-production"
-    session_timeout: int = SECONDS_PER_DAY
+    secret_key: str = Field(min_length=1)
+    session_timeout: int
 
     # Flussonic
-    flussonic_url: str = "http://localhost:8080"
-    flussonic_username: str = "admin"
-    flussonic_password: str = ""
-    flussonic_timeout: float = 60.0
-    flussonic_page_limit: int = 500
+    flussonic_url: str = Field(min_length=1)
+    flussonic_username: str = Field(min_length=1)
+    flussonic_password: str = Field(min_length=1)
+    flussonic_timeout: float
+    flussonic_page_limit: int
 
     # Auth Service
-    auth_service_url: str = "http://localhost:8090"
-    auth_service_api_key: str = ""
-    auth_service_timeout: float = 30.0
+    auth_service_url: str = Field(min_length=1)
+    auth_service_api_key: str = Field(min_length=1)
+    auth_service_timeout: float
 
     # EPG Service
-    epg_service_url: str = "http://localhost:8000"
-    epg_service_timeout: float = 30.0
-    epg_service_fetch_timeout: float = 300.0
+    epg_service_url: str = Field(min_length=1)
+    epg_service_timeout: float
+    epg_service_fetch_timeout: float
+
+    # RUTV Site
+    rutv_site_url: str = Field(min_length=1)
+    rutv_stats_token: str = Field(min_length=1)
+    rutv_site_timeout: float
 
     # Server
-    base_url: str = "http://localhost:8080"
-    api_host: str = "0.0.0.0"
-    api_port: int = 8080
+    base_url: str = Field(min_length=1)
+    api_host: str = Field(min_length=1)
+    api_port: int
 
     # Pagination
-    pagination_default_per_page: int = 20
-    pagination_max_per_page: int = 100
-    lookup_default_limit: int = 50
-    lookup_max_limit: int = 1000
+    pagination_default_per_page: int
+    pagination_max_per_page: int
+    lookup_default_limit: int
+    lookup_max_limit: int
 
     # Token
-    token_length: int = 32
+    token_length: int
 
     # Logging
-    log_level: str = "INFO"
+    log_level: str = Field(min_length=1)
 
 
 @lru_cache

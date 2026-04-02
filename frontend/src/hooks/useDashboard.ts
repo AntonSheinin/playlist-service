@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAuthStats, getEpgStats, getFlussonicStats, getStats, triggerEpgUpdate } from "../api/dashboard";
+import {
+  getAuthStats,
+  getEpgStats,
+  getFlussonicStats,
+  getRutvStats,
+  getStats,
+  triggerEpgUpdate,
+} from "../api/dashboard";
 
 const parsedServiceRefreshMs = Number(import.meta.env.VITE_FLUSSONIC_DASHBOARD_REFRESH_MS);
 const SERVICE_REFRESH_MS =
@@ -40,6 +47,17 @@ export function useEpgDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-epg-stats"],
     queryFn: getEpgStats,
+    refetchInterval: SERVICE_REFRESH_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+}
+
+export function useRutvDashboardStats() {
+  return useQuery({
+    queryKey: ["dashboard-rutv-stats"],
+    queryFn: getRutvStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,

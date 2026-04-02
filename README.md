@@ -37,7 +37,9 @@ FLUSSONIC_USERNAME=admin
 FLUSSONIC_PASSWORD=your-flussonic-password
 AUTH_SERVICE_URL=http://your-auth-service:8090
 AUTH_SERVICE_API_KEY=your-auth-service-api-key
-EPG_SERVICE_URL=http://host.docker.internal:8000
+EPG_SERVICE_URL=http://your-epg-service:8000
+RUTV_SITE_URL=https://rutv.co.il
+RUTV_STATS_TOKEN=your-rutv-stats-token
 ```
 
 4. Start the services:
@@ -156,7 +158,9 @@ Once running, API documentation is available at:
 | `FLUSSONIC_PASSWORD` | Flussonic API password | Required |
 | `AUTH_SERVICE_URL` | Auth Service base URL | Required |
 | `AUTH_SERVICE_API_KEY` | Auth Service API key | Required |
-| `EPG_SERVICE_URL` | EPG Service base URL | `http://host.docker.internal:8000` |
+| `EPG_SERVICE_URL` | EPG Service base URL | Required |
+| `RUTV_SITE_URL` | RUTV site base URL | Required |
+| `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |
 | `API_HOST` | Server bind address | 0.0.0.0 |
 | `API_PORT` | Server port | 8080 |
 

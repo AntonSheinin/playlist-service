@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ApiError } from "../api/client";
 import { Button } from "../components/ui/Button";
@@ -9,7 +9,6 @@ import { Spinner } from "../components/ui/Spinner";
 
 export function LoginPage() {
   const { admin, loading, login } = useAuth();
-  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -22,7 +21,9 @@ export function LoginPage() {
 
     try {
       await login({ username, password });
-      navigate("/", { replace: true });
+      // Use a full navigation after login because a fresh authenticated load is stable
+      // even when some browsers leave the SPA transition in a visually inert state.
+      window.location.replace("/");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

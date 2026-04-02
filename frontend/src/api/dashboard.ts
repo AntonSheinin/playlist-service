@@ -1,5 +1,11 @@
 import { fetchMessage, get } from "./client";
-import type { AuthDashboardStats, DashboardStats, EpgDashboardStats, FlussonicDashboardStats } from "./types";
+import type {
+  AuthDashboardStats,
+  DashboardStats,
+  EpgDashboardStats,
+  FlussonicDashboardStats,
+  RutvDashboardStats,
+} from "./types";
 
 export function getStats(): Promise<DashboardStats> {
   return get<DashboardStats>("/api/v1/dashboard/stats");
@@ -15,6 +21,10 @@ export function getAuthStats(): Promise<AuthDashboardStats> {
 
 export function getEpgStats(): Promise<EpgDashboardStats> {
   return get<EpgDashboardStats>("/api/v1/dashboard/epg");
+}
+
+export function getRutvStats(): Promise<RutvDashboardStats> {
+  return get<RutvDashboardStats>("/api/v1/dashboard/rutv");
 }
 
 export function triggerEpgUpdate(): Promise<string> {

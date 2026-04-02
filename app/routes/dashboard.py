@@ -6,8 +6,9 @@ from sqlalchemy import func, select
 from app.clients.auth_service import AuthServiceClient
 from app.clients.epg_service import EpgServiceClient
 from app.clients.flussonic import FlussonicClient
+from app.clients.rutv import RutvClient
 from app.dependencies import CurrentAdminId, DBSession
-from app.exceptions import AuthServiceError, EpgServiceError, FlussonicError
+from app.exceptions import AuthServiceError, EpgServiceError, FlussonicError, RutvServiceError
 from app.models import Channel, Group, Package, SyncStatus, Tariff, User, UserStatus
 from app.schemas import (
     AuthDashboardStats,
@@ -15,6 +16,7 @@ from app.schemas import (
     EpgDashboardStats,
     FlussonicDashboardStats,
     MessageResponse,
+    RutvDashboardStats,
     SuccessResponse,
 )
 
@@ -158,6 +160,34 @@ async def get_epg_stats(_admin_id: CurrentAdminId) -> SuccessResponse[EpgDashboa
     except EpgServiceError as e:
         checked_at = datetime.now(UTC)
         stats = EpgDashboardStats(
+            health="down",
+            checked_at=checked_at,
+            error=str(e),
+        )
+
+    return SuccessResponse(data=stats)
+
+
+@router.get("/rutv", response_model=SuccessResponse[RutvDashboardStats])
+async def get_rutv_stats(_admin_id: CurrentAdminId) -> SuccessResponse[RutvDashboardStats]:
+    """Get RUTV site health and stats for dashboard."""
+    checked_at = datetime.now(UTC)
+    client = RutvClient()
+
+    try:
+        payload = await client.get_dashboard_stats()
+        stats = RutvDashboardStats(
+            health=payload["health"],
+            checked_at=checked_at,
+            window_seconds=payload["window_seconds"],
+            from_at=payload["from_at"],
+            to_at=payload["to_at"],
+            unique_visits=payload["unique_visits"],
+            successful_contact_forms=payload["successful_contact_forms"],
+            error=payload.get("error"),
+        )
+    except RutvServiceError as e:
+        stats = RutvDashboardStats(
             health="down",
             checked_at=checked_at,
             error=str(e),

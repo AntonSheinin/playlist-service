@@ -5,23 +5,36 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://playlist:playlist@postgres:5432/playlist_service
-      - DB_POOL_SIZE=5
-      - DB_MAX_OVERFLOW=10
-      - DB_ECHO=false
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - SESSION_TIMEOUT=86400
-      - FLUSSONIC_URL=${FLUSSONIC_URL:-http://flussonic:8080}
-      - FLUSSONIC_USERNAME=${FLUSSONIC_USERNAME:-admin}
-      - FLUSSONIC_PASSWORD=${FLUSSONIC_PASSWORD:-}
-      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-http://auth-service:8090}
-      - AUTH_SERVICE_API_KEY=${AUTH_SERVICE_API_KEY:-}
-      - EPG_SERVICE_URL=${EPG_SERVICE_URL:-http://host.docker.internal:8000}
-      - EPG_SERVICE_TIMEOUT=${EPG_SERVICE_TIMEOUT:-30}
-      - EPG_SERVICE_FETCH_TIMEOUT=${EPG_SERVICE_FETCH_TIMEOUT:-300}
-      - BASE_URL=${BASE_URL:-http://localhost:8080}
-      - API_HOST=0.0.0.0
-      - API_PORT=8080
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:?DB_POOL_SIZE is required}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:?DB_MAX_OVERFLOW is required}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:?DB_POOL_TIMEOUT is required}
+      - DB_ECHO=${DB_ECHO:?DB_ECHO is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - SESSION_TIMEOUT=${SESSION_TIMEOUT:?SESSION_TIMEOUT is required}
+      - FLUSSONIC_URL=${FLUSSONIC_URL:?FLUSSONIC_URL is required}
+      - FLUSSONIC_USERNAME=${FLUSSONIC_USERNAME:?FLUSSONIC_USERNAME is required}
+      - FLUSSONIC_PASSWORD=${FLUSSONIC_PASSWORD:?FLUSSONIC_PASSWORD is required}
+      - FLUSSONIC_TIMEOUT=${FLUSSONIC_TIMEOUT:?FLUSSONIC_TIMEOUT is required}
+      - FLUSSONIC_PAGE_LIMIT=${FLUSSONIC_PAGE_LIMIT:?FLUSSONIC_PAGE_LIMIT is required}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:?AUTH_SERVICE_URL is required}
+      - AUTH_SERVICE_API_KEY=${AUTH_SERVICE_API_KEY:?AUTH_SERVICE_API_KEY is required}
+      - AUTH_SERVICE_TIMEOUT=${AUTH_SERVICE_TIMEOUT:?AUTH_SERVICE_TIMEOUT is required}
+      - EPG_SERVICE_URL=${EPG_SERVICE_URL:?EPG_SERVICE_URL is required}
+      - EPG_SERVICE_TIMEOUT=${EPG_SERVICE_TIMEOUT:?EPG_SERVICE_TIMEOUT is required}
+      - EPG_SERVICE_FETCH_TIMEOUT=${EPG_SERVICE_FETCH_TIMEOUT:?EPG_SERVICE_FETCH_TIMEOUT is required}
+      - RUTV_SITE_URL=${RUTV_SITE_URL:?RUTV_SITE_URL is required}
+      - RUTV_STATS_TOKEN=${RUTV_STATS_TOKEN:?RUTV_STATS_TOKEN is required}
+      - RUTV_SITE_TIMEOUT=${RUTV_SITE_TIMEOUT:?RUTV_SITE_TIMEOUT is required}
+      - BASE_URL=${BASE_URL:?BASE_URL is required}
+      - API_HOST=${API_HOST:?API_HOST is required}
+      - API_PORT=${API_PORT:?API_PORT is required}
+      - PAGINATION_DEFAULT_PER_PAGE=${PAGINATION_DEFAULT_PER_PAGE:?PAGINATION_DEFAULT_PER_PAGE is required}
+      - PAGINATION_MAX_PER_PAGE=${PAGINATION_MAX_PER_PAGE:?PAGINATION_MAX_PER_PAGE is required}
+      - LOOKUP_DEFAULT_LIMIT=${LOOKUP_DEFAULT_LIMIT:?LOOKUP_DEFAULT_LIMIT is required}
+      - LOOKUP_MAX_LIMIT=${LOOKUP_MAX_LIMIT:?LOOKUP_MAX_LIMIT is required}
+      - TOKEN_LENGTH=${TOKEN_LENGTH:?TOKEN_LENGTH is required}
+      - LOG_LEVEL=${LOG_LEVEL:?LOG_LEVEL is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,9 +59,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=playlist
-      - POSTGRES_PASSWORD=playlist
-      - POSTGRES_DB=playlist_service
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
