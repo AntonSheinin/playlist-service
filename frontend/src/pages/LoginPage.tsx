@@ -21,8 +21,7 @@ export function LoginPage() {
 
     try {
       await login({ username, password });
-      // Use a full navigation after login because a fresh authenticated load is stable
-      // even when some browsers leave the SPA transition in a visually inert state.
+      // Complete the auth handoff with a fresh document load.
       window.location.replace("/");
     } catch (err) {
       if (err instanceof ApiError) {

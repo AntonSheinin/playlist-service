@@ -46,15 +46,15 @@ app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 if FRONTEND_ASSETS.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="assets")
 
-# Include routers (API first, then pages with SPA catch-all last)
-app.include_router(api_router)
-app.include_router(pages_router)
-
-
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Lightweight unauthenticated liveness probe."""
     return {"status": "up", "service": "playlist-service"}
+
+
+# Include routers (API first, then pages with SPA catch-all last)
+app.include_router(api_router)
+app.include_router(pages_router)
 
 
 @app.exception_handler(PlaylistServiceError)
