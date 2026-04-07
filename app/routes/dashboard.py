@@ -3,20 +3,20 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 from sqlalchemy import func, select
 
+from app.clients.stream_provider import get_stream_provider
 from app.clients.auth_service import AuthServiceClient
 from app.clients.epg_service import EpgServiceClient
-from app.clients.flussonic import FlussonicClient
 from app.clients.rutv import RutvClient
 from app.dependencies import CurrentAdminId, DBSession
-from app.exceptions import AuthServiceError, EpgServiceError, FlussonicError, RutvServiceError
-from app.models import Channel, Group, Package, SyncStatus, Tariff, User, UserStatus
+from app.exceptions import AuthServiceError, EpgServiceError, RutvServiceError, StreamProviderError
+from app.models import Channel, Group, Package, StreamSource, SyncStatus, Tariff, User, UserStatus
 from app.schemas import (
     AuthDashboardStats,
     DashboardStats,
     EpgDashboardStats,
-    FlussonicDashboardStats,
     MessageResponse,
     RutvDashboardStats,
+    StreamProviderDashboardStats,
     SuccessResponse,
 )
 
@@ -87,32 +87,47 @@ async def get_stats(
     return SuccessResponse(data=stats)
 
 
-@router.get("/flussonic", response_model=SuccessResponse[FlussonicDashboardStats])
-async def get_flussonic_stats(_admin_id: CurrentAdminId) -> SuccessResponse[FlussonicDashboardStats]:
-    """Get Flussonic health and runtime traffic/source stats for dashboard."""
+async def _get_provider_stats(source: StreamSource) -> StreamProviderDashboardStats:
     checked_at = datetime.now(UTC)
-    client = FlussonicClient()
 
     try:
+        client = get_stream_provider(source)
         payload = await client.get_dashboard_stats()
-        stats = FlussonicDashboardStats(
-            health=payload["health"],
+        stats = StreamProviderDashboardStats(
+            health=payload.health,
             checked_at=checked_at,
-            incoming_kbit=payload["incoming_kbit"],
-            outgoing_kbit=payload["outgoing_kbit"],
-            total_clients=payload["total_clients"],
-            total_sources=payload["total_sources"],
-            good_sources=payload["good_sources"],
-            broken_sources=payload["broken_sources"],
+            incoming_kbit=payload.incoming_kbit,
+            outgoing_kbit=payload.outgoing_kbit,
+            total_clients=payload.total_clients,
+            total_sources=payload.total_sources,
+            good_sources=payload.good_sources,
+            broken_sources=payload.broken_sources,
+            error=payload.error,
         )
-    except FlussonicError as e:
-        stats = FlussonicDashboardStats(
+    except StreamProviderError as e:
+        stats = StreamProviderDashboardStats(
             health="down",
             checked_at=checked_at,
             error=str(e),
         )
 
-    return SuccessResponse(data=stats)
+    return stats
+
+
+@router.get("/flussonic", response_model=SuccessResponse[StreamProviderDashboardStats])
+async def get_flussonic_stats(
+    _admin_id: CurrentAdminId,
+) -> SuccessResponse[StreamProviderDashboardStats]:
+    """Get Flussonic health and runtime stats for dashboard."""
+    return SuccessResponse(data=await _get_provider_stats(StreamSource.FLUSSONIC))
+
+
+@router.get("/nimble", response_model=SuccessResponse[StreamProviderDashboardStats])
+async def get_nimble_stats(
+    _admin_id: CurrentAdminId,
+) -> SuccessResponse[StreamProviderDashboardStats]:
+    """Get Nimble health and runtime stats for dashboard."""
+    return SuccessResponse(data=await _get_provider_stats(StreamSource.NIMBLE))
 
 
 @router.get("/auth", response_model=SuccessResponse[AuthDashboardStats])

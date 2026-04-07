@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.auth_service import AuthServiceClient, AuthTokenCreate, AuthTokenUpdate
 from app.exceptions import AuthServiceError
-from app.models import User, UserStatus
+from app.models import Channel, User, UserStatus
 from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -21,10 +21,14 @@ class AuthSyncService:
         """Map internal status to Auth Service status."""
         return "active" if status == UserStatus.ENABLED else "suspended"
 
+    def _build_allowed_streams(self, channels: list[Channel]) -> list[str]:
+        """Build provider-agnostic allowed stream names without duplicates."""
+        return list(dict.fromkeys(ch.stream_name for ch in channels))
+
     async def _do_create(self, client: AuthServiceClient, user: User) -> None:
         """Create token in Auth Service and store auth_token_id."""
         channels = await self.user_service.resolve_channels(user.id)
-        allowed_streams = [ch.stream_name for ch in channels]
+        allowed_streams = self._build_allowed_streams(channels)
 
         data = AuthTokenCreate(
             token=user.token,
@@ -69,7 +73,7 @@ class AuthSyncService:
                     return
 
                 channels = await self.user_service.resolve_channels(user.id)
-                allowed_streams = [ch.stream_name for ch in channels]
+                allowed_streams = self._build_allowed_streams(channels)
 
                 data = AuthTokenUpdate(
                     status=self._map_status(user.status),

@@ -1,6 +1,11 @@
 export const queryKeys = {
   dashboard: {
     stats: () => ["dashboard-stats"] as const,
+    provider: (source: "flussonic" | "nimble") =>
+      ["dashboard-provider-stats", source] as const,
+    auth: () => ["dashboard-auth-stats"] as const,
+    epg: () => ["dashboard-epg-stats"] as const,
+    rutv: () => ["dashboard-rutv-stats"] as const,
   },
   channels: {
     all: () => ["channels"] as const,
@@ -22,7 +27,8 @@ export const queryKeys = {
     groups: () => ["lookup", "groups"] as const,
     packages: () => ["lookup", "packages"] as const,
     tariffs: () => ["lookup", "tariffs"] as const,
-    channels: () => ["lookup", "channels"] as const,
+    channels: (params?: unknown) =>
+      params === undefined ? (["lookup", "channels"] as const) : (["lookup", "channels", params] as const),
   },
   users: {
     all: () => ["users"] as const,

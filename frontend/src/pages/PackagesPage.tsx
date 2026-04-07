@@ -28,6 +28,7 @@ import { fieldControlClass, fieldLabelClass } from "../components/ui/fieldStyles
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { PackageWithCount, TariffWithCount } from "../api/types";
+import { formatChannelPrimary, formatChannelSecondary } from "../utils/channels";
 
 export function PackagesPage() {
   const { data: packages, isLoading: packagesLoading } = usePackages();
@@ -368,11 +369,8 @@ export function PackagesPage() {
                       return na.localeCompare(nb);
                     })
                     .map((ch) => {
-                      const primary = ch.display_name || ch.stream_name || ch.tvg_name || `Channel ${ch.id}`;
-                      const secondary =
-                        ch.display_name && ch.stream_name && ch.display_name !== ch.stream_name
-                          ? ch.stream_name
-                          : ch.tvg_name || "";
+                      const primary = formatChannelPrimary(ch);
+                      const secondary = formatChannelSecondary(ch);
                       return (
                         <div key={ch.id} className="flex items-center justify-between px-3 py-2">
                           <div>

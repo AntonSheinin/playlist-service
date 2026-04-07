@@ -2,47 +2,39 @@ import logging
 from typing import Any
 
 import httpx
-from pydantic import BaseModel
 
-from app.config import MINUTES_PER_DAY, SECONDS_PER_DAY, get_settings
+from app.config import SECONDS_PER_DAY, get_settings
+from app.clients.stream_provider import ProviderDashboardStats, ProviderStream
 from app.exceptions import FlussonicError
+from app.models import StreamSource
 
 logger = logging.getLogger(__name__)
 
-# Threshold for distinguishing minutes from days in DVR depth
-DVR_DEPTH_MINUTES_THRESHOLD = 365
 V3_READINESS_ENDPOINT = "/streamer/api/v3/monitoring/readiness"
-V3_LIVENESS_ENDPOINT = "/streamer/api/v3/monitoring/liveness"
 V3_STATS_ENDPOINT = "/streamer/api/v3/config/stats"
-
-
-class FlussonicStream(BaseModel):
-    """Represents a stream from Flussonic API."""
-
-    name: str  # stream_name (unique identifier)
-    title: str | None = None  # display_name
-    dvr: int | None = None  # catchup_days
 
 
 class FlussonicClient:
     """Client for Flussonic Media Server API."""
 
-    # API endpoints in order of preference (newest first)
-    API_ENDPOINTS = [
-        "/streamer/api/v3/streams",
-        "/flussonic/api/media",
-        "/erlyvideo/api/streams",
-    ]
+    source = StreamSource.FLUSSONIC
+    STREAMS_ENDPOINT = "/streamer/api/v3/streams"
 
     def __init__(self) -> None:
         settings = get_settings()
+        if not settings.flussonic_url or not settings.flussonic_username or not settings.flussonic_password:
+            raise FlussonicError("Not configured")
+
         self.base_url = settings.flussonic_url.rstrip("/")
         self.username = settings.flussonic_username
         self.password = settings.flussonic_password
         self.timeout = settings.flussonic_timeout
         self.page_limit = settings.flussonic_page_limit
 
-    async def get_dashboard_stats(self) -> dict[str, int | str | None]:
+    def build_stream_url(self, stream_name: str, token: str) -> str:
+        return f"{self.base_url}/{stream_name}/video.m3u8?token={token}"
+
+    async def get_dashboard_stats(self) -> ProviderDashboardStats:
         """
         Fetch Flussonic dashboard stats.
 
@@ -66,61 +58,38 @@ class FlussonicClient:
         elif isinstance(streamer_status, str) and streamer_status != "running":
             health = "degraded"
 
-        return {
-            "health": health,
-            "incoming_kbit": self._as_int(stats.get("input_kbit")),
-            "outgoing_kbit": self._as_int(stats.get("output_kbit")),
-            "total_clients": self._as_int(stats.get("total_clients")),
-            "total_sources": total_sources,
-            "good_sources": good_sources,
-            "broken_sources": broken_sources,
-        }
+        return ProviderDashboardStats(
+            health=health,
+            incoming_kbit=self._as_int(stats.get("input_kbit")),
+            outgoing_kbit=self._as_int(stats.get("output_kbit")),
+            total_clients=self._as_int(stats.get("total_clients")),
+            total_sources=total_sources,
+            good_sources=good_sources,
+            broken_sources=broken_sources,
+        )
 
-    async def get_streams(self) -> list[FlussonicStream]:
+    async def get_streams(self) -> list[ProviderStream]:
         """
-        Fetch all streams from Flussonic.
-
-        Tries multiple API endpoints for compatibility with different Flussonic versions.
+        Fetch all streams from Flussonic V3.
         """
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             auth = httpx.BasicAuth(self.username, self.password)
-
-            # Try API v3 first with pagination
-            streams = await self._try_v3_api(client, auth)
-            if streams is not None:
-                return streams
-
-            # Try legacy APIs
-            for endpoint in self.API_ENDPOINTS[1:]:
-                streams = await self._try_legacy_api(client, auth, endpoint)
-                if streams is not None:
-                    return streams
-
-            raise FlussonicError("Failed to fetch streams from any Flussonic API endpoint")
+            return await self._get_v3_streams(client, auth)
 
     async def _check_v3_health(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
     ) -> bool:
-        """Check Flussonic health endpoints. Returns True if any probe succeeds."""
-        endpoints = [V3_READINESS_ENDPOINT, V3_LIVENESS_ENDPOINT]
-
-        for endpoint in endpoints:
-            url = f"{self.base_url}{endpoint}"
-            try:
-                response = await client.get(url, auth=auth)
-                if response.status_code == 200:
-                    return True
-                logger.debug(
-                    "Flussonic health probe %s returned status %d",
-                    endpoint,
-                    response.status_code,
-                )
-            except httpx.TimeoutException:
-                logger.warning("Timeout during Flussonic health probe at %s", url)
-            except httpx.RequestError as e:
-                logger.debug("Flussonic health probe failed at %s: %s", url, e)
-
-        return False
+        """Check the Flussonic V3 readiness endpoint."""
+        url = f"{self.base_url}{V3_READINESS_ENDPOINT}"
+        try:
+            response = await client.get(url, auth=auth)
+            return response.status_code == 200
+        except httpx.TimeoutException:
+            logger.warning("Timeout during Flussonic health probe at %s", url)
+            return False
+        except httpx.RequestError as e:
+            logger.debug("Flussonic health probe failed at %s: %s", url, e)
+            return False
 
     async def _get_v3_server_stats(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
@@ -169,15 +138,14 @@ class FlussonicClient:
                 return None
         return None
 
-    async def _try_v3_api(
+    async def _get_v3_streams(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
-    ) -> list[FlussonicStream] | None:
-        """Try fetching streams from API v3 with pagination."""
-        endpoint = self.API_ENDPOINTS[0]
-        url = f"{self.base_url}{endpoint}"
+    ) -> list[ProviderStream]:
+        """Fetch streams from Flussonic API v3 with pagination."""
+        url = f"{self.base_url}{self.STREAMS_ENDPOINT}"
 
         try:
-            all_streams: list[FlussonicStream] = []
+            all_streams: list[ProviderStream] = []
             cursor = None
 
             while True:
@@ -188,127 +156,51 @@ class FlussonicClient:
                 response = await client.get(url, auth=auth, params=params)
 
                 if response.status_code != 200:
-                    logger.debug(
-                        "Flussonic API v3 returned status %d", response.status_code
+                    raise FlussonicError(
+                        f"Failed to fetch Flussonic streams: {response.status_code}"
                     )
-                    return None
 
                 data = response.json()
                 streams = self._parse_v3_response(data)
                 all_streams.extend(streams)
 
-                cursor = data.get("next") if isinstance(data, dict) else None
+                cursor = data.get("next")
                 if not cursor:
                     break
 
             logger.info("Fetched %d streams from Flussonic API v3", len(all_streams))
-            return all_streams if all_streams else None
-
+            return all_streams
         except httpx.TimeoutException:
-            logger.warning("Timeout connecting to Flussonic API v3 at %s", url)
-            return None
+            raise FlussonicError(f"Timeout connecting to Flussonic API v3 at {url}") from None
         except httpx.RequestError as e:
-            logger.debug("Failed to connect to Flussonic API v3: %s", e)
-            return None
+            raise FlussonicError(f"Failed to connect to Flussonic API v3: {e}") from e
 
-    async def _try_legacy_api(
-        self, client: httpx.AsyncClient, auth: httpx.BasicAuth, endpoint: str
-    ) -> list[FlussonicStream] | None:
-        """Try fetching streams from a legacy API endpoint."""
-        url = f"{self.base_url}{endpoint}"
-
-        try:
-            response = await client.get(url, auth=auth)
-
-            if response.status_code == 200:
-                streams = self._parse_legacy_response(response.json())
-                logger.info("Fetched %d streams from Flussonic %s", len(streams), endpoint)
-                return streams
-
-            logger.debug("Flussonic %s returned status %d", endpoint, response.status_code)
-            return None
-
-        except httpx.TimeoutException:
-            logger.warning("Timeout connecting to Flussonic at %s", url)
-            return None
-        except httpx.RequestError as e:
-            logger.debug("Failed to connect to Flussonic %s: %s", endpoint, e)
-            return None
-
-    def _parse_v3_response(self, data: dict | list) -> list[FlussonicStream]:
+    def _parse_v3_response(self, data: dict[str, Any]) -> list[ProviderStream]:
         """Parse response from Flussonic API v3."""
-        streams = []
+        items = data.get("items")
+        if not isinstance(items, list):
+            raise FlussonicError("Unexpected Flussonic streams response format")
 
-        # Handle different response formats
-        if isinstance(data, dict):
-            # Could be {"streams": [...]} or direct stream objects
-            if "streams" in data:
-                items = data["streams"]
-            elif "items" in data:
-                items = data["items"]
-            else:
-                # Direct object mapping {name: stream_config}
-                items = [{"name": k, **v} for k, v in data.items() if isinstance(v, dict)]
-        else:
-            items = data
-
+        streams: list[ProviderStream] = []
         for item in items:
             if isinstance(item, dict):
-                stream = FlussonicStream(
-                    name=item.get("name", item.get("stream_name", "")),
-                    title=item.get("title", item.get("display_name")),
-                    dvr=self._extract_dvr_days(item),
+                name = item.get("name")
+                title = item.get("title")
+                stream = ProviderStream(
+                    name=name if isinstance(name, str) else "",
+                    title=title if isinstance(title, str) else None,
+                    catchup_days=self._extract_dvr_days(item),
                 )
                 if stream.name:
                     streams.append(stream)
 
         return streams
 
-    def _parse_legacy_response(self, data: dict | list) -> list[FlussonicStream]:
-        """Parse response from legacy Flussonic API."""
-        streams = []
-
-        if isinstance(data, dict):
-            # Handle {name: config} format
-            for name, config in data.items():
-                if isinstance(config, dict):
-                    stream = FlussonicStream(
-                        name=name,
-                        title=config.get("title", config.get("display_name")),
-                        dvr=self._extract_dvr_days(config),
-                    )
-                    streams.append(stream)
-        elif isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    stream = FlussonicStream(
-                        name=item.get("name", ""),
-                        title=item.get("title"),
-                        dvr=self._extract_dvr_days(item),
-                    )
-                    if stream.name:
-                        streams.append(stream)
-
-        return streams
-
     def _extract_dvr_days(self, item: dict) -> int | None:
-        """Extract DVR days from various possible field names."""
-        for field in ["dvr", "dvr_days", "catchup_days", "archive_depth"]:
-            if field in item:
-                value = item[field]
-                if isinstance(value, int):
-                    return value
-                if isinstance(value, dict):
-                    # API v3 format: {"dvr": {"expiration": 1209600}} (seconds)
-                    if "expiration" in value:
-                        expiration = value["expiration"]
-                        if isinstance(expiration, int) and expiration > 0:
-                            return expiration // SECONDS_PER_DAY
-                    # Alternative format: {"dvr": {"depth": 14}}
-                    if "depth" in value:
-                        depth = value["depth"]
-                        if isinstance(depth, int):
-                            if depth > DVR_DEPTH_MINUTES_THRESHOLD:
-                                return depth // MINUTES_PER_DAY
-                            return depth
+        """Extract DVR days from the Flussonic V3 dvr.expiration field."""
+        value = item.get("dvr")
+        if isinstance(value, dict):
+            expiration = value.get("expiration")
+            if isinstance(expiration, int) and expiration > 0:
+                return expiration // SECONDS_PER_DAY
         return None

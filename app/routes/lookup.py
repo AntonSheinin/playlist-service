@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.dependencies import CurrentAdminId, DBSession
+from app.models import StreamSource
 from app.schemas import ChannelLookup, GroupLookup, PackageLookup, SuccessResponse, TariffLookup
 from app.services.channel_service import ChannelService
 from app.services.group_service import GroupService
@@ -55,15 +56,17 @@ async def lookup_channels(
     db: DBSession,
     search: str = Query("", min_length=0),
     limit: int = Query(50, ge=1, le=1000),
+    source: StreamSource | None = None,
 ) -> SuccessResponse[list[ChannelLookup]]:
     """Search channels for dropdown."""
     service = ChannelService(db)
-    channels = await service.search(search, limit)
+    channels = await service.search(search, limit, source)
 
     return SuccessResponse(
         data=[
             ChannelLookup(
                 id=ch.id,
+                source=ch.source,
                 stream_name=ch.stream_name,
                 display_name=ch.display_name,
                 tvg_name=ch.tvg_name,

@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String, Table, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -17,6 +17,11 @@ class TimestampMixin:
 class SyncStatus(str, enum.Enum):
     SYNCED = "synced"
     ORPHANED = "orphaned"
+
+
+class StreamSource(str, enum.Enum):
+    FLUSSONIC = "flussonic"
+    NIMBLE = "nimble"
 
 
 class UserStatus(str, enum.Enum):
@@ -93,9 +98,17 @@ class Group(Base, TimestampMixin):
 
 class Channel(Base, TimestampMixin):
     __tablename__ = "channels"
+    __table_args__ = (
+        UniqueConstraint("source", "stream_name", name="uq_channels_source_stream_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    stream_name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    source: Mapped[StreamSource] = mapped_column(
+        Enum(StreamSource, native_enum=False),
+        default=StreamSource.FLUSSONIC,
+        index=True,
+    )
+    stream_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     tvg_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     catchup_days: Mapped[int | None] = mapped_column(nullable=True)

@@ -3,16 +3,20 @@ import type {
   AuthDashboardStats,
   DashboardStats,
   EpgDashboardStats,
-  FlussonicDashboardStats,
   RutvDashboardStats,
+  StreamProviderDashboardStats,
 } from "./types";
 
 export function getStats(): Promise<DashboardStats> {
   return get<DashboardStats>("/api/v1/dashboard/stats");
 }
 
-export function getFlussonicStats(): Promise<FlussonicDashboardStats> {
-  return get<FlussonicDashboardStats>("/api/v1/dashboard/flussonic");
+export function getFlussonicStats(): Promise<StreamProviderDashboardStats> {
+  return get<StreamProviderDashboardStats>("/api/v1/dashboard/flussonic");
+}
+
+export function getNimbleStats(): Promise<StreamProviderDashboardStats> {
+  return get<StreamProviderDashboardStats>("/api/v1/dashboard/nimble");
 }
 
 export function getAuthStats(): Promise<AuthDashboardStats> {

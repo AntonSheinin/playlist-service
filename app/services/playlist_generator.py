@@ -1,4 +1,5 @@
 from app.config import get_settings
+from app.clients.stream_provider import get_stream_provider
 from app.models import Channel, User
 
 
@@ -17,7 +18,6 @@ class PlaylistGenerator:
         lines = ["#EXTM3U"]
 
         settings = get_settings()
-        base_url = settings.flussonic_url.rstrip("/")
         logo_base_url = settings.base_url.rstrip("/")
 
         for channel in channels:
@@ -59,8 +59,8 @@ class PlaylistGenerator:
             extinf = f'#EXTINF:-1 {" ".join(attrs)},{display_name}'
             lines.append(extinf)
 
-            # Build stream URL with token
-            stream_url = f"{base_url}/{channel.stream_name}/video.m3u8?token={user.token}"
+            provider = get_stream_provider(channel.source)
+            stream_url = provider.build_stream_url(channel.stream_name, user.token)
             lines.append(stream_url)
 
         return "\n".join(lines) + "\n"

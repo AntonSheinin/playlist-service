@@ -1,10 +1,10 @@
 # Playlist Service
 
-IPTV Playlist Service for Flussonic Media Server.
+IPTV Playlist Service for Flussonic and Nimble stream providers.
 
 ## Features
 
-- Sync channels from Flussonic (read-only cache)
+- Sync channels from Flussonic and Nimble (read-only cache)
 - Organize channels into groups, packages, and tariffs
 - Manage users with subscription-based channel access
 - Generate personalized M3U/M3U8 playlists with authentication tokens
@@ -40,6 +40,16 @@ AUTH_SERVICE_API_KEY=your-auth-service-api-key
 EPG_SERVICE_URL=http://your-epg-service:8000
 RUTV_SITE_URL=https://rutv.co.il
 RUTV_STATS_TOKEN=your-rutv-stats-token
+```
+
+Add Nimble variables only when Nimble support should be enabled in that environment. Nimble sync and dashboard use WMSPanel API credentials plus the Nimble playback URL.
+
+```env
+WMSPANEL_API_URL=https://api.wmspanel.com
+WMSPANEL_CLIENT_ID=your-wmspanel-client-id
+WMSPANEL_API_KEY=your-wmspanel-api-key
+WMSPANEL_SERVER_ID=your-nimble-server-id
+NIMBLE_PLAYBACK_URL=http://your-nimble-server:8081
 ```
 
 4. Start the services:
@@ -135,10 +145,10 @@ Once running, API documentation is available at:
 ## Key Workflows
 
 ### Channel Sync
-1. Admin clicks "Sync from Flussonic" in the dashboard
-2. Service fetches channel list from Flussonic API
+1. Admin triggers sync for Flussonic or Nimble in the dashboard
+2. Service fetches channel list from the selected provider API
 3. New channels are added, existing channels updated
-4. Channels missing from Flussonic are marked as "orphaned"
+4. Channels missing from that provider are marked as "orphaned"
 
 ### Playlist Generation
 1. Admin creates a user with tariffs/packages/channels
@@ -153,9 +163,15 @@ Once running, API documentation is available at:
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `SECRET_KEY` | Secret key for sessions | Required |
-| `FLUSSONIC_URL` | Flussonic API base URL | Required |
-| `FLUSSONIC_USERNAME` | Flussonic API username | admin |
-| `FLUSSONIC_PASSWORD` | Flussonic API password | Required |
+| `FLUSSONIC_URL` | Flussonic API base URL | Optional |
+| `FLUSSONIC_USERNAME` | Flussonic API username | Optional |
+| `FLUSSONIC_PASSWORD` | Flussonic API password | Optional |
+| `WMSPANEL_API_URL` | WMSPanel API base URL | Optional |
+| `WMSPANEL_CLIENT_ID` | WMSPanel API client ID | Optional |
+| `WMSPANEL_API_KEY` | WMSPanel API key | Optional |
+| `WMSPANEL_SERVER_ID` | WMSPanel server ID for the Nimble instance | Optional |
+| `NIMBLE_PLAYBACK_URL` | Nimble playback base URL | Optional |
+| `NIMBLE_APPLICATION` | Nimble application name used for playback/stat filtering | `live` |
 | `AUTH_SERVICE_URL` | Auth Service base URL | Required |
 | `AUTH_SERVICE_API_KEY` | Auth Service API key | Required |
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |

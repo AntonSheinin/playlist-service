@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="Playlist Service",
-    description="IPTV Playlist Service for Flussonic Media Server",
+    description="IPTV Playlist Service for multiple stream providers",
     version="1.0.0",
     lifespan=lifespan,
 )

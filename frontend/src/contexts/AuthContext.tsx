@@ -16,32 +16,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const authRequestIdRef = useRef(0);
 
-  useEffect(() => {
+  const syncCurrentAdmin = useCallback(async (allowUnauthenticated = false) => {
     const requestId = ++authRequestIdRef.current;
-    let active = true;
 
-    getMe()
-      .then((admin) => {
-        if (active && requestId === authRequestIdRef.current) {
-          setState({ admin, loading: false });
-        }
-      })
-      .catch(() => {
-        if (active && requestId === authRequestIdRef.current) {
-          setState({ admin: null, loading: false });
-        }
-      });
+    try {
+      const admin = await getMe();
+      if (requestId === authRequestIdRef.current) {
+        setState({ admin, loading: false });
+      }
+      return admin;
+    } catch (error) {
+      if (requestId === authRequestIdRef.current) {
+        setState({ admin: null, loading: false });
+      }
 
-    return () => {
-      active = false;
-    };
+      if (allowUnauthenticated) {
+        return null;
+      }
+
+      throw error;
+    }
   }, []);
+
+  useEffect(() => {
+    void syncCurrentAdmin(true);
+  }, [syncCurrentAdmin]);
 
   const login = useCallback(async (credentials: LoginRequest) => {
-    authRequestIdRef.current += 1;
     await apiLogin(credentials);
-    setState({ admin: null, loading: false });
-  }, []);
+    await syncCurrentAdmin();
+  }, [syncCurrentAdmin]);
 
   const logout = useCallback(async () => {
     authRequestIdRef.current += 1;

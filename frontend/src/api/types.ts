@@ -1,3 +1,4 @@
+export type StreamSource = "flussonic" | "nimble";
 export type SyncStatus = "synced" | "orphaned";
 export type UserStatus = "enabled" | "disabled";
 
@@ -36,7 +37,7 @@ export interface DashboardStats {
 
 export type ServiceHealth = "up" | "degraded" | "down";
 
-export interface FlussonicDashboardStats {
+export interface StreamProviderDashboardStats {
   health: ServiceHealth;
   checked_at: string;
   incoming_kbit: number | null;
@@ -95,6 +96,7 @@ export interface TariffLookup {
 
 export interface ChannelLookup {
   id: number;
+  source: StreamSource;
   stream_name: string;
   display_name: string | null;
   tvg_name: string | null;
@@ -147,6 +149,7 @@ export interface TariffDeleteInfo {
 // Channel
 export interface ChannelResponse {
   id: number;
+  source: StreamSource;
   stream_name: string;
   tvg_name: string | null;
   display_name: string | null;
@@ -169,6 +172,7 @@ export interface ChannelCascadeInfo {
 }
 
 export interface SyncResultResponse {
+  source: StreamSource;
   total: number;
   new: number;
   updated: number;
@@ -246,6 +250,7 @@ export interface UserUpdate {
 
 export interface ResolvedChannel {
   id: number;
+  source: StreamSource;
   stream_name: string;
   display_name: string | null;
   tvg_name: string | null;

@@ -3,7 +3,7 @@ from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models import SyncStatus, UserStatus
+from app.models import StreamSource, SyncStatus, UserStatus
 
 T = TypeVar("T")
 
@@ -80,7 +80,7 @@ class DashboardStats(BaseModel):
     last_sync: datetime | None
 
 
-class FlussonicDashboardStats(BaseModel):
+class StreamProviderDashboardStats(BaseModel):
     health: Literal["up", "degraded", "down"]
     checked_at: datetime
     incoming_kbit: int | None = None
@@ -261,6 +261,7 @@ class ChannelCascadeInfo(BaseModel):
 
 
 class SyncResultResponse(BaseModel):
+    source: StreamSource
     total: int
     new: int
     updated: int
@@ -270,6 +271,7 @@ class SyncResultResponse(BaseModel):
 class ChannelLookup(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    source: StreamSource
     stream_name: str
     display_name: str | None = None
     tvg_name: str | None = None
@@ -282,6 +284,7 @@ class PackageDetail(PackageResponse):
 class ChannelResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    source: StreamSource
     stream_name: str
     tvg_name: str | None = None
     display_name: str | None = None
@@ -361,6 +364,7 @@ class UserListItem(BaseModel):
 class ResolvedChannel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    source: StreamSource
     stream_name: str
     display_name: str | None = None
     tvg_name: str | None = None

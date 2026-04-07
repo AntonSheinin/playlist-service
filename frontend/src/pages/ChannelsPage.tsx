@@ -15,6 +15,7 @@ import {
   useRemoveLogo,
 } from "../hooks/useChannels";
 import { useLookupGroups, useLookupPackages } from "../hooks/useLookup";
+import { useFlussonicDashboardStats, useNimbleDashboardStats } from "../hooks/useDashboard";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
 import { useSortable } from "../hooks/useSortable";
@@ -34,7 +35,12 @@ import { Select } from "../components/ui/Select";
 import { fieldLabelClass } from "../components/ui/fieldStyles";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
-import type { ChannelResponse, ChannelBulkUpdateItem } from "../api/types";
+import type { ChannelResponse, ChannelBulkUpdateItem, StreamSource } from "../api/types";
+import {
+  formatChannelPrimary,
+  formatChannelSecondary,
+  formatStreamSource,
+} from "../utils/channels";
 
 interface PendingChange {
   id: number;
@@ -67,6 +73,10 @@ const portalOnlySelectStyles = {
   menuPortal: (base: object) => ({ ...base, zIndex: 50 }),
 };
 
+function isNotConfigured(error: string | null | undefined): boolean {
+  return error === "Not configured";
+}
+
 export function ChannelsPage() {
   const { showToast } = useToast();
   const { sortBy, sortDir, toggleSort } = useSortable("channel_number");
@@ -76,6 +86,7 @@ export function ChannelsPage() {
   const page = parsePositiveInt(searchParams.get("page"), 1);
   const perPage = parsePositiveInt(searchParams.get("perPage"), 20);
   const groupFilter = searchParams.get("group") ?? "";
+  const sourceFilter = searchParams.get("source") ?? "";
   const statusFilter = searchParams.get("status") ?? "";
   const urlSearch = searchParams.get("search") ?? "";
 
@@ -111,12 +122,15 @@ export function ChannelsPage() {
     sort_by: sortBy,
     sort_dir: sortDir,
     group_id: groupFilter ? Number(groupFilter) : undefined,
+    source: (sourceFilter || undefined) as StreamSource | undefined,
     sync_status: statusFilter || undefined,
     search: search || undefined,
   });
 
   const { data: groups } = useLookupGroups();
   const { data: packages } = useLookupPackages();
+  const { data: flussonicStats } = useFlussonicDashboardStats();
+  const { data: nimbleStats } = useNimbleDashboardStats();
 
   // Mutations
   const bulkUpdate = useBulkUpdateChannels();
@@ -226,15 +240,21 @@ export function ChannelsPage() {
   }
 
   // Sync
-  async function handleSync() {
+  async function handleSync(source: StreamSource) {
     try {
-      const result = await syncMut.mutateAsync();
-      showToast(`Sync complete: ${result.new} new, ${result.updated} updated, ${result.orphaned} orphaned`, "success");
+      const result = await syncMut.mutateAsync(source);
+      showToast(
+        `${formatStreamSource(result.source)} sync complete: ${result.new} new, ${result.updated} updated, ${result.orphaned} orphaned`,
+        "success"
+      );
       updateParams({ page: "1" });
     } catch {
       showToast("Failed to sync channels", "error");
     }
   }
+
+  const flussonicConfigured = !isNotConfigured(flussonicStats?.error);
+  const nimbleConfigured = !isNotConfigured(nimbleStats?.error);
 
   // Delete channel
   async function handleDelete() {
@@ -258,7 +278,7 @@ export function ChannelsPage() {
       ? `This will remove it from: ${details.join(", ")}.`
       : "This channel is not assigned to any packages or users.";
     if (deleteTarget && deleteTarget.sync_status !== "orphaned") {
-      msg += " Warning: This channel is still synced with Flussonic and will reappear on next sync.";
+      msg += ` Warning: This channel is still synced with ${formatStreamSource(deleteTarget.source)} and will reappear on the next sync.`;
     }
     return msg;
   }
@@ -373,8 +393,21 @@ export function ChannelsPage() {
               Apply All ({pendingCount})
             </Button>
           )}
-          <Button onClick={handleSync} loading={syncMut.isPending}>
-            Sync from Flussonic
+          <Button
+            onClick={() => handleSync("flussonic")}
+            loading={syncMut.isPending}
+            disabled={!flussonicConfigured}
+            title={flussonicConfigured ? undefined : "Flussonic is not configured"}
+          >
+            {flussonicConfigured ? "Sync Flussonic" : "Flussonic Not Configured"}
+          </Button>
+          <Button
+            onClick={() => handleSync("nimble")}
+            loading={syncMut.isPending}
+            disabled={!nimbleConfigured}
+            title={nimbleConfigured ? undefined : "Nimble is not configured"}
+          >
+            {nimbleConfigured ? "Sync Nimble" : "Nimble Not Configured"}
           </Button>
           </div>
         }
@@ -400,6 +433,15 @@ export function ChannelsPage() {
           <option value="synced">Synced</option>
           <option value="orphaned">Orphaned</option>
         </Select>
+        <Select
+          label="Source"
+          value={sourceFilter}
+          onChange={(e) => updateParams({ source: e.target.value || undefined, page: "1" })}
+        >
+          <option value="">All Sources</option>
+          <option value="flussonic">Flussonic</option>
+          <option value="nimble">Nimble</option>
+        </Select>
         <div className="md:col-span-2">
           <Input
             label="Search"
@@ -424,6 +466,9 @@ export function ChannelsPage() {
               <ResizableHeader colKey="name" width={widths.name} onResize={onResize}>
                 <SortableHeader label="Name" field="display_name" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
+              <ResizableHeader colKey="source" width={widths.source} onResize={onResize} className="w-28">
+                <SortableHeader label="Source" field="source" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              </ResizableHeader>
               <ResizableHeader colKey="tvg-id" width={widths["tvg-id"]} onResize={onResize} className="w-28">
                 <SortableHeader label="TVG ID" field="tvg_id" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
@@ -446,7 +491,7 @@ export function ChannelsPage() {
           </thead>
             <tbody className="bg-white divide-y divide-slate-200">
             {channels.length === 0 ? (
-              <EmptyState message="No channels found" colSpan={9} />
+              <EmptyState message="No channels found" colSpan={10} />
             ) : (
               channels.map((ch) => {
                 const pending = pendingChanges[ch.id];
@@ -498,8 +543,13 @@ export function ChannelsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2">
-                      <div className="font-medium text-sm">{ch.display_name || ch.stream_name}</div>
-                      <div className="text-xs text-slate-500">{ch.stream_name}</div>
+                      <div className="font-medium text-sm">{formatChannelPrimary(ch)}</div>
+                      <div className="text-xs text-slate-500">{formatChannelSecondary(ch)}</div>
+                    </td>
+                    <td className="px-2 py-2">
+                      <Badge variant={ch.source === "flussonic" ? "blue" : "gray"}>
+                        {formatStreamSource(ch.source)}
+                      </Badge>
                     </td>
                     <td className="px-2 py-2">
                       <input
@@ -667,6 +717,7 @@ export function ChannelsPage() {
         >
           <div className="space-y-4">
             <Input label="Stream Name" type="text" readOnly value={editChannel.stream_name} className="bg-slate-50 text-slate-500" />
+            <Input label="Source" type="text" readOnly value={formatStreamSource(editChannel.source)} className="bg-slate-50 text-slate-500" />
             <Input label="Display Name" type="text" readOnly value={editChannel.display_name || ""} className="bg-slate-50 text-slate-500" />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -682,7 +733,9 @@ export function ChannelsPage() {
                 <div className="mt-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                   {editChannel.catchup_days == null ? "-" : String(editChannel.catchup_days)}
                 </div>
-                <p className="mt-1 text-xs text-slate-400">Imported from Flussonic.</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Imported from {formatStreamSource(editChannel.source)}.
+                </p>
               </div>
             </div>
             <Input label="TVG ID (EPG ID)" type="text" value={editTvgId} onChange={(e) => setEditTvgId(e.target.value)} />

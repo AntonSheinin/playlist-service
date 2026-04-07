@@ -6,6 +6,7 @@ import type {
   ChannelBulkUpdateItem,
   LogoUploadResponse,
   PaginatedData,
+  StreamSource,
 } from "./types";
 
 interface ListChannelsParams {
@@ -13,6 +14,7 @@ interface ListChannelsParams {
   per_page?: number;
   search?: string;
   group_id?: number;
+  source?: StreamSource;
   sync_status?: string;
   sort_by?: string;
   sort_dir?: string;
@@ -26,6 +28,7 @@ export function listChannels(
   if (params.per_page) searchParams.set("per_page", String(params.per_page));
   if (params.search) searchParams.set("search", params.search);
   if (params.group_id) searchParams.set("group_id", String(params.group_id));
+  if (params.source) searchParams.set("source", params.source);
   if (params.sync_status) searchParams.set("sync_status", params.sync_status);
   if (params.sort_by) searchParams.set("sort_by", params.sort_by);
   if (params.sort_dir) searchParams.set("sort_dir", params.sort_dir);
@@ -83,8 +86,8 @@ export function updateChannelPackages(
   });
 }
 
-export function syncChannels(): Promise<SyncResultResponse> {
-  return post<SyncResultResponse>("/api/v1/channels/sync");
+export function syncChannels(source: StreamSource): Promise<SyncResultResponse> {
+  return post<SyncResultResponse>(`/api/v1/channels/sync?source=${source}`);
 }
 
 export function getCascadeInfo(id: number): Promise<ChannelCascadeInfo> {

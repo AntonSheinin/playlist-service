@@ -15,6 +15,7 @@ import {
 import { useLookupTariffs, useLookupPackages, useLookupChannels } from "../hooks/useLookup";
 import { useToast } from "../hooks/useToast";
 import { useSortable } from "../hooks/useSortable";
+import { useDebounce } from "../hooks/useDebounce";
 import { Button } from "../components/ui/Button";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Spinner } from "../components/ui/Spinner";
@@ -32,6 +33,7 @@ import {
 } from "../components/users/UserDetailModals";
 import { buildPlaylistUrl } from "../utils/playlist";
 import type { UserCreate, UserUpdate } from "../api/types";
+import { formatChannelOptionLabel } from "../utils/channels";
 
 function toDateStr(d: Date): string {
   return d.toISOString().split("T")[0];
@@ -64,7 +66,9 @@ export function UserDetailPage() {
   // Lookups
   const { data: lookupTariffs } = useLookupTariffs();
   const { data: lookupPackages } = useLookupPackages();
-  const { data: lookupChannels } = useLookupChannels();
+  const [channelSearchInput, setChannelSearchInput] = useState("");
+  const channelSearch = useDebounce(channelSearchInput);
+  const { data: lookupChannels, isLoading: lookupChannelsLoading } = useLookupChannels(channelSearch);
 
   // Form fields (plain useState instead of react-hook-form)
   const [firstName, setFirstName] = useState("");
@@ -130,7 +134,7 @@ export function UserDetailPage() {
     () =>
       (lookupChannels || []).map((c) => ({
         value: c.id,
-        label: c.display_name || c.tvg_name || c.stream_name || `Channel ${c.id}`,
+        label: formatChannelOptionLabel(c),
       })),
     [lookupChannels]
   );
@@ -150,7 +154,7 @@ export function UserDetailPage() {
     setSelectedChannels(
       user.channels.map((c) => ({
         value: c.id,
-        label: c.display_name || c.tvg_name || c.stream_name || `Channel ${c.id}`,
+        label: formatChannelOptionLabel(c),
       }))
     );
   }, [user]);
@@ -367,6 +371,12 @@ export function UserDetailPage() {
             options={channelOptions}
             value={selectedChannels}
             onChange={(v: MultiValue<SelectOption>) => setSelectedChannels([...v])}
+            onInputChange={setChannelSearchInput}
+            isLoading={lookupChannelsLoading}
+            placeholder="Type to search channels..."
+            noOptionsMessage={(inputValue) =>
+              inputValue ? "No channels found" : "Type to search channels"
+            }
           />
           {isEdit && resolvedChannels && (
             <div className="flex items-center justify-between border-t border-slate-200 pt-4">

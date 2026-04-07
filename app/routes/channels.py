@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app.dependencies import CurrentAdminId, DBSession
 from app.exceptions import ValidationError
-from app.models import Channel, SyncStatus
+from app.models import Channel, StreamSource, SyncStatus
 from app.schemas import (
     ChannelBulkUpdate,
     ChannelCascadeInfo,
@@ -179,6 +179,7 @@ async def list_channels(
     per_page: int = Query(20, ge=1, le=100),
     search: str | None = None,
     group_id: int | None = None,
+    source: StreamSource | None = None,
     sync_status: SyncStatus | None = None,
     sort_by: str = "channel_number",
     sort_dir: str = "asc",
@@ -191,6 +192,7 @@ async def list_channels(
         pagination=pagination,
         search=search,
         group_id=group_id,
+        source=source,
         sync_status=sync_status,
         sort_by=sort_by,
         sort_dir=sort_dir,
@@ -373,12 +375,14 @@ async def reorder_channels(
 async def sync_channels(
     _admin_id: CurrentAdminId,
     db: DBSession,
+    source: StreamSource = Query(StreamSource.FLUSSONIC),
 ) -> SuccessResponse[SyncResultResponse]:
-    """Trigger channel synchronization from Flussonic."""
+    """Trigger channel synchronization for a specific provider."""
     service = ChannelSyncService(db)
-    result = await service.sync()
+    result = await service.sync(source)
     return SuccessResponse(
         data=SyncResultResponse(
+            source=result.source,
             total=result.total,
             new=result.new,
             updated=result.updated,

@@ -18,6 +18,14 @@ export function lookupTariffs(): Promise<TariffLookup[]> {
   return get<TariffLookup[]>("/api/v1/lookup/tariffs");
 }
 
-export function lookupChannels(limit = 500): Promise<ChannelLookup[]> {
-  return get<ChannelLookup[]>(`/api/v1/lookup/channels?limit=${limit}`);
+export function lookupChannels(
+  search = "",
+  limit = 50,
+  source?: "flussonic" | "nimble"
+): Promise<ChannelLookup[]> {
+  const sp = new URLSearchParams();
+  if (search) sp.set("search", search);
+  sp.set("limit", String(limit));
+  if (source) sp.set("source", source);
+  return get<ChannelLookup[]>(`/api/v1/lookup/channels?${sp.toString()}`);
 }

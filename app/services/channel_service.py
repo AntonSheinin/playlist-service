@@ -6,6 +6,7 @@ from app.models import (
     Channel,
     Group,
     Package,
+    StreamSource,
     SyncStatus,
     group_channels,
     package_channels,
@@ -35,6 +36,7 @@ class ChannelService(BaseService[Channel]):
         pagination: PaginationParams,
         search: str | None = None,
         group_id: int | None = None,
+        source: StreamSource | None = None,
         sync_status: SyncStatus | None = None,
         sort_by: str = "channel_number",
         sort_dir: str = "asc",
@@ -59,6 +61,9 @@ class ChannelService(BaseService[Channel]):
 
         if group_id is not None:
             stmt = stmt.where(Channel.groups.any(Group.id == group_id))
+
+        if source is not None:
+            stmt = stmt.where(Channel.source == source)
 
         if sync_status is not None:
             stmt = stmt.where(Channel.sync_status == sync_status)
@@ -119,12 +124,6 @@ class ChannelService(BaseService[Channel]):
             raise NotFoundError("Channel not found")
 
         return channel
-
-    async def get_by_stream_name(self, stream_name: str) -> Channel | None:
-        """Get channel by stream_name."""
-        stmt = select(Channel).where(Channel.stream_name == stream_name)
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def update(
         self,
@@ -255,9 +254,16 @@ class ChannelService(BaseService[Channel]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def search(self, search: str, limit: int = 50) -> list[Channel]:
+    async def search(
+        self,
+        search: str,
+        limit: int = 50,
+        source: StreamSource | None = None,
+    ) -> list[Channel]:
         """Search channels for dropdown."""
         stmt = select(Channel)
+        if source is not None:
+            stmt = stmt.where(Channel.source == source)
         if search:
             search_filter = f"%{search}%"
             stmt = stmt.where(
@@ -267,6 +273,10 @@ class ChannelService(BaseService[Channel]):
                     Channel.tvg_name.ilike(search_filter),
                 )
             )
-        stmt = stmt.order_by(Channel.sort_order.asc()).limit(limit)
+        stmt = stmt.order_by(
+            Channel.display_name.asc().nulls_last(),
+            Channel.stream_name.asc(),
+            Channel.source.asc(),
+        ).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

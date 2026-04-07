@@ -5,6 +5,7 @@ import {
   useDashboardStats,
   useEpgDashboardStats,
   useFlussonicDashboardStats,
+  useNimbleDashboardStats,
   useRutvDashboardStats,
   useTriggerEpgUpdate,
 } from "../hooks/useDashboard";
@@ -16,7 +17,8 @@ import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SectionCard } from "../components/ui/SectionCard";
-import type { SyncResultResponse } from "../api/types";
+import type { StreamSource } from "../api/types";
+import { formatStreamSource } from "../utils/channels";
 
 function StatCard({
   iconBg,
@@ -65,7 +67,15 @@ function formatDateTime(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "N/A";
 }
 
-function getHealthBadgeVariant(health: "up" | "degraded" | "down" | undefined): "green" | "yellow" | "red" | "gray" {
+function isNotConfigured(error: string | null | undefined): boolean {
+  return error === "Not configured";
+}
+
+function getHealthBadgeVariant(
+  health: "up" | "degraded" | "down" | undefined,
+  error?: string | null
+): "green" | "yellow" | "red" | "gray" {
+  if (isNotConfigured(error)) return "gray";
   if (health === "up") return "green";
   if (health === "degraded") return "yellow";
   if (health === "down") return "red";
@@ -75,19 +85,21 @@ function getHealthBadgeVariant(health: "up" | "degraded" | "down" | undefined): 
 export function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: flussonicStats, isLoading: isFlussonicLoading } = useFlussonicDashboardStats();
+  const { data: nimbleStats, isLoading: isNimbleLoading } = useNimbleDashboardStats();
   const { data: authStats, isLoading: isAuthLoading } = useAuthDashboardStats();
   const { data: epgStats, isLoading: isEpgLoading } = useEpgDashboardStats();
   const { data: rutvStats, isLoading: isRutvLoading } = useRutvDashboardStats();
   const epgUpdateMutation = useTriggerEpgUpdate();
   const syncMutation = useSyncChannels();
   const { showToast } = useToast();
-  const [syncResult, setSyncResult] = useState<SyncResultResponse | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-  async function handleSync() {
+  async function handleSync(source: StreamSource) {
     try {
-      const result = await syncMutation.mutateAsync();
-      setSyncResult(result);
-      showToast("Channels synchronized successfully", "success");
+      const result = await syncMutation.mutateAsync(source);
+      const message = `${formatStreamSource(result.source)} sync completed: ${result.total} total, ${result.new} new, ${result.updated} updated, ${result.orphaned} orphaned`;
+      setSyncMessage(message);
+      showToast(message, "success");
     } catch {
       showToast("Failed to sync channels", "error");
     }
@@ -274,15 +286,21 @@ export function DashboardPage() {
           className="xl:col-span-1"
           title={(
             <div className="flex items-center gap-2">
-              <Badge variant={getHealthBadgeVariant(flussonicStats?.health)}>
-                {flussonicStats?.health?.toUpperCase() ?? (isFlussonicLoading ? "LOADING" : "N/A")}
+              <Badge variant={getHealthBadgeVariant(flussonicStats?.health, flussonicStats?.error)}>
+                {isNotConfigured(flussonicStats?.error)
+                  ? "NOT CONFIGURED"
+                  : flussonicStats?.health?.toUpperCase() ?? (isFlussonicLoading ? "LOADING" : "N/A")}
               </Badge>
-              <span>Flussonic Sync</span>
+              <span>Flussonic</span>
             </div>
           )}
           bodyClassName="flex flex-col gap-4"
           actions={
-            <Button onClick={handleSync} loading={syncMutation.isPending}>
+            <Button
+              onClick={() => handleSync("flussonic")}
+              loading={syncMutation.isPending}
+              disabled={isNotConfigured(flussonicStats?.error)}
+            >
               <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -290,45 +308,110 @@ export function DashboardPage() {
             </Button>
           }
         >
-          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-col">
-              <div className="space-y-2 text-sm text-slate-700">
-                <p>
-                  Incoming:{" "}
-                  <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.incoming_kbit)}</span>
-                </p>
-                <p>
-                  Outgoing:{" "}
-                  <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.outgoing_kbit)}</span>
-                </p>
-                <p>
-                  Clients:{" "}
-                  <span className="font-semibold text-slate-900">{flussonicStats?.total_clients ?? "N/A"}</span>
-                </p>
-                <p>
-                  Total sources:{" "}
-                  <span className="font-semibold text-slate-900">{flussonicStats?.total_sources ?? "N/A"}</span>
-                </p>
-                <p>
-                  Good/Broken:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {flussonicStats?.good_sources ?? "N/A"} / {flussonicStats?.broken_sources ?? "N/A"}
-                  </span>
-                </p>
+          {isNotConfigured(flussonicStats?.error) ? (
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-600">Flussonic is not configured in the current environment.</p>
+            </div>
+          ) : (
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col">
+                <div className="space-y-2 text-sm text-slate-700">
+                  <p>
+                    Incoming:{" "}
+                    <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.incoming_kbit)}</span>
+                  </p>
+                  <p>
+                    Outgoing:{" "}
+                    <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.outgoing_kbit)}</span>
+                  </p>
+                  <p>
+                    Clients:{" "}
+                    <span className="font-semibold text-slate-900">{flussonicStats?.total_clients ?? "N/A"}</span>
+                  </p>
+                  <p>
+                    Total sources:{" "}
+                    <span className="font-semibold text-slate-900">{flussonicStats?.total_sources ?? "N/A"}</span>
+                  </p>
+                  <p>
+                    Good/Broken:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {flussonicStats?.good_sources ?? "N/A"} / {flussonicStats?.broken_sources ?? "N/A"}
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          {flussonicStats?.error && (
+          )}
+          {flussonicStats?.error && !isNotConfigured(flussonicStats.error) && (
             <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
               <p className="text-sm text-rose-800">{flussonicStats.error}</p>
             </div>
           )}
-          {syncResult && (
-            <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm text-emerald-800">
-                Sync completed: {syncResult.total} total, {syncResult.new} new,{" "}
-                {syncResult.updated} updated, {syncResult.orphaned} orphaned
-              </p>
+        </SectionCard>
+
+        <SectionCard
+          className="xl:col-span-1"
+          title={(
+            <div className="flex items-center gap-2">
+              <Badge variant={getHealthBadgeVariant(nimbleStats?.health, nimbleStats?.error)}>
+                {isNotConfigured(nimbleStats?.error)
+                  ? "NOT CONFIGURED"
+                  : nimbleStats?.health?.toUpperCase() ?? (isNimbleLoading ? "LOADING" : "N/A")}
+              </Badge>
+              <span>Nimble</span>
+            </div>
+          )}
+          bodyClassName="flex flex-col gap-4"
+          actions={
+            <Button
+              onClick={() => handleSync("nimble")}
+              loading={syncMutation.isPending}
+              disabled={isNotConfigured(nimbleStats?.error)}
+            >
+              <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Sync Now
+            </Button>
+          }
+        >
+          {isNotConfigured(nimbleStats?.error) ? (
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-600">Nimble is not configured in the current environment.</p>
+            </div>
+          ) : (
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col">
+                <div className="space-y-2 text-sm text-slate-700">
+                  <p>
+                    Incoming:{" "}
+                    <span className="font-semibold text-slate-900">{formatTrafficKbit(nimbleStats?.incoming_kbit)}</span>
+                  </p>
+                  <p>
+                    Outgoing:{" "}
+                    <span className="font-semibold text-slate-900">{formatTrafficKbit(nimbleStats?.outgoing_kbit)}</span>
+                  </p>
+                  <p>
+                    Clients:{" "}
+                    <span className="font-semibold text-slate-900">{nimbleStats?.total_clients ?? "N/A"}</span>
+                  </p>
+                  <p>
+                    Total sources:{" "}
+                    <span className="font-semibold text-slate-900">{nimbleStats?.total_sources ?? "N/A"}</span>
+                  </p>
+                  <p>
+                    Good/Broken:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {nimbleStats?.good_sources ?? "N/A"} / {nimbleStats?.broken_sources ?? "N/A"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {nimbleStats?.error && !isNotConfigured(nimbleStats.error) && (
+            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm text-rose-800">{nimbleStats.error}</p>
             </div>
           )}
         </SectionCard>
@@ -366,6 +449,12 @@ export function DashboardPage() {
           )}
         </SectionCard>
       </div>
+
+      {syncMessage && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm text-emerald-800">{syncMessage}</p>
+        </div>
+      )}
     </div>
   );
 }

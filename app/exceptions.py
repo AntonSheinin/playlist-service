@@ -45,13 +45,27 @@ class UnauthorizedError(PlaylistServiceError):
         super().__init__(message, code="UNAUTHORIZED")
 
 
-class FlussonicError(PlaylistServiceError):
-    """Flussonic API error."""
+class StreamProviderError(PlaylistServiceError):
+    """Stream provider API error."""
 
     status_code = 502
 
+    def __init__(self, message: str = "Stream provider error", code: str = "STREAM_PROVIDER_ERROR") -> None:
+        super().__init__(message, code=code)
+
+
+class FlussonicError(StreamProviderError):
+    """Flussonic API error."""
+
     def __init__(self, message: str = "Flussonic API error") -> None:
         super().__init__(message, code="FLUSSONIC_ERROR")
+
+
+class NimbleError(StreamProviderError):
+    """Nimble API error."""
+
+    def __init__(self, message: str = "Nimble API error") -> None:
+        super().__init__(message, code="NIMBLE_ERROR")
 
 
 class AuthServiceError(PlaylistServiceError):

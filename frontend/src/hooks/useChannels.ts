@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   listChannels,
-  updateChannel,
   bulkUpdateChannels,
   deleteChannel,
   updateChannelGroups,
@@ -12,7 +11,7 @@ import {
   uploadLogoByUrl,
   removeLogo,
 } from "../api/channels";
-import type { ChannelBulkUpdateItem } from "../api/types";
+import type { ChannelBulkUpdateItem, StreamSource } from "../api/types";
 import { queryKeys } from "./queryKeys";
 
 interface ListParams {
@@ -22,6 +21,7 @@ interface ListParams {
   sort_dir?: string;
   search?: string;
   group_id?: number;
+  source?: StreamSource;
   sync_status?: string;
 }
 
@@ -30,18 +30,6 @@ export function useChannels(params: ListParams) {
     queryKey: queryKeys.channels.list(params),
     queryFn: () => listChannels(params),
     placeholderData: keepPreviousData,
-  });
-}
-
-export function useUpdateChannel() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
-      updateChannel(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.channels.all() });
-      qc.invalidateQueries({ queryKey: queryKeys.lookup.channels() });
-    },
   });
 }
 
@@ -100,11 +88,14 @@ export function useUpdateChannelPackages() {
 export function useSyncChannels() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => syncChannels(),
-    onSuccess: () => {
+    mutationFn: (source: StreamSource) => syncChannels(source),
+    onSuccess: (_, source) => {
       qc.invalidateQueries({ queryKey: queryKeys.channels.all() });
       qc.invalidateQueries({ queryKey: queryKeys.lookup.channels() });
+      qc.invalidateQueries({ queryKey: queryKeys.packages.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.provider(source) });
     },
   });
 }

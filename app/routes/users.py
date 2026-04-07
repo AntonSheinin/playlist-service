@@ -202,6 +202,7 @@ async def get_resolved_channels(
     result = [
         ResolvedChannel(
             id=ch.id,
+            source=ch.source,
             stream_name=ch.stream_name,
             display_name=ch.display_name,
             tvg_name=ch.tvg_name,

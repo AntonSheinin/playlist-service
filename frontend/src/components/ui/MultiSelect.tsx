@@ -12,9 +12,11 @@ interface MultiSelectProps {
   options: SelectOption[];
   value: SelectOption[];
   onChange: (selected: MultiValue<SelectOption>) => void;
+  onInputChange?: (value: string) => void;
   placeholder?: string;
   isLoading?: boolean;
   isClearable?: boolean;
+  noOptionsMessage?: (inputValue: string) => string;
 }
 
 export function MultiSelect({
@@ -22,9 +24,11 @@ export function MultiSelect({
   options,
   value,
   onChange,
+  onInputChange,
   placeholder = "Select...",
   isLoading,
   isClearable = true,
+  noOptionsMessage,
 }: MultiSelectProps) {
   return (
     <div>
@@ -38,9 +42,16 @@ export function MultiSelect({
         options={options}
         value={value}
         onChange={onChange}
+        onInputChange={(value, meta) => {
+          if (meta.action === "input-change") onInputChange?.(value);
+        }}
         placeholder={placeholder}
         isLoading={isLoading}
         isClearable={isClearable}
+        noOptionsMessage={({ inputValue }) =>
+          noOptionsMessage ? noOptionsMessage(inputValue) : "No options"
+        }
+        filterOption={onInputChange ? () => true : undefined}
         classNamePrefix="react-select"
         styles={{
           control: (base) => ({

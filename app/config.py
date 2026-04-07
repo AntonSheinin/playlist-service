@@ -38,11 +38,22 @@ class Settings(BaseSettings):
     session_timeout: int
 
     # Flussonic
-    flussonic_url: str = Field(min_length=1)
-    flussonic_username: str = Field(min_length=1)
-    flussonic_password: str = Field(min_length=1)
-    flussonic_timeout: float
-    flussonic_page_limit: int
+    flussonic_url: str | None = None
+    flussonic_username: str | None = None
+    flussonic_password: str | None = None
+    flussonic_timeout: float = 60
+    flussonic_page_limit: int = 500
+
+    # Nimble via WMSPanel
+    wmspanel_api_url: str | None = None
+    wmspanel_client_id: str | None = None
+    wmspanel_api_key: str | None = None
+    wmspanel_server_id: str | None = None
+    nimble_timeout: float = 30
+    nimble_playback_url: str | None = None
+    nimble_application: str = "live"
+    nimble_playlist_path: str = "playlist.m3u8"
+    nimble_token_query_param: str = "token"
 
     # Auth Service
     auth_service_url: str = Field(min_length=1)

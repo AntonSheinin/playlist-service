@@ -3,12 +3,14 @@ import {
   getAuthStats,
   getEpgStats,
   getFlussonicStats,
+  getNimbleStats,
   getRutvStats,
   getStats,
   triggerEpgUpdate,
 } from "../api/dashboard";
+import { queryKeys } from "./queryKeys";
 
-const parsedServiceRefreshMs = Number(import.meta.env.VITE_FLUSSONIC_DASHBOARD_REFRESH_MS);
+const parsedServiceRefreshMs = Number(import.meta.env.VITE_SERVICE_DASHBOARD_REFRESH_MS);
 const SERVICE_REFRESH_MS =
   Number.isFinite(parsedServiceRefreshMs) && parsedServiceRefreshMs > 0
     ? parsedServiceRefreshMs
@@ -16,15 +18,26 @@ const SERVICE_REFRESH_MS =
 
 export function useDashboardStats() {
   return useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: queryKeys.dashboard.stats(),
     queryFn: getStats,
   });
 }
 
 export function useFlussonicDashboardStats() {
   return useQuery({
-    queryKey: ["dashboard-flussonic-stats"],
+    queryKey: queryKeys.dashboard.provider("flussonic"),
     queryFn: getFlussonicStats,
+    refetchInterval: SERVICE_REFRESH_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+}
+
+export function useNimbleDashboardStats() {
+  return useQuery({
+    queryKey: queryKeys.dashboard.provider("nimble"),
+    queryFn: getNimbleStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -34,7 +47,7 @@ export function useFlussonicDashboardStats() {
 
 export function useAuthDashboardStats() {
   return useQuery({
-    queryKey: ["dashboard-auth-stats"],
+    queryKey: queryKeys.dashboard.auth(),
     queryFn: getAuthStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
@@ -45,7 +58,7 @@ export function useAuthDashboardStats() {
 
 export function useEpgDashboardStats() {
   return useQuery({
-    queryKey: ["dashboard-epg-stats"],
+    queryKey: queryKeys.dashboard.epg(),
     queryFn: getEpgStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
@@ -56,7 +69,7 @@ export function useEpgDashboardStats() {
 
 export function useRutvDashboardStats() {
   return useQuery({
-    queryKey: ["dashboard-rutv-stats"],
+    queryKey: queryKeys.dashboard.rutv(),
     queryFn: getRutvStats,
     refetchInterval: SERVICE_REFRESH_MS,
     refetchIntervalInBackground: true,
@@ -70,7 +83,7 @@ export function useTriggerEpgUpdate() {
   return useMutation({
     mutationFn: () => triggerEpgUpdate(),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["dashboard-epg-stats"] });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.epg() });
     },
   });
 }

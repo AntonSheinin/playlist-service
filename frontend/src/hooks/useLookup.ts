@@ -31,10 +31,13 @@ export function useLookupTariffs() {
   });
 }
 
-export function useLookupChannels() {
+export function useLookupChannels(search = "", source?: "flussonic" | "nimble") {
+  const normalizedSearch = search.trim();
+
   return useQuery({
-    queryKey: queryKeys.lookup.channels(),
-    queryFn: () => lookupChannels(),
+    queryKey: queryKeys.lookup.channels({ search: normalizedSearch, source }),
+    queryFn: () => lookupChannels(normalizedSearch, 50, source),
+    enabled: normalizedSearch.length > 0,
     staleTime: 30_000,
   });
 }
