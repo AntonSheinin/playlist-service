@@ -7,7 +7,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.config import get_settings
-from app.exceptions import AuthServiceError
+from app.exceptions import AuthServiceError, AuthServiceNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,6 @@ class AuthTokenUpdate(BaseModel):
 
     status: str | None = None
     max_sessions: int | None = None
-    valid_from: datetime | None = None
     valid_until: datetime | None = None
     allowed_streams: list[str] | None = None
     meta: dict[str, str] | None = None
@@ -91,7 +90,7 @@ class AuthServiceClient:
 
             if response.status_code == 404 and 404 not in accept_statuses:
                 logger.debug("Auth service %s: 404 at %s", operation, url)
-                raise AuthServiceError(f"Not found: {path}")
+                raise AuthServiceNotFoundError(f"Not found: {path}")
 
             logger.error(
                 "Auth service %s failed: %d - %s", operation, response.status_code, response.text

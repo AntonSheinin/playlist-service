@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.auth_service import AuthServiceClient, AuthTokenCreate, AuthTokenUpdate
-from app.exceptions import AuthServiceError
+from app.exceptions import AuthServiceError, AuthServiceNotFoundError
 from app.models import Channel, User, UserStatus
 from app.services.user_service import UserService
 
@@ -78,7 +78,6 @@ class AuthSyncService:
                 data = AuthTokenUpdate(
                     status=self._map_status(user.status),
                     max_sessions=user.max_sessions,
-                    valid_from=user.valid_from,
                     valid_until=user.valid_until,
                     allowed_streams=allowed_streams,
                     meta={
@@ -87,7 +86,17 @@ class AuthSyncService:
                     },
                 )
 
-                await client.update_token(user.auth_token_id, data)
+                try:
+                    await client.update_token(user.auth_token_id, data)
+                except AuthServiceNotFoundError:
+                    logger.warning(
+                        "Auth token %d for user %d is missing in Auth Service; recreating it",
+                        user.auth_token_id,
+                        user.id,
+                    )
+                    await self._do_create(client, user)
+                    return
+
                 logger.info("Updated user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)

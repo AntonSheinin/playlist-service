@@ -29,6 +29,15 @@ class UserStatus(str, enum.Enum):
     DISABLED = "disabled"
 
 
+def value_enum(enum_cls: type[enum.Enum]) -> Enum:
+    return Enum(
+        enum_cls,
+        native_enum=False,
+        values_callable=lambda members: [member.value for member in members],
+        validate_strings=True,
+    )
+
+
 # Association tables
 package_channels = Table(
     "package_channels",
@@ -104,7 +113,7 @@ class Channel(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     source: Mapped[StreamSource] = mapped_column(
-        Enum(StreamSource, native_enum=False),
+        value_enum(StreamSource),
         default=StreamSource.FLUSSONIC,
         index=True,
     )
@@ -116,7 +125,11 @@ class Channel(Base, TimestampMixin):
     tvg_logo: Mapped[str | None] = mapped_column(Text, nullable=True)
     channel_number: Mapped[int | None] = mapped_column(nullable=True)
     sort_order: Mapped[int] = mapped_column(default=0, index=True)
-    sync_status: Mapped[SyncStatus] = mapped_column(Enum(SyncStatus, native_enum=False), default=SyncStatus.SYNCED, index=True)
+    sync_status: Mapped[SyncStatus] = mapped_column(
+        Enum(SyncStatus, native_enum=False),
+        default=SyncStatus.SYNCED,
+        index=True,
+    )
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     groups: Mapped[list["Group"]] = relationship(
@@ -156,7 +169,11 @@ class User(Base, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     agreement_number: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
-    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, native_enum=False), default=UserStatus.ENABLED, index=True)
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, native_enum=False),
+        default=UserStatus.ENABLED,
+        index=True,
+    )
     max_sessions: Mapped[int] = mapped_column(default=1, nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     auth_token_id: Mapped[int | None] = mapped_column(nullable=True)

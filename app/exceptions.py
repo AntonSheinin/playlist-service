@@ -77,6 +77,16 @@ class AuthServiceError(PlaylistServiceError):
         super().__init__(message, code="AUTH_SERVICE_ERROR")
 
 
+class AuthServiceNotFoundError(AuthServiceError):
+    """Auth Service resource not found."""
+
+    status_code = 404
+
+    def __init__(self, message: str = "Auth Service resource not found") -> None:
+        super().__init__(message)
+        self.code = "AUTH_SERVICE_NOT_FOUND"
+
+
 class EpgServiceError(PlaylistServiceError):
     """EPG Service API error."""
 
