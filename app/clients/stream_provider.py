@@ -12,6 +12,13 @@ class ProviderStream:
 
 
 @dataclass(frozen=True)
+class ProviderActiveSourceCounters:
+    online24: int
+    restream: int
+    other: int
+
+
+@dataclass(frozen=True)
 class ProviderDashboardStats:
     health: str
     incoming_kbit: int | None = None
@@ -20,6 +27,7 @@ class ProviderDashboardStats:
     total_sources: int | None = None
     good_sources: int | None = None
     broken_sources: int | None = None
+    active_source_counters: ProviderActiveSourceCounters | None = None
     error: str | None = None
 
 

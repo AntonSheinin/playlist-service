@@ -338,6 +338,24 @@ export function DashboardPage() {
                       {flussonicStats?.good_sources ?? "N/A"} / {flussonicStats?.broken_sources ?? "N/A"}
                     </span>
                   </p>
+                  <p>
+                    Active online24:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {flussonicStats?.active_source_counters?.online24 ?? "N/A"}
+                    </span>
+                  </p>
+                  <p>
+                    Active restream.pw / 185.96.80.44:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {flussonicStats?.active_source_counters?.restream ?? "N/A"}
+                    </span>
+                  </p>
+                  <p>
+                    Active other:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {flussonicStats?.active_source_counters?.other ?? "N/A"}
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>

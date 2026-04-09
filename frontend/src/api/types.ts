@@ -37,6 +37,12 @@ export interface DashboardStats {
 
 export type ServiceHealth = "up" | "degraded" | "down";
 
+export interface ActiveSourceCounters {
+  online24: number;
+  restream: number;
+  other: number;
+}
+
 export interface StreamProviderDashboardStats {
   health: ServiceHealth;
   checked_at: string;
@@ -46,6 +52,7 @@ export interface StreamProviderDashboardStats {
   total_sources: number | null;
   good_sources: number | null;
   broken_sources: number | null;
+  active_source_counters: ActiveSourceCounters | null;
   error: string | null;
 }
 

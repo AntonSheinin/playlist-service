@@ -11,6 +11,7 @@ from app.dependencies import CurrentAdminId, DBSession
 from app.exceptions import AuthServiceError, EpgServiceError, RutvServiceError, StreamProviderError
 from app.models import Channel, Group, Package, StreamSource, SyncStatus, Tariff, User, UserStatus
 from app.schemas import (
+    ActiveSourceCounters,
     AuthDashboardStats,
     DashboardStats,
     EpgDashboardStats,
@@ -102,6 +103,15 @@ async def _get_provider_stats(source: StreamSource) -> StreamProviderDashboardSt
             total_sources=payload.total_sources,
             good_sources=payload.good_sources,
             broken_sources=payload.broken_sources,
+            active_source_counters=(
+                ActiveSourceCounters(
+                    online24=payload.active_source_counters.online24,
+                    restream=payload.active_source_counters.restream,
+                    other=payload.active_source_counters.other,
+                )
+                if payload.active_source_counters is not None
+                else None
+            ),
             error=payload.error,
         )
     except StreamProviderError as e:

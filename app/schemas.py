@@ -80,6 +80,12 @@ class DashboardStats(BaseModel):
     last_sync: datetime | None
 
 
+class ActiveSourceCounters(BaseModel):
+    online24: int
+    restream: int
+    other: int
+
+
 class StreamProviderDashboardStats(BaseModel):
     health: Literal["up", "degraded", "down"]
     checked_at: datetime
@@ -89,6 +95,7 @@ class StreamProviderDashboardStats(BaseModel):
     total_sources: int | None = None
     good_sources: int | None = None
     broken_sources: int | None = None
+    active_source_counters: ActiveSourceCounters | None = None
     error: str | None = None
 
 
