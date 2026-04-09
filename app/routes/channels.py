@@ -179,12 +179,21 @@ async def list_channels(
     per_page: int = Query(20, ge=1, le=100),
     search: str | None = None,
     group_id: int | None = None,
+    package_id: int | None = None,
+    without_group: bool = False,
+    without_package: bool = False,
     source: StreamSource | None = None,
     sync_status: SyncStatus | None = None,
     sort_by: str = "channel_number",
     sort_dir: str = "asc",
 ) -> PaginatedResponse[ChannelResponse]:
     """List channels with pagination and filters."""
+    if group_id is not None and without_group:
+        raise ValidationError("Choose either a group or 'without group', not both")
+
+    if package_id is not None and without_package:
+        raise ValidationError("Choose either a package or 'without package', not both")
+
     service = ChannelService(db)
     pagination = PaginationParams(page=page, per_page=per_page)
 
@@ -192,6 +201,9 @@ async def list_channels(
         pagination=pagination,
         search=search,
         group_id=group_id,
+        package_id=package_id,
+        without_group=without_group,
+        without_package=without_package,
         source=source,
         sync_status=sync_status,
         sort_by=sort_by,

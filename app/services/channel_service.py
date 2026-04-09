@@ -36,6 +36,9 @@ class ChannelService(BaseService[Channel]):
         pagination: PaginationParams,
         search: str | None = None,
         group_id: int | None = None,
+        package_id: int | None = None,
+        without_group: bool = False,
+        without_package: bool = False,
         source: StreamSource | None = None,
         sync_status: SyncStatus | None = None,
         sort_by: str = "channel_number",
@@ -61,6 +64,13 @@ class ChannelService(BaseService[Channel]):
 
         if group_id is not None:
             stmt = stmt.where(Channel.groups.any(Group.id == group_id))
+        elif without_group:
+            stmt = stmt.where(~Channel.groups.any())
+
+        if package_id is not None:
+            stmt = stmt.where(Channel.packages.any(Package.id == package_id))
+        elif without_package:
+            stmt = stmt.where(~Channel.packages.any())
 
         if source is not None:
             stmt = stmt.where(Channel.source == source)

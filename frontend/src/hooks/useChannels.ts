@@ -21,6 +21,9 @@ interface ListParams {
   sort_dir?: string;
   search?: string;
   group_id?: number;
+  package_id?: number;
+  without_group?: boolean;
+  without_package?: boolean;
   source?: StreamSource;
   sync_status?: string;
 }

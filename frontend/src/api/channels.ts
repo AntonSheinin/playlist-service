@@ -14,6 +14,9 @@ interface ListChannelsParams {
   per_page?: number;
   search?: string;
   group_id?: number;
+  package_id?: number;
+  without_group?: boolean;
+  without_package?: boolean;
   source?: StreamSource;
   sync_status?: string;
   sort_by?: string;
@@ -28,6 +31,9 @@ export function listChannels(
   if (params.per_page) searchParams.set("per_page", String(params.per_page));
   if (params.search) searchParams.set("search", params.search);
   if (params.group_id) searchParams.set("group_id", String(params.group_id));
+  if (params.package_id) searchParams.set("package_id", String(params.package_id));
+  if (params.without_group) searchParams.set("without_group", "true");
+  if (params.without_package) searchParams.set("without_package", "true");
   if (params.source) searchParams.set("source", params.source);
   if (params.sync_status) searchParams.set("sync_status", params.sync_status);
   if (params.sort_by) searchParams.set("sort_by", params.sort_by);

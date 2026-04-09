@@ -86,6 +86,7 @@ export function ChannelsPage() {
   const page = parsePositiveInt(searchParams.get("page"), 1);
   const perPage = parsePositiveInt(searchParams.get("perPage"), 20);
   const groupFilter = searchParams.get("group") ?? "";
+  const packageFilter = searchParams.get("package") ?? "";
   const sourceFilter = searchParams.get("source") ?? "";
   const statusFilter = searchParams.get("status") ?? "";
   const urlSearch = searchParams.get("search") ?? "";
@@ -121,7 +122,10 @@ export function ChannelsPage() {
     per_page: perPage,
     sort_by: sortBy,
     sort_dir: sortDir,
-    group_id: groupFilter ? Number(groupFilter) : undefined,
+    group_id: groupFilter && groupFilter !== "none" ? Number(groupFilter) : undefined,
+    package_id: packageFilter && packageFilter !== "none" ? Number(packageFilter) : undefined,
+    without_group: groupFilter === "none" || undefined,
+    without_package: packageFilter === "none" || undefined,
     source: (sourceFilter || undefined) as StreamSource | undefined,
     sync_status: statusFilter || undefined,
     search: search || undefined,
@@ -420,8 +424,20 @@ export function ChannelsPage() {
           onChange={(e) => updateParams({ group: e.target.value || undefined, page: "1" })}
         >
           <option value="">All Groups</option>
+          <option value="none">No Group</option>
           {(groups || []).map((g) => (
             <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </Select>
+        <Select
+          label="Package"
+          value={packageFilter}
+          onChange={(e) => updateParams({ package: e.target.value || undefined, page: "1" })}
+        >
+          <option value="">All Packages</option>
+          <option value="none">No Package</option>
+          {(packages || []).map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </Select>
         <Select
