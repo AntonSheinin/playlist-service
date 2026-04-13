@@ -27,13 +27,20 @@ ACTIVE_SOURCE_COUNTERS_CACHE_TTL_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
-class _ActiveSourceCountersCacheEntry:
+class _StreamDerivedStats:
+    total_sources: int
+    broken_sources: int
+    active_source_counters: ProviderActiveSourceCounters
+
+
+@dataclass(frozen=True)
+class _StreamStatsCacheEntry:
     expires_at: float
-    counters: ProviderActiveSourceCounters
+    stats: _StreamDerivedStats
 
 
-_active_source_counters_cache: dict[str, _ActiveSourceCountersCacheEntry] = {}
-_active_source_counters_cache_lock = asyncio.Lock()
+_stream_stats_cache: dict[str, _StreamStatsCacheEntry] = {}
+_stream_stats_cache_lock = asyncio.Lock()
 
 
 class FlussonicClient:
@@ -66,13 +73,11 @@ class FlussonicClient:
             auth = httpx.BasicAuth(self.username, self.password)
             health_probe_ok = await self._check_v3_health(client, auth)
             stats = await self._get_v3_server_stats(client, auth)
-            active_source_counters = await self._get_cached_active_source_counters(client, auth)
+            stream_stats = await self._get_cached_stream_stats(client, auth)
 
-        total_sources = self._as_int(stats.get("total_streams"))
-        good_sources = self._as_int(stats.get("online_streams"))
-        broken_sources: int | None = None
-        if total_sources is not None and good_sources is not None:
-            broken_sources = max(total_sources - good_sources, 0)
+        total_sources = stream_stats.total_sources
+        broken_sources = stream_stats.broken_sources
+        good_sources = max(total_sources - broken_sources, 0)
 
         streamer_status = stats.get("streamer_status")
         health = "up"
@@ -89,7 +94,7 @@ class FlussonicClient:
             total_sources=total_sources,
             good_sources=good_sources,
             broken_sources=broken_sources,
-            active_source_counters=active_source_counters,
+            active_source_counters=stream_stats.active_source_counters,
         )
 
     async def get_streams(self) -> list[ProviderStream]:
@@ -206,28 +211,32 @@ class FlussonicClient:
         except httpx.RequestError as e:
             raise FlussonicError(f"Failed to connect to Flussonic API v3: {e}") from e
 
-    async def _get_cached_active_source_counters(
+    async def _get_cached_stream_stats(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
-    ) -> ProviderActiveSourceCounters:
+    ) -> _StreamDerivedStats:
         cache_key = self.base_url
         now = time.monotonic()
-        cached = _active_source_counters_cache.get(cache_key)
+        cached = _stream_stats_cache.get(cache_key)
         if cached is not None and cached.expires_at > now:
-            return cached.counters
+            return cached.stats
 
-        async with _active_source_counters_cache_lock:
+        async with _stream_stats_cache_lock:
             now = time.monotonic()
-            cached = _active_source_counters_cache.get(cache_key)
+            cached = _stream_stats_cache.get(cache_key)
             if cached is not None and cached.expires_at > now:
-                return cached.counters
+                return cached.stats
 
             items = await self._get_v3_stream_items(client, auth)
-            counters = self._count_active_source_counters(items)
-            _active_source_counters_cache[cache_key] = _ActiveSourceCountersCacheEntry(
-                expires_at=now + ACTIVE_SOURCE_COUNTERS_CACHE_TTL_SECONDS,
-                counters=counters,
+            stream_stats = _StreamDerivedStats(
+                total_sources=len(items),
+                broken_sources=self._count_broken_sources(items),
+                active_source_counters=self._count_active_source_counters(items),
             )
-            return counters
+            _stream_stats_cache[cache_key] = _StreamStatsCacheEntry(
+                expires_at=now + ACTIVE_SOURCE_COUNTERS_CACHE_TTL_SECONDS,
+                stats=stream_stats,
+            )
+            return stream_stats
 
     def _extract_v3_items(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract stream items from a Flussonic V3 response page."""
@@ -272,6 +281,14 @@ class FlussonicClient:
             online24=online24,
             restream=restream,
             other=other,
+        )
+
+    def _count_broken_sources(self, items: list[dict[str, Any]]) -> int:
+        return sum(
+            1
+            for item in items
+            if isinstance(item.get("stats"), dict)
+            and item["stats"].get("status") == "error"
         )
 
     def _get_active_input_url(self, item: dict[str, Any]) -> str | None:
