@@ -1,3 +1,4 @@
+import { Alert, Stack, Typography } from "@mui/material";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 
@@ -38,22 +39,10 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="flex items-start space-x-4">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-100">
-          <svg className="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-        </div>
-        <div>
-          <p className="text-slate-900">{message}</p>
-          {details && <p className="mt-2 text-sm text-slate-600">{details}</p>}
-        </div>
-      </div>
+      <Stack spacing={1.5}>
+        <Alert severity="warning">{message}</Alert>
+        {details && <Typography color="text.secondary">{details}</Typography>}
+      </Stack>
     </Modal>
   );
 }

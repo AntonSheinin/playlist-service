@@ -1,5 +1,5 @@
-import DatePickerLib from "react-datepicker";
-import { fieldControlClass, fieldLabelClass } from "./fieldStyles";
+import dayjs from "dayjs";
+import { DatePicker as MuiDatePicker } from "@mui/x-date-pickers/DatePicker";
 
 interface DatePickerProps {
   label?: string;
@@ -16,29 +16,21 @@ export function DatePicker({
   onChange,
   isClearable = true,
   id,
-  placeholder = "Select date",
 }: DatePickerProps) {
   return (
-    <div>
-      {label && (
-        <label htmlFor={id} className={fieldLabelClass}>
-          {label}
-        </label>
-      )}
-      <DatePickerLib
-        id={id}
-        selected={selected}
-        onChange={(date: Date | null) => onChange(date)}
-        isClearable={isClearable}
-        placeholderText={placeholder}
-        dateFormat="yyyy-MM-dd"
-        showPopperArrow={false}
-        popperPlacement="bottom-start"
-        wrapperClassName="w-full"
-        calendarClassName="modern-datepicker"
-        className={fieldControlClass}
-        ariaLabelledBy={id && label ? id : undefined}
-      />
-    </div>
+    <MuiDatePicker
+      label={label}
+      value={selected ? dayjs(selected) : null}
+      onChange={(value) => onChange(value?.toDate() ?? null)}
+      format="YYYY-MM-DD"
+      slotProps={{
+        field: { clearable: isClearable },
+        textField: {
+          id,
+          fullWidth: true,
+        },
+        popper: { sx: { zIndex: 1500 } },
+      }}
+    />
   );
 }

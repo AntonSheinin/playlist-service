@@ -1,15 +1,37 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link as RouterLink, useLocation } from "react-router-dom";
+import {
+  AppBar,
+  Avatar,
+  Box,
+  Divider,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  useMediaQuery,
+} from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import GroupsIcon from "@mui/icons-material/FolderCopy";
+import InventoryIcon from "@mui/icons-material/Inventory2";
+import LiveTvIcon from "@mui/icons-material/LiveTv";
+import LogoutIcon from "@mui/icons-material/Logout";
+import MenuIcon from "@mui/icons-material/Menu";
+import PeopleIcon from "@mui/icons-material/People";
 import { useAuth } from "../../hooks/useAuth";
-import { cn } from "../../utils/cn";
-import { Button } from "../ui/Button";
+import { drawerWidth } from "../../theme";
 
 const navLinks = [
-  { to: "/", label: "Dashboard", key: "dashboard" },
-  { to: "/channels", label: "Channels", key: "channels" },
-  { to: "/groups", label: "Groups", key: "groups" },
-  { to: "/packages", label: "Packages & Tariffs", key: "packages" },
-  { to: "/users", label: "Users", key: "users" },
+  { to: "/", label: "Dashboard", key: "dashboard", icon: <DashboardIcon fontSize="small" /> },
+  { to: "/channels", label: "Channels", key: "channels", icon: <LiveTvIcon fontSize="small" /> },
+  { to: "/groups", label: "Groups", key: "groups", icon: <GroupsIcon fontSize="small" /> },
+  { to: "/packages", label: "Packages & Tariffs", key: "packages", icon: <InventoryIcon fontSize="small" /> },
+  { to: "/users", label: "Users", key: "users", icon: <PeopleIcon fontSize="small" /> },
 ];
 
 function isActive(key: string, pathname: string): boolean {
@@ -20,104 +42,105 @@ function isActive(key: string, pathname: string): boolean {
 export function NavBar() {
   const { admin, logout } = useAuth();
   const { pathname } = useLocation();
+  const theme = useTheme();
+  const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  const drawer = (
+    <Box sx={{ display: "flex", minHeight: "100%", flexDirection: "column" }}>
+      <Toolbar sx={{ gap: 1.5, minHeight: 64 }}>
+        <Avatar src="/media/rutv-logo.png" alt="RUTV logo" variant="rounded" sx={{ width: 34, height: 34 }} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography noWrap variant="subtitle1" sx={{ fontWeight: 700 }}>
+            Playlist Service
+          </Typography>
+          <Typography noWrap variant="caption" color="text.secondary">
+            Admin console
+          </Typography>
+        </Box>
+      </Toolbar>
+      <Divider />
+      <List dense sx={{ flex: 1, px: 1, py: 1.5 }}>
+        {navLinks.map((link) => {
+          const active = isActive(link.key, pathname);
+          return (
+            <ListItemButton
+              key={link.key}
+              component={RouterLink}
+              to={link.to}
+              selected={active}
+              onClick={() => setMobileOpen(false)}
+              sx={{
+                mb: 0.5,
+                borderRadius: 1,
+                "&.Mui-selected": {
+                  bgcolor: "#e0f2fe",
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36, color: active ? "primary.main" : "text.secondary" }}>
+                {link.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={<Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>{link.label}</Typography>}
+              />
+            </ListItemButton>
+          );
+        })}
+      </List>
+      <Divider />
+      <Box sx={{ p: 1.5 }}>
+        <Typography noWrap variant="body2" color="text.secondary" sx={{ px: 1, mb: 1 }}>
+          {admin?.username}
+        </Typography>
+        <ListItemButton onClick={() => void logout()} sx={{ borderRadius: 1, color: "error.main" }}>
+          <ListItemIcon sx={{ minWidth: 36, color: "error.main" }}>
+            <LogoutIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary={<Typography sx={{ fontSize: 14, fontWeight: 600 }}>Logout</Typography>} />
+        </ListItemButton>
+      </Box>
+    </Box>
+  );
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-6">
-        <div className="flex min-h-16 items-center justify-between gap-4 py-2">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link
-              to="/"
-              className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-lg font-semibold text-slate-900"
-            >
-              <img
-                src="/media/rutv-logo.png"
-                alt="RUTV logo"
-                className="h-8 w-8 flex-shrink-0 object-contain"
-              />
-              <span className="truncate">Playlist Service</span>
-            </Link>
-          </div>
-
-          <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.key}
-                to={link.to}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900",
-                  isActive(link.key, pathname) && "bg-sky-50 text-sky-800"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-slate-600 md:block">
-              {admin?.username}
-            </span>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="hidden md:inline-flex"
-              onClick={() => void logout()}
-            >
-              Logout
-            </Button>
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700 md:hidden"
-              onClick={() => setMobileOpen((prev) => !prev)}
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-nav"
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {mobileOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {mobileOpen && (
-          <div id="mobile-nav" className="border-t border-slate-200 py-3 md:hidden">
-            <div className="mb-3 px-1 text-sm text-slate-600">{admin?.username}</div>
-            <div className="grid gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={`${link.key}-mobile`}
-                  to={link.to}
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-sm font-medium text-slate-700",
-                    isActive(link.key, pathname) && "bg-sky-50 text-sky-800"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <button
-                type="button"
-                onClick={() => void logout()}
-                className="mt-1 rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
+    <>
+      {!desktop && (
+        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Toolbar variant="dense">
+            <IconButton edge="start" color="inherit" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="subtitle1" sx={{ ml: 1, fontWeight: 700 }}>
+              Playlist Service
+            </Typography>
+          </Toolbar>
+        </AppBar>
+      )}
+      <Box component="nav" aria-label="Main navigation">
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            display: { xs: "block", md: "none" },
+            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          open
+          sx={{
+            display: { xs: "none", md: "block" },
+            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
+          }}
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+    </>
   );
 }

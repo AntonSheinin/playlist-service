@@ -39,7 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void syncCurrentAdmin(true);
+    const timeout = window.setTimeout(() => {
+      void syncCurrentAdmin(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [syncCurrentAdmin]);
 
   const login = useCallback(async (credentials: LoginRequest) => {

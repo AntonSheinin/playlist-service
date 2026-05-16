@@ -1,20 +1,14 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "../../utils/cn";
+import { Card as MuiCard } from "@mui/material";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
-export function Card({ className, children, ...props }: CardProps) {
+export function Card({ children, ...props }: CardProps) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border border-slate-200 bg-white shadow-sm",
-        className
-      )}
-      {...props}
-    >
+    <MuiCard {...props} sx={{ overflow: "hidden", ...(props.style as object) }}>
       {children}
-    </div>
+    </MuiCard>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useRef, type ReactNode } from "react";
-import { cn } from "../../utils/cn";
+import { TableCell } from "@mui/material";
 
 interface ResizableHeaderProps {
   colKey: string;
@@ -15,7 +15,6 @@ export function ResizableHeader({
   width,
   onResize,
   children,
-  className,
   minWidth = 56,
 }: ResizableHeaderProps) {
   const thRef = useRef<HTMLTableCellElement>(null);
@@ -58,21 +57,18 @@ export function ResizableHeader({
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     },
-    [colKey, onResize]
+    [colKey, minWidth, onResize]
   );
 
   return (
-    <th
+    <TableCell
       ref={thRef}
       data-col-key={colKey}
       style={width ? { width: `${Math.max(width, minWidth)}px` } : { minWidth: `${minWidth}px` }}
-      className={cn(
-        "relative overflow-hidden whitespace-nowrap border-r border-slate-200 px-4 py-3 text-left text-xs font-medium uppercase text-slate-500 last:border-r-0",
-        className
-      )}
+      sx={{ position: "relative", overflow: "hidden", borderRight: 1, borderColor: "divider" }}
     >
       {children}
       <span className="resize-handle" onMouseDown={handleMouseDown} />
-    </th>
+    </TableCell>
   );
 }

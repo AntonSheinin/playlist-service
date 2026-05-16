@@ -1,6 +1,4 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import type { MultiValue } from "react-select";
-import ReactSelect from "react-select";
 import { useSearchParams } from "react-router-dom";
 import {
   useChannels,
@@ -32,6 +30,7 @@ import { FilterBar } from "../components/ui/FilterBar";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Select } from "../components/ui/Select";
+import { MultiSelect } from "../components/ui/MultiSelect";
 import { fieldLabelClass } from "../components/ui/fieldStyles";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
@@ -56,22 +55,6 @@ function parsePositiveInt(value: string | null, fallback: number) {
 
 const compactCellInputClass =
   "h-8 rounded-md border border-slate-300 px-1.5 py-1 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100";
-
-const compactMultiSelectStyles = {
-  menuPortal: (base: object) => ({ ...base, zIndex: 50 }),
-  control: (base: object) => ({
-    ...base,
-    minHeight: "30px",
-    fontSize: "12px",
-    borderColor: "#cbd5e1",
-    boxShadow: "none",
-  }),
-  multiValue: (base: object) => ({ ...base, fontSize: "11px" }),
-};
-
-const portalOnlySelectStyles = {
-  menuPortal: (base: object) => ({ ...base, zIndex: 50 }),
-};
 
 function isNotConfigured(error: string | null | undefined): boolean {
   return error === "Not configured";
@@ -363,7 +346,7 @@ export function ChannelsPage() {
     }
   }
 
-  // Group/Package options for react-select
+  // Group/package options for multi-select controls.
   const groupOptions = useMemo(
     () => (groups || []).map((g) => ({ value: g.id, label: g.name })),
     [groups]
@@ -578,32 +561,24 @@ export function ChannelsPage() {
                       />
                     </td>
                     <td className="px-2 py-2">
-                      <ReactSelect
-                        isMulti
+                      <MultiSelect
                         options={groupOptions}
                         value={groupOptions.filter((o) => ch.groups.some((g) => g.id === o.value))}
-                        onChange={(selected: MultiValue<{ value: number; label: string }>) => {
+                        onChange={(selected) => {
                           handleGroupChange(ch.id, selected.map((s) => s.value));
                         }}
-                        menuPortalTarget={document.body}
-                        styles={compactMultiSelectStyles}
-                        classNamePrefix="react-select"
                       />
                     </td>
                     <td className="px-2 py-2">
                       <span className={`text-sm ${catchupDisplay === "-" ? "text-slate-400" : "text-slate-700"}`}>{catchupDisplay}</span>
                     </td>
                     <td className="px-2 py-2">
-                      <ReactSelect
-                        isMulti
+                      <MultiSelect
                         options={packageOptions}
                         value={packageOptions.filter((o) => ch.packages.some((p) => p.id === o.value))}
-                        onChange={(selected: MultiValue<{ value: number; label: string }>) => {
+                        onChange={(selected) => {
                           handlePackageChange(ch.id, selected.map((s) => s.value));
                         }}
-                        menuPortalTarget={document.body}
-                        styles={compactMultiSelectStyles}
-                        classNamePrefix="react-select"
                       />
                     </td>
                     <td className="px-2 py-2">
@@ -780,15 +755,11 @@ export function ChannelsPage() {
             </div>
             <div>
               <label className={fieldLabelClass}>Groups</label>
-              <ReactSelect
-                isMulti
+              <MultiSelect
                 options={groupOptions}
                 value={groupOptions.filter((o) => editGroupIds.includes(o.value))}
-                onChange={(selected: MultiValue<{ value: number; label: string }>) => setEditGroupIds(selected.map((s) => s.value))}
-                menuPortalTarget={document.body}
-                styles={portalOnlySelectStyles}
                 className="mt-1"
-                classNamePrefix="react-select"
+                onChange={(selected) => setEditGroupIds(selected.map((s) => s.value))}
               />
             </div>
           </div>

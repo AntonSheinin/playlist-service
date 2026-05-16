@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "../../utils/cn";
+import { Box, Typography } from "@mui/material";
 
 interface PageHeaderProps {
   title: string;
@@ -8,28 +8,20 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({
-  title,
-  description,
-  actions,
-  className,
-}: PageHeaderProps) {
+export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-3 md:flex-row md:items-center md:justify-between",
-        className
-      )}
-    >
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+    <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", gap: 1.5 }}>
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
           {title}
-        </h1>
+        </Typography>
         {description && (
-          <p className="mt-1 text-sm text-slate-600">{description}</p>
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
         )}
-      </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
+      </Box>
+      {actions && <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{actions}</Box>}
+    </Box>
   );
 }

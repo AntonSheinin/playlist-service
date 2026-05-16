@@ -11,16 +11,8 @@ export default defineConfig({
             return undefined;
           }
 
-          if (id.includes("react-datepicker")) {
-            return "date-picker";
-          }
-
-          if (id.includes("react-select")) {
-            return "select";
-          }
-
-          if (id.includes("@headlessui/react")) {
-            return "headless-ui";
+          if (id.includes("@mui/") || id.includes("@emotion/")) {
+            return "mui";
           }
 
           if (id.includes("@tanstack/react-query")) {

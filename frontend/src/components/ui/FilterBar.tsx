@@ -1,16 +1,23 @@
 import type { ReactNode } from "react";
-import { Card } from "./Card";
-import { cn } from "../../utils/cn";
+import { Box, Paper } from "@mui/material";
 
 interface FilterBarProps {
   children: ReactNode;
   className?: string;
 }
 
-export function FilterBar({ children, className }: FilterBarProps) {
+export function FilterBar({ children }: FilterBarProps) {
   return (
-    <Card className={cn("p-4", className)}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">{children}</div>
-    </Card>
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "repeat(4, minmax(0, 1fr))" },
+          gap: 2,
+        }}
+      >
+        {children}
+      </Box>
+    </Paper>
   );
 }

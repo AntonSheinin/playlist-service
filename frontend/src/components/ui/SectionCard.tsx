@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "./Card";
-import { cn } from "../../utils/cn";
+import { Box, Card, CardContent, CardHeader, Typography } from "@mui/material";
 
 interface SectionCardProps {
   title: ReactNode;
@@ -10,25 +9,17 @@ interface SectionCardProps {
   bodyClassName?: string;
 }
 
-export function SectionCard({
-  title,
-  children,
-  actions,
-  className,
-  bodyClassName,
-}: SectionCardProps) {
-  const titleNode =
-    typeof title === "string"
-      ? <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      : <div className="text-lg font-semibold text-slate-900">{title}</div>;
-
+export function SectionCard({ title, children, actions }: SectionCardProps) {
   return (
-    <Card className={className}>
-      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-        {titleNode}
-        {actions}
-      </div>
-      <div className={cn("px-6 py-4", bodyClassName)}>{children}</div>
+    <Card variant="outlined">
+      <CardHeader
+        title={typeof title === "string" ? <Typography variant="h6">{title}</Typography> : title}
+        action={actions}
+        sx={{ borderBottom: 1, borderColor: "divider", py: 1.5 }}
+      />
+      <CardContent>
+        <Box>{children}</Box>
+      </CardContent>
     </Card>
   );
 }

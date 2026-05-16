@@ -1,4 +1,4 @@
-import { cn } from "../../utils/cn";
+import { CircularProgress, Box } from "@mui/material";
 
 export function Spinner({
   className,
@@ -8,15 +8,11 @@ export function Spinner({
   label?: string;
 }) {
   return (
-    <div className="inline-flex items-center justify-center" role="status" aria-live="polite">
-      <div
-        className={cn(
-          "h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-b-sky-600",
-          className
-        )}
-        aria-hidden="true"
-      />
-      <span className="sr-only">{label}</span>
-    </div>
+    <Box className={className} component="span" role="status" aria-live="polite" sx={{ display: "inline-flex", alignItems: "center" }}>
+      <CircularProgress size={28} aria-hidden="true" />
+      <Box component="span" sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+        {label}
+      </Box>
+    </Box>
   );
 }

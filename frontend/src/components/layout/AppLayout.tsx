@@ -1,15 +1,25 @@
 import { Outlet } from "react-router-dom";
+import { Box } from "@mui/material";
 import { NavBar } from "./NavBar";
 import { ToastContainer } from "../ui/ToastContainer";
+import { drawerWidth } from "../../theme";
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen">
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       <NavBar />
-      <main className="mx-auto w-full max-w-screen-2xl px-4 py-6 md:px-6 md:py-8">
+      <Box
+        component="main"
+        sx={{
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+          px: { xs: 2, md: 3 },
+          py: { xs: 2, md: 3 },
+        }}
+      >
         <Outlet />
-      </main>
+      </Box>
       <ToastContainer />
-    </div>
+    </Box>
   );
 }

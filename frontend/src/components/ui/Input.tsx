@@ -1,48 +1,48 @@
-import type { InputHTMLAttributes } from "react";
-import { cn } from "../../utils/cn";
-import {
-  fieldControlClass,
-  fieldErrorClass,
-  fieldHintClass,
-  fieldLabelClass,
-} from "./fieldStyles";
+import type { ChangeEventHandler, HTMLInputTypeAttribute, KeyboardEventHandler } from "react";
+import { TextField } from "@mui/material";
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps {
+  id?: string;
+  name?: string;
+  type?: HTMLInputTypeAttribute;
   label?: string;
   error?: string;
   hint?: string;
+  value?: string | number | readonly string[];
+  defaultValue?: string | number | readonly string[];
+  onChange?: ChangeEventHandler<HTMLInputElement>;
+  placeholder?: string;
+  autoComplete?: string;
+  className?: string;
+  autoFocus?: boolean;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  readOnly?: boolean;
+  disabled?: boolean;
+  required?: boolean;
+  min?: string | number;
+  max?: string | number;
+  step?: string | number;
 }
 
 export function Input({
   label,
   error,
   hint,
-  className,
   id,
+  readOnly,
+  className,
   ...props
 }: InputProps) {
   return (
-    <div>
-      {label && (
-        <label htmlFor={id} className={fieldLabelClass}>
-          {label}
-        </label>
-      )}
-      <input
-        id={id}
-        className={cn(
-          fieldControlClass,
-          error && "border-rose-500 focus:border-rose-500 focus:ring-rose-100",
-          className
-        )}
-        aria-invalid={!!error}
-        {...props}
-      />
-      {error ? (
-        <p className={fieldErrorClass}>{error}</p>
-      ) : (
-        hint && <p className={fieldHintClass}>{hint}</p>
-      )}
-    </div>
+    <TextField
+      id={id}
+      label={label}
+      error={!!error}
+      helperText={error || hint}
+      fullWidth
+      className={className}
+      slotProps={readOnly ? { htmlInput: { readOnly: true } } : undefined}
+      {...props}
+    />
   );
 }

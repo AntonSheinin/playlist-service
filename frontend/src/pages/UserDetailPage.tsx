@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, type FormEvent } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import type { MultiValue } from "react-select";
 import {
   useUser,
   useCreateUser,
@@ -142,21 +141,24 @@ export function UserDetailPage() {
   // Populate form when user data loads
   useEffect(() => {
     if (!user) return;
-    setFirstName(user.first_name);
-    setLastName(user.last_name);
-    setAgreementNumber(user.agreement_number);
-    setMaxSessions(user.max_sessions);
-    setStatus(user.status);
-    setValidFrom(user.valid_from ? new Date(user.valid_from) : null);
-    setValidUntil(user.valid_until ? new Date(user.valid_until) : null);
-    setSelectedTariffs(user.tariffs.map((t) => ({ value: t.id, label: t.name })));
-    setSelectedPackages(user.packages.map((p) => ({ value: p.id, label: p.name })));
-    setSelectedChannels(
-      user.channels.map((c) => ({
-        value: c.id,
-        label: formatChannelOptionLabel(c),
-      }))
-    );
+    const timeout = window.setTimeout(() => {
+      setFirstName(user.first_name);
+      setLastName(user.last_name);
+      setAgreementNumber(user.agreement_number);
+      setMaxSessions(user.max_sessions);
+      setStatus(user.status);
+      setValidFrom(user.valid_from ? new Date(user.valid_from) : null);
+      setValidUntil(user.valid_until ? new Date(user.valid_until) : null);
+      setSelectedTariffs(user.tariffs.map((t) => ({ value: t.id, label: t.name })));
+      setSelectedPackages(user.packages.map((p) => ({ value: p.id, label: p.name })));
+      setSelectedChannels(
+        user.channels.map((c) => ({
+          value: c.id,
+          label: formatChannelOptionLabel(c),
+        }))
+      );
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [user]);
 
   // Playlist URL (live update)
@@ -358,19 +360,19 @@ export function UserDetailPage() {
             label="Tariffs"
             options={tariffOptions}
             value={selectedTariffs}
-            onChange={(v: MultiValue<SelectOption>) => setSelectedTariffs([...v])}
+            onChange={(v) => setSelectedTariffs([...v])}
           />
           <MultiSelect
             label="Additional Packages (beyond tariffs)"
             options={packageOptions}
             value={selectedPackages}
-            onChange={(v: MultiValue<SelectOption>) => setSelectedPackages([...v])}
+            onChange={(v) => setSelectedPackages([...v])}
           />
           <MultiSelect
             label="Additional Channels (individual)"
             options={channelOptions}
             value={selectedChannels}
-            onChange={(v: MultiValue<SelectOption>) => setSelectedChannels([...v])}
+            onChange={(v) => setSelectedChannels([...v])}
             onInputChange={setChannelSearchInput}
             isLoading={lookupChannelsLoading}
             placeholder="Type to search channels..."
