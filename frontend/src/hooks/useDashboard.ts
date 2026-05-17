@@ -10,11 +10,7 @@ import {
 } from "../api/dashboard";
 import { queryKeys } from "./queryKeys";
 
-const parsedServiceRefreshMs = Number(import.meta.env.VITE_SERVICE_DASHBOARD_REFRESH_MS);
-const SERVICE_REFRESH_MS =
-  Number.isFinite(parsedServiceRefreshMs) && parsedServiceRefreshMs > 0
-    ? parsedServiceRefreshMs
-    : false;
+const SERVICE_REFRESH_MS = 30000;
 
 export function useDashboardStats() {
   return useQuery({

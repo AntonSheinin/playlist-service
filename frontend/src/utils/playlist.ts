@@ -1,5 +1,3 @@
-const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
-
 export function sanitizePlaylistPart(value: string): string {
   if (!value) return "";
   const withUnderscores = value.replace(/ /g, "_");
@@ -27,5 +25,5 @@ export function buildPlaylistUrl(
 ): string {
   const filename = buildPlaylistFilename(firstName, lastName, agreementNumber);
   if (!filename) return "";
-  return `${BASE_URL}/${filename}`;
+  return `${window.location.origin}/${filename}`;
 }

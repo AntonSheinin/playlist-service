@@ -74,7 +74,6 @@ export default defineConfig([
 
 ## Environment
 
-Frontend uses Vite environment variables from `frontend/.env`:
-
-- `VITE_BASE_URL` - API base URL.
-- `VITE_SERVICE_DASHBOARD_REFRESH_MS` - Provider dashboard polling interval in milliseconds (default `30000`).
+The production frontend does not require Vite environment variables. API and
+playlist URLs use the same origin as the served application, and provider
+dashboard polling uses a fixed 30 second interval.
