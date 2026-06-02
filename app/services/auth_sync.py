@@ -48,6 +48,12 @@ class AuthSyncService:
         await self.user_service.set_auth_token_id(user.id, auth_token_id)
         logger.info("Synced user %d to Auth Service with token_id %d", user.id, auth_token_id)
 
+    async def _do_recreate(self, client: AuthServiceClient, user: User) -> None:
+        """Recreate the Auth Service token using the existing playlist token value."""
+        if user.auth_token_id is not None:
+            await client.delete_token(user.auth_token_id)
+        await self._do_create(client, user)
+
     async def sync_user_create(self, user: User) -> None:
         """
         Sync new user to Auth Service.
@@ -60,16 +66,23 @@ class AuthSyncService:
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d to Auth Service: %s", user.id, e)
 
-    async def sync_user_update(self, user: User) -> None:
+    async def sync_user_update(self, user: User, *, recreate_token: bool = False) -> None:
         """
         Sync user updates to Auth Service.
         Updates token with new settings and allowed streams.
+        Recreates the Auth Service token when fields unsupported by the update
+        endpoint need to be replaced, while keeping the playlist token stable.
         Failures are logged but don't prevent user update.
         """
         try:
             async with AuthServiceClient() as client:
                 if user.auth_token_id is None:
                     await self._do_create(client, user)
+                    return
+
+                if recreate_token:
+                    await self._do_recreate(client, user)
+                    logger.info("Recreated user %d token in Auth Service", user.id)
                     return
 
                 channels = await self.user_service.resolve_channels(user.id)
@@ -100,6 +113,8 @@ class AuthSyncService:
                 logger.info("Updated user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)
+            if recreate_token:
+                raise
 
     async def sync_user_delete(self, user: User) -> None:
         """

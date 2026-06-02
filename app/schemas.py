@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models import StreamSource, SyncStatus, UserStatus
 
@@ -313,7 +313,7 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
     agreement_number: str
-    max_sessions: int = 1
+    max_sessions: int = Field(1, ge=1, le=100)
     status: UserStatus = UserStatus.ENABLED
     valid_from: datetime | None = None
     valid_until: datetime | None = None
@@ -321,12 +321,19 @@ class UserCreate(BaseModel):
     package_ids: list[int] = []
     channel_ids: list[int] = []
 
+    @model_validator(mode="after")
+    def validate_validity_window(self) -> "UserCreate":
+        if self.valid_from is not None and self.valid_until is not None:
+            if self.valid_until <= self.valid_from:
+                raise ValueError("valid_until must be after valid_from")
+        return self
+
 
 class UserUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     agreement_number: str | None = None
-    max_sessions: int | None = None
+    max_sessions: int | None = Field(None, ge=1, le=100)
     status: UserStatus | None = None
     valid_from: datetime | None = None
     valid_until: datetime | None = None
@@ -335,6 +342,13 @@ class UserUpdate(BaseModel):
     tariff_ids: list[int] | None = None
     package_ids: list[int] | None = None
     channel_ids: list[int] | None = None
+
+    @model_validator(mode="after")
+    def validate_validity_window(self) -> "UserUpdate":
+        if self.valid_from is not None and self.valid_until is not None:
+            if self.valid_until <= self.valid_from:
+                raise ValueError("valid_until must be after valid_from")
+        return self
 
 
 class UserResponse(BaseModel):

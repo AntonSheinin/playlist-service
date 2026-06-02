@@ -31,21 +31,18 @@ import {
   SessionsLogModal,
 } from "../components/users/UserDetailModals";
 import { buildPlaylistUrl } from "../utils/playlist";
+import { formatDate, parseLocalDate } from "../utils/formatters";
 import type { UserCreate, UserUpdate } from "../api/types";
 import { formatChannelOptionLabel } from "../utils/channels";
 
-function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
-
 function todayStr(): string {
-  return toDateStr(new Date());
+  return formatDate(new Date());
 }
 
 function sevenDaysAgoStr(): string {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return toDateStr(d);
+  return formatDate(d);
 }
 
 export function UserDetailPage() {
@@ -147,8 +144,8 @@ export function UserDetailPage() {
       setAgreementNumber(user.agreement_number);
       setMaxSessions(user.max_sessions);
       setStatus(user.status);
-      setValidFrom(user.valid_from ? new Date(user.valid_from) : null);
-      setValidUntil(user.valid_until ? new Date(user.valid_until) : null);
+      setValidFrom(parseLocalDate(user.valid_from));
+      setValidUntil(parseLocalDate(user.valid_until));
       setSelectedTariffs(user.tariffs.map((t) => ({ value: t.id, label: t.name })));
       setSelectedPackages(user.packages.map((p) => ({ value: p.id, label: p.name })));
       setSelectedChannels(
@@ -184,15 +181,15 @@ export function UserDetailPage() {
           clear_valid_from: !validFrom,
           clear_valid_until: !validUntil,
         };
-        if (validFrom) payload.valid_from = toDateStr(validFrom) + "T00:00:00";
-        if (validUntil) payload.valid_until = toDateStr(validUntil) + "T23:59:59";
+        if (validFrom) payload.valid_from = formatDate(validFrom) + "T00:00:00";
+        if (validUntil) payload.valid_until = formatDate(validUntil) + "T23:59:59";
 
         await updateUser.mutateAsync({ id: userId!, data: payload });
         showToast("User updated", "success");
       } else {
         const payload: UserCreate = { ...base };
-        if (validFrom) payload.valid_from = toDateStr(validFrom) + "T00:00:00";
-        if (validUntil) payload.valid_until = toDateStr(validUntil) + "T23:59:59";
+        if (validFrom) payload.valid_from = formatDate(validFrom) + "T00:00:00";
+        if (validUntil) payload.valid_until = formatDate(validUntil) + "T23:59:59";
 
         const newUser = await createUser.mutateAsync(payload);
         showToast("User created", "success");

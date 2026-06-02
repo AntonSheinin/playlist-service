@@ -6,6 +6,7 @@ from fastapi.responses import PlainTextResponse
 
 from app.clients.auth_service import AuthServiceClient
 from app.dependencies import CurrentAdminId, DBSession
+from app.exceptions import ValidationError
 from app.models import UserStatus
 from app.schemas import (
     MessageResponse,
@@ -127,6 +128,31 @@ async def update_user(
     """Update a user and sync to Auth Service."""
     user_service = UserService(db)
     auth_sync = AuthSyncService(db)
+    current_user = await user_service.get_by_id(user_id)
+    current_valid_from = current_user.valid_from
+    current_valid_until = current_user.valid_until
+    current_agreement_number = current_user.agreement_number
+
+    next_valid_from = current_valid_from
+    if data.clear_valid_from:
+        next_valid_from = None
+    if data.valid_from is not None:
+        next_valid_from = data.valid_from
+
+    next_valid_until = current_valid_until
+    if data.clear_valid_until:
+        next_valid_until = None
+    if data.valid_until is not None:
+        next_valid_until = data.valid_until
+
+    valid_from_changed = next_valid_from != current_valid_from
+    valid_until_cleared = current_valid_until is not None and next_valid_until is None
+    agreement_number_changed = (
+        data.agreement_number is not None and data.agreement_number != current_agreement_number
+    )
+    if next_valid_from is not None and next_valid_until is not None:
+        if next_valid_until <= next_valid_from:
+            raise ValidationError("Valid until must be after valid from")
 
     user = await user_service.update(
         user_id,
@@ -145,7 +171,10 @@ async def update_user(
     )
 
     # Sync to Auth Service
-    await auth_sync.sync_user_update(user)
+    await auth_sync.sync_user_update(
+        user,
+        recreate_token=valid_from_changed or valid_until_cleared or agreement_number_changed,
+    )
 
     return SuccessResponse(data=UserResponse.model_validate(user))
 

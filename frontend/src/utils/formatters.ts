@@ -1,5 +1,16 @@
 export function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function parseLocalDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const [datePart] = value.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
 }
 
 export function formatDateTime(isoString: string | null): string {

@@ -6,6 +6,8 @@ import { DatePicker } from "../ui/DatePicker";
 import {
   formatDateTime,
   formatDuration,
+  formatDate,
+  parseLocalDate,
   truncateText,
 } from "../../utils/formatters";
 import type {
@@ -28,21 +30,6 @@ interface DateRangeProps {
   onToChange: (value: string) => void;
 }
 
-function parseDate(value: string): Date | null {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return null;
-  return new Date(year, month - 1, day);
-}
-
-function formatDate(value: Date | null): string {
-  if (!value) return "";
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function DateRangeFilters({
   from,
   to,
@@ -53,14 +40,14 @@ function DateRangeFilters({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
       <DatePicker
         label="From"
-        selected={parseDate(from)}
-        onChange={(date) => onFromChange(formatDate(date))}
+        selected={parseLocalDate(from)}
+        onChange={(date) => onFromChange(date ? formatDate(date) : "")}
         isClearable={false}
       />
       <DatePicker
         label="To"
-        selected={parseDate(to)}
-        onChange={(date) => onToChange(formatDate(date))}
+        selected={parseLocalDate(to)}
+        onChange={(date) => onToChange(date ? formatDate(date) : "")}
         isClearable={false}
       />
     </div>
