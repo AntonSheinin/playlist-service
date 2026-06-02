@@ -91,7 +91,7 @@ class AuthSyncService:
         try:
             async with AuthServiceClient() as client:
                 if user.auth_token_id is None:
-                    await self._do_create(client, user)
+                    await self._do_recreate(client, user)
                     return
 
                 if recreate_token:
@@ -121,7 +121,7 @@ class AuthSyncService:
                         user.auth_token_id,
                         user.id,
                     )
-                    await self._do_create(client, user)
+                    await self._do_recreate(client, user)
                     return
 
                 logger.info("Updated user %d in Auth Service", user.id)
@@ -151,9 +151,7 @@ class AuthSyncService:
         """
         try:
             async with AuthServiceClient() as client:
-                if user.auth_token_id is not None:
-                    await client.delete_token(user.auth_token_id)
-                await self._do_create(client, user)
+                await self._do_recreate(client, user)
             logger.info("Regenerated token for user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to regenerate token for user %d in Auth Service: %s", user.id, e)
