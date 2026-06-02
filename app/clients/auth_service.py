@@ -130,6 +130,24 @@ class AuthServiceClient:
         )
         logger.info("Updated auth token %d", auth_token_id)
 
+    async def find_token_by_value(self, token: str, *, limit: int = 1000) -> dict[str, Any] | None:
+        """Find an Auth Service token record by token value."""
+        response = await self._request(
+            "GET",
+            "/api/tokens",
+            params={"skip": 0, "limit": limit},
+            accept_statuses={200},
+            operation="find token by value",
+        )
+        payload = response.json()
+        if not isinstance(payload, list):
+            raise AuthServiceError("Unexpected token list response format")
+
+        for item in payload:
+            if isinstance(item, dict) and item.get("token") == token:
+                return item
+        return None
+
     async def delete_token(self, auth_token_id: int) -> None:
         """Delete a token from Auth Service."""
         await self._request(

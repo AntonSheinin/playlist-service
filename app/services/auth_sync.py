@@ -50,8 +50,22 @@ class AuthSyncService:
 
     async def _do_recreate(self, client: AuthServiceClient, user: User) -> None:
         """Recreate the Auth Service token using the existing playlist token value."""
+        deleted_ids: set[int] = set()
         if user.auth_token_id is not None:
             await client.delete_token(user.auth_token_id)
+            deleted_ids.add(user.auth_token_id)
+
+        existing_token = await client.find_token_by_value(user.token)
+        if existing_token is not None:
+            existing_token_id = existing_token.get("id")
+            if isinstance(existing_token_id, int) and existing_token_id not in deleted_ids:
+                logger.warning(
+                    "Auth token for user %d exists with stale token_id %d; deleting before recreate",
+                    user.id,
+                    existing_token_id,
+                )
+                await client.delete_token(existing_token_id)
+
         await self._do_create(client, user)
 
     async def sync_user_create(self, user: User) -> None:
