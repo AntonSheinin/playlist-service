@@ -272,7 +272,7 @@ export interface PlaylistPreview {
 
 // Session / Access log (fields from Auth Service, mapped)
 export interface SessionEntry {
-  started_at: string;
+  started_at: string | null;
   ended_at: string | null;
   duration: number | null;
   ip: string | null;
@@ -281,7 +281,7 @@ export interface SessionEntry {
 }
 
 export interface AccessLogEntry {
-  accessed_at: string;
+  accessed_at: string | null;
   ip: string | null;
   channel: string | null;
   action: string | null;

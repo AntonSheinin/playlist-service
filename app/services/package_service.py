@@ -1,14 +1,29 @@
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import NotFoundError
+from app.exceptions import DuplicateEntryError, NotFoundError
 from app.models import Package, package_channels, tariff_packages, user_packages
-from app.services.base import BaseService
 
 
-class PackageService(BaseService[Package]):
-    model_class = Package
+class PackageService:
     not_found_message = "Package not found"
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def _ensure_name_available(
+        self,
+        name: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        stmt = select(Package.id).where(Package.name == name)
+        if exclude_id is not None:
+            stmt = stmt.where(Package.id != exclude_id)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none() is not None:
+            raise DuplicateEntryError(f"Package '{name}' already exists")
 
     async def get_by_id(self, package_id: int) -> Package:
         """Get package by ID with channels."""
@@ -44,7 +59,7 @@ class PackageService(BaseService[Package]):
 
     async def create(self, name: str, description: str | None = None) -> Package:
         """Create a new package."""
-        await self.check_unique("name", name, message=f"Package '{name}' already exists")
+        await self._ensure_name_available(name)
 
         package = Package(name=name, description=description)
         self.db.add(package)
@@ -61,7 +76,7 @@ class PackageService(BaseService[Package]):
         package = await self.get_by_id(package_id)
 
         if name is not None:
-            await self.check_unique("name", name, exclude_id=package_id, message=f"Package '{name}' already exists")
+            await self._ensure_name_available(name, exclude_id=package_id)
             package.name = name
 
         if description is not None:

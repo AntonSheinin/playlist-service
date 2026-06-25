@@ -396,3 +396,20 @@ class PlaylistPreview(BaseModel):
     filename: str
     content: str
     channel_count: int
+
+
+class SessionEntry(BaseModel):
+    started_at: str | None = None
+    ended_at: str | None = None
+    duration: int | None = None
+    ip: str | None = None
+    channel: str | None = None
+    user_agent: str | None = None
+
+
+class AccessLogEntry(BaseModel):
+    accessed_at: str | None = None
+    ip: str | None = None
+    channel: str | None = None
+    action: str | None = None
+    user_agent: str | None = None

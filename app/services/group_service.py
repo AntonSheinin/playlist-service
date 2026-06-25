@@ -1,12 +1,34 @@
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import DuplicateEntryError, NotFoundError
 from app.models import Group, group_channels
-from app.services.base import BaseService
 
 
-class GroupService(BaseService[Group]):
-    model_class = Group
-    not_found_message = "Group not found"
+class GroupService:
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def get_by_id(self, group_id: int) -> Group:
+        stmt = select(Group).where(Group.id == group_id)
+        result = await self.db.execute(stmt)
+        group = result.scalar_one_or_none()
+        if group is None:
+            raise NotFoundError("Group not found")
+        return group
+
+    async def _ensure_name_available(
+        self,
+        name: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        stmt = select(Group.id).where(Group.name == name)
+        if exclude_id is not None:
+            stmt = stmt.where(Group.id != exclude_id)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none() is not None:
+            raise DuplicateEntryError(f"Group '{name}' already exists")
 
     async def get_all(self) -> list[Group]:
         """Get all groups ordered by sort_order."""
@@ -27,7 +49,7 @@ class GroupService(BaseService[Group]):
 
     async def create(self, name: str) -> Group:
         """Create a new group."""
-        await self.check_unique("name", name, message=f"Group '{name}' already exists")
+        await self._ensure_name_available(name)
 
         # Get max sort_order for new group
         stmt = select(func.coalesce(func.max(Group.sort_order), 0))
@@ -42,7 +64,7 @@ class GroupService(BaseService[Group]):
     async def update(self, group_id: int, name: str) -> Group:
         """Update a group."""
         group = await self.get_by_id(group_id)
-        await self.check_unique("name", name, exclude_id=group_id, message=f"Group '{name}' already exists")
+        await self._ensure_name_available(name, exclude_id=group_id)
 
         group.name = name
         await self.db.flush()
@@ -60,3 +82,13 @@ class GroupService(BaseService[Group]):
         await self.db.delete(group)
         await self.db.flush()
         return affected_count
+
+    async def reorder(self, order: list[dict[str, int]]) -> None:
+        """Reorder groups, preserving current behavior of ignoring missing IDs."""
+        for item in order:
+            stmt = select(Group).where(Group.id == item["id"])
+            result = await self.db.execute(stmt)
+            group = result.scalar_one_or_none()
+            if group:
+                group.sort_order = item["sort_order"]
+        await self.db.flush()

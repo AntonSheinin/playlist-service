@@ -1,7 +1,7 @@
 [project]
 name = "playlist-service"
 version = "1.0.0"
-description = "IPTV Playlist Service for Flussonic Media Server"
+description = "IPTV Playlist Service for multiple stream providers"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
@@ -17,6 +17,17 @@ dependencies = [
     "python-multipart>=0.0.17",
     "itsdangerous>=2.2.0",
 ]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.20.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [build-system]
 requires = ["hatchling"]

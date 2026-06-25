@@ -1,19 +1,45 @@
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, union
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import NotFoundError
-from app.models import Channel, Package, Tariff, User, UserStatus, package_channels
-from app.services.base import BaseService
+from app.exceptions import DuplicateEntryError, NotFoundError
+from app.models import (
+    Channel,
+    Package,
+    Tariff,
+    User,
+    UserStatus,
+    package_channels,
+    tariff_packages,
+    user_channels,
+    user_packages,
+    user_tariffs,
+)
 from app.services.playlist_generator import PlaylistGenerator
 from app.utils.pagination import PaginatedResult, PaginationParams
 from app.utils.token import generate_token
 
 
-class UserService(BaseService[User]):
-    model_class = User
+class UserService:
     not_found_message = "User not found"
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def _ensure_agreement_available(
+        self,
+        agreement_number: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        stmt = select(User.id).where(User.agreement_number == agreement_number)
+        if exclude_id is not None:
+            stmt = stmt.where(User.id != exclude_id)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none() is not None:
+            raise DuplicateEntryError(f"Agreement number '{agreement_number}' already exists")
 
     async def get_by_id(self, user_id: int) -> User:
         """Get user by ID with all relationships."""
@@ -126,11 +152,7 @@ class UserService(BaseService[User]):
         channel_ids: list[int] | None = None,
     ) -> User:
         """Create a new user."""
-        await self.check_unique(
-            "agreement_number",
-            agreement_number,
-            message=f"Agreement number '{agreement_number}' already exists",
-        )
+        await self._ensure_agreement_available(agreement_number)
 
         # Generate unique token
         token = generate_token()
@@ -194,12 +216,7 @@ class UserService(BaseService[User]):
             user.last_name = last_name
 
         if agreement_number is not None:
-            await self.check_unique(
-                "agreement_number",
-                agreement_number,
-                exclude_id=user_id,
-                message=f"Agreement number '{agreement_number}' already exists",
-            )
+            await self._ensure_agreement_available(agreement_number, exclude_id=user_id)
             user.agreement_number = agreement_number
 
         if max_sessions is not None:
@@ -262,32 +279,40 @@ class UserService(BaseService[User]):
 
         Returns deduplicated, ordered list.
         """
-        user = await self.get_by_id(user_id)
+        result = await self.db.execute(select(User.id).where(User.id == user_id))
+        if result.scalar_one_or_none() is None:
+            raise NotFoundError(self.not_found_message)
 
-        # Collect all channel IDs from different sources
-        channel_ids: set[int] = set()
-
-        # 1. Direct channels
-        for channel in user.channels:
-            channel_ids.add(channel.id)
-
-        # 2. Package channels
-        for package in user.packages:
-            for channel in package.channels:
-                channel_ids.add(channel.id)
-
-        # 3. Tariff channels (tariff -> packages -> channels)
-        for tariff in user.tariffs:
-            for package in tariff.packages:
-                # Need to load channels for this package
-                stmt = (
-                    select(Channel.id)
-                    .join(package_channels)
-                    .where(package_channels.c.package_id == package.id)
+        direct_channel_ids = select(user_channels.c.channel_id).where(
+            user_channels.c.user_id == user_id
+        )
+        package_channel_ids = (
+            select(package_channels.c.channel_id)
+            .select_from(
+                user_packages.join(
+                    package_channels,
+                    user_packages.c.package_id == package_channels.c.package_id,
                 )
-                result = await self.db.execute(stmt)
-                for row in result:
-                    channel_ids.add(row[0])
+            )
+            .where(user_packages.c.user_id == user_id)
+        )
+        tariff_channel_ids = (
+            select(package_channels.c.channel_id)
+            .select_from(
+                user_tariffs.join(
+                    tariff_packages,
+                    user_tariffs.c.tariff_id == tariff_packages.c.tariff_id,
+                ).join(
+                    package_channels,
+                    tariff_packages.c.package_id == package_channels.c.package_id,
+                )
+            )
+            .where(user_tariffs.c.user_id == user_id)
+        )
+
+        channel_ids_stmt = union(direct_channel_ids, package_channel_ids, tariff_channel_ids)
+        result = await self.db.execute(channel_ids_stmt)
+        channel_ids = [channel_id for channel_id in result.scalars().all() if channel_id is not None]
 
         if not channel_ids:
             return []
