@@ -105,12 +105,11 @@ class FlussonicClient:
             auth = httpx.BasicAuth(self.username, self.password)
             items = await self._get_v3_stream_items(client, auth)
 
-        streams: list[ProviderStream] = []
-        for item in items:
-            stream = self._parse_stream_item(item)
-            if stream is not None:
-                streams.append(stream)
-        return streams
+        return [
+            stream
+            for item in items
+            if (stream := self._parse_stream_item(item)) is not None
+        ]
 
     async def _check_v3_health(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
@@ -131,33 +130,13 @@ class FlussonicClient:
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
     ) -> dict[str, Any]:
         """Fetch server stats from Flussonic v3 API."""
-        url = f"{self.base_url}{V3_STATS_ENDPOINT}"
-
-        try:
-            response = await client.get(url, auth=auth)
-            if response.status_code != 200:
-                logger.error(
-                    "Flussonic stats endpoint returned status %d: %s",
-                    response.status_code,
-                    response.text,
-                )
-                raise FlussonicError(
-                    f"Failed to fetch Flussonic stats: {response.status_code}"
-                )
-
-            payload = response.json()
-            if not isinstance(payload, dict):
-                raise FlussonicError("Unexpected Flussonic stats response format")
-            return payload
-
-        except httpx.TimeoutException:
-            logger.error("Timeout connecting to Flussonic stats endpoint at %s", url)
-            raise FlussonicError(
-                f"Timeout connecting to Flussonic stats endpoint at {url}"
-            ) from None
-        except httpx.RequestError as e:
-            logger.error("Failed to connect to Flussonic stats endpoint: %s", e)
-            raise FlussonicError(f"Failed to connect to Flussonic stats endpoint: {e}") from e
+        return await self._get_v3_json(
+            client,
+            auth,
+            V3_STATS_ENDPOINT,
+            operation="fetch Flussonic stats",
+            response_description="Flussonic stats",
+        )
 
     def _as_int(self, value: Any) -> int | None:
         """Convert API value to int when possible."""
@@ -178,38 +157,63 @@ class FlussonicClient:
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
     ) -> list[dict[str, Any]]:
         """Fetch raw stream items from Flussonic API v3 with pagination."""
-        url = f"{self.base_url}{self.STREAMS_ENDPOINT}"
+        all_items: list[dict[str, Any]] = []
+        cursor = None
 
+        while True:
+            params: dict[str, int | str] = {"limit": self.page_limit}
+            if cursor:
+                params["cursor"] = cursor
+
+            data = await self._get_v3_json(
+                client,
+                auth,
+                self.STREAMS_ENDPOINT,
+                params=params,
+                operation="fetch Flussonic streams",
+                response_description="Flussonic streams",
+            )
+            all_items.extend(self._extract_v3_items(data))
+
+            cursor = data.get("next")
+            if not cursor:
+                break
+
+        logger.info("Fetched %d streams from Flussonic API v3", len(all_items))
+        return all_items
+
+    async def _get_v3_json(
+        self,
+        client: httpx.AsyncClient,
+        auth: httpx.BasicAuth,
+        path: str,
+        *,
+        operation: str,
+        response_description: str,
+        params: dict[str, int | str] | None = None,
+    ) -> dict[str, Any]:
+        url = f"{self.base_url}{path}"
         try:
-            all_items: list[dict[str, Any]] = []
-            cursor = None
+            response = await client.get(url, auth=auth, params=params)
+            if response.status_code != 200:
+                logger.error(
+                    "Failed to %s: %d - %s",
+                    operation,
+                    response.status_code,
+                    response.text,
+                )
+                raise FlussonicError(f"Failed to {operation}: {response.status_code}")
 
-            while True:
-                params: dict[str, int | str] = {"limit": self.page_limit}
-                if cursor:
-                    params["cursor"] = cursor
-
-                response = await client.get(url, auth=auth, params=params)
-
-                if response.status_code != 200:
-                    raise FlussonicError(
-                        f"Failed to fetch Flussonic streams: {response.status_code}"
-                    )
-
-                data = response.json()
-                items = self._extract_v3_items(data)
-                all_items.extend(items)
-
-                cursor = data.get("next")
-                if not cursor:
-                    break
-
-            logger.info("Fetched %d streams from Flussonic API v3", len(all_items))
-            return all_items
+            payload = response.json()
+            if isinstance(payload, dict):
+                return payload
+            raise FlussonicError(f"Unexpected {response_description} response format")
         except httpx.TimeoutException:
-            raise FlussonicError(f"Timeout connecting to Flussonic API v3 at {url}") from None
+            logger.error("Timeout during %s at %s", operation, url)
+            raise FlussonicError(f"Timeout during {operation} at {url}") from None
         except httpx.RequestError as e:
-            raise FlussonicError(f"Failed to connect to Flussonic API v3: {e}") from e
+            logger.error("Connection error during %s: %s", operation, e)
+            raise FlussonicError(f"Failed to {operation}: {e}") from e
 
     async def _get_cached_stream_stats(
         self, client: httpx.AsyncClient, auth: httpx.BasicAuth
@@ -303,24 +307,9 @@ class FlussonicClient:
             key=lambda input_item: self._as_int(input_item.get("priority")) or 0
         )
 
-        active_url = self._find_input_url(configured_inputs, require_active=True)
-        if active_url is not None:
-            return active_url
-
-        return None
-
-    def _find_input_url(
-        self, inputs: list[dict[str, Any]], *, require_active: bool
-    ) -> str | None:
-        for input_item in inputs:
+        for input_item in configured_inputs:
             input_stats = input_item.get("stats")
-            is_active = False
-            if isinstance(input_stats, dict):
-                active = input_stats.get("active")
-                if isinstance(active, bool):
-                    is_active = active
-
-            if require_active and not is_active:
+            if not isinstance(input_stats, dict) or input_stats.get("active") is not True:
                 continue
 
             url = input_item.get("url")

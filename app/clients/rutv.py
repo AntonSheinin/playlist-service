@@ -48,50 +48,42 @@ class RutvClient:
 
     async def get_health(self) -> dict[str, Any]:
         """Get RUTV health payload."""
-        response = await self._request(
-            "GET",
+        return await self._get_json(
             "/health",
             operation="get RUTV health",
         )
 
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise RutvServiceError("Unexpected RUTV health response format")
-        return payload
-
     async def get_stats(self) -> dict[str, Any]:
         """Get RUTV stats payload."""
-        response = await self._request(
-            "GET",
+        payload = await self._get_json(
             "/stats",
             headers={"X-Stats-Token": self.stats_token},
             operation="get RUTV stats",
         )
 
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise RutvServiceError("Unexpected RUTV stats response format")
         if payload.get("ok") is not True:
             raise RutvServiceError("RUTV stats request returned ok=false")
         return payload
 
-    async def _request(
+    async def _get_json(
         self,
-        method: str,
         path: str,
         *,
         headers: dict[str, str] | None = None,
         operation: str = "request",
-    ) -> httpx.Response:
-        """Execute an HTTP request with standard error handling."""
+    ) -> dict[str, Any]:
+        """Fetch and validate a JSON object with standard error handling."""
         url = f"{self.base_url}{path}"
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.request(method, url, headers=headers)
+                response = await client.get(url, headers=headers)
 
             if response.status_code == 200:
-                return response
+                payload = response.json()
+                if isinstance(payload, dict):
+                    return payload
+                raise RutvServiceError(f"Unexpected RUTV response format during {operation}")
 
             logger.error(
                 "RUTV %s failed: %d - %s",
