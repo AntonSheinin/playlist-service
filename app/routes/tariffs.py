@@ -10,6 +10,7 @@ from app.schemas import (
     TariffWithCount,
 )
 from app.services.tariff_service import TariffService
+from app.services.auth_sync import AuthSyncService
 
 router = APIRouter()
 
@@ -64,12 +65,16 @@ async def update_tariff(
 ) -> SuccessResponse[TariffResponse]:
     """Update a tariff."""
     service = TariffService(db)
+    auth_sync = AuthSyncService(db)
+    affected_user_ids = await auth_sync.get_user_ids_for_tariffs([tariff_id])
+
     tariff = await service.update(
         tariff_id,
         name=data.name,
         description=data.description,
         package_ids=data.package_ids,
     )
+    await auth_sync.sync_users_by_ids(affected_user_ids)
     return SuccessResponse(data=TariffResponse.model_validate(tariff))
 
 
@@ -81,5 +86,9 @@ async def delete_tariff(
 ) -> SuccessResponse[TariffDeleteInfo]:
     """Delete a tariff."""
     service = TariffService(db)
+    auth_sync = AuthSyncService(db)
+    affected_user_ids = await auth_sync.get_user_ids_for_tariffs([tariff_id])
+
     info = await service.delete(tariff_id)
+    await auth_sync.sync_users_by_ids(affected_user_ids)
     return SuccessResponse(data=TariffDeleteInfo(**info))

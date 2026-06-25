@@ -27,6 +27,7 @@ from app.schemas import (
     SyncResultResponse,
 )
 from app.services.channel_service import ChannelService
+from app.services.auth_sync import AuthSyncService
 from app.services.channel_sync import ChannelSyncService
 from app.utils.pagination import PaginationParams
 
@@ -367,7 +368,14 @@ async def update_channel_packages(
 ) -> SuccessResponse[ChannelResponse]:
     """Update channel's package assignments."""
     service = ChannelService(db)
+    auth_sync = AuthSyncService(db)
+    current_channel = await service.get_by_id(channel_id)
+    affected_package_ids = {package.id for package in current_channel.packages}
+    affected_package_ids.update(data.package_ids)
+
     channel = await service.update_packages(channel_id, data.package_ids)
+    affected_user_ids = await auth_sync.get_user_ids_for_packages(list(affected_package_ids))
+    await auth_sync.sync_users_by_ids(affected_user_ids)
     return SuccessResponse(data=ChannelResponse.model_validate(channel))
 
 

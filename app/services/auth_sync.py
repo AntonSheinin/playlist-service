@@ -1,10 +1,11 @@
 import logging
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.auth_service import AuthServiceClient, AuthTokenCreate, AuthTokenUpdate
 from app.exceptions import AuthServiceError, AuthServiceNotFoundError
-from app.models import Channel, User, UserStatus
+from app.models import Channel, User, UserStatus, tariff_packages, user_packages, user_tariffs
 from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,42 @@ class AuthSyncService:
     def _build_allowed_streams(self, channels: list[Channel]) -> list[str]:
         """Build provider-agnostic allowed stream names without duplicates."""
         return list(dict.fromkeys(ch.stream_name for ch in channels))
+
+    async def get_user_ids_for_packages(self, package_ids: list[int]) -> list[int]:
+        """Find users whose resolved channels can change when packages change."""
+        if not package_ids:
+            return []
+
+        direct_users = select(user_packages.c.user_id).where(
+            user_packages.c.package_id.in_(package_ids)
+        )
+        tariff_users = (
+            select(user_tariffs.c.user_id)
+            .join(tariff_packages, tariff_packages.c.tariff_id == user_tariffs.c.tariff_id)
+            .where(tariff_packages.c.package_id.in_(package_ids))
+        )
+        stmt = direct_users.union(tariff_users)
+        result = await self.db.execute(stmt)
+        return sorted(set(result.scalars().all()))
+
+    async def get_user_ids_for_tariffs(self, tariff_ids: list[int]) -> list[int]:
+        """Find users whose resolved channels can change when tariffs change."""
+        if not tariff_ids:
+            return []
+
+        stmt = (
+            select(user_tariffs.c.user_id)
+            .where(user_tariffs.c.tariff_id.in_(tariff_ids))
+            .distinct()
+        )
+        result = await self.db.execute(stmt)
+        return sorted(result.scalars().all())
+
+    async def sync_users_by_ids(self, user_ids: list[int]) -> None:
+        """Refresh Auth Service tokens for all provided user IDs."""
+        for user_id in dict.fromkeys(user_ids):
+            user = await self.user_service.get_by_id(user_id)
+            await self.sync_user_update(user)
 
     async def _do_create(self, client: AuthServiceClient, user: User) -> None:
         """Create token in Auth Service and store auth_token_id."""

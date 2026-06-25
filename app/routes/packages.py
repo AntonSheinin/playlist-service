@@ -12,6 +12,7 @@ from app.schemas import (
     SuccessResponse,
 )
 from app.services.package_service import PackageService
+from app.services.auth_sync import AuthSyncService
 
 router = APIRouter()
 
@@ -89,7 +90,11 @@ async def delete_package(
 ) -> SuccessResponse[PackageDeleteInfo]:
     """Delete a package."""
     service = PackageService(db)
+    auth_sync = AuthSyncService(db)
+    affected_user_ids = await auth_sync.get_user_ids_for_packages([package_id])
+
     info = await service.delete(package_id)
+    await auth_sync.sync_users_by_ids(affected_user_ids)
     return SuccessResponse(data=PackageDeleteInfo(**info))
 
 
@@ -102,5 +107,9 @@ async def remove_package_channel(
 ) -> MessageResponse:
     """Remove a channel from a package."""
     service = PackageService(db)
+    auth_sync = AuthSyncService(db)
+    affected_user_ids = await auth_sync.get_user_ids_for_packages([package_id])
+
     await service.remove_channel(package_id, channel_id)
+    await auth_sync.sync_users_by_ids(affected_user_ids)
     return MessageResponse(message="Channel removed from package")
