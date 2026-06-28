@@ -1,24 +1,14 @@
-/* eslint-disable react-refresh/only-export-components */
 import {
-  createContext,
   useCallback,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-
-export type Theme = "light" | "dark";
+import { ThemeContext, type Theme } from "./theme-context";
 
 const STORAGE_KEY = "rutv-admin-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-
-interface ThemeContextValue {
-  theme: Theme;
-  toggleTheme: () => void;
-}
-
-export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function isTheme(value: unknown): value is Theme {
   return value === "light" || value === "dark";

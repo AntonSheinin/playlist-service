@@ -177,7 +177,7 @@ select {
 }
 
 .overflow-x-auto:has(> table.resizable-table) {
-  max-height: min(58vh, 640px);
+  max-height: calc(100vh - 4rem);
   overflow: auto;
 }
 
