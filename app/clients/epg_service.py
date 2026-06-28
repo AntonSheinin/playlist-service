@@ -57,30 +57,39 @@ class EpgServiceClient:
 
     async def get_health(self) -> dict[str, Any]:
         """Get EPG service health payload."""
-        response = await self._request(
+        return await self._get_json(
             "GET",
             "/health",
             operation="get EPG health",
         )
 
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise EpgServiceError("Unexpected EPG health response format")
-        return payload
-
     async def get_stats(self) -> dict[str, Any]:
         """Get EPG service stats payload."""
-        response = await self._request(
+        return await self._get_json(
             "GET",
             "/stats",
             accept_statuses=frozenset({200, 500}),
             operation="get EPG stats",
         )
 
+    async def _get_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        accept_statuses: frozenset[int] = frozenset({200}),
+        operation: str = "request",
+    ) -> dict[str, Any]:
+        response = await self._request(
+            method,
+            path,
+            accept_statuses=accept_statuses,
+            operation=operation,
+        )
         payload = response.json()
-        if not isinstance(payload, dict):
-            raise EpgServiceError("Unexpected EPG stats response format")
-        return payload
+        if isinstance(payload, dict):
+            return payload
+        raise EpgServiceError(f"Unexpected EPG response format during {operation}")
 
     async def _request(
         self,

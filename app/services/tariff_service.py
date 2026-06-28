@@ -1,14 +1,29 @@
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import NotFoundError
+from app.exceptions import DuplicateEntryError, NotFoundError
 from app.models import Package, Tariff, tariff_packages, user_tariffs
-from app.services.base import BaseService
 
 
-class TariffService(BaseService[Tariff]):
-    model_class = Tariff
+class TariffService:
     not_found_message = "Tariff not found"
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def _ensure_name_available(
+        self,
+        name: str,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        stmt = select(Tariff.id).where(Tariff.name == name)
+        if exclude_id is not None:
+            stmt = stmt.where(Tariff.id != exclude_id)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none() is not None:
+            raise DuplicateEntryError(f"Tariff '{name}' already exists")
 
     async def get_by_id(self, tariff_id: int) -> Tariff:
         """Get tariff by ID with packages."""
@@ -50,7 +65,7 @@ class TariffService(BaseService[Tariff]):
         package_ids: list[int] | None = None,
     ) -> Tariff:
         """Create a new tariff."""
-        await self.check_unique("name", name, message=f"Tariff '{name}' already exists")
+        await self._ensure_name_available(name)
 
         tariff = Tariff(name=name, description=description)
 
@@ -74,7 +89,7 @@ class TariffService(BaseService[Tariff]):
         tariff = await self.get_by_id(tariff_id)
 
         if name is not None:
-            await self.check_unique("name", name, exclude_id=tariff_id, message=f"Tariff '{name}' already exists")
+            await self._ensure_name_available(name, exclude_id=tariff_id)
             tariff.name = name
 
         if description is not None:

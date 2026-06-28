@@ -79,7 +79,7 @@ export function PlaylistPreviewModal({
     >
       {playlist ? (
         <div className="space-y-4">
-          <div className="flex flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
               Filename: <strong>{playlist.filename}</strong>
             </span>
@@ -91,7 +91,7 @@ export function PlaylistPreviewModal({
             readOnly
             rows={15}
             value={playlist.content}
-            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-800"
+            className="w-full rounded-lg border border-input bg-muted px-3 py-2 font-mono text-xs text-foreground"
           />
         </div>
       ) : (
@@ -135,11 +135,11 @@ export function SessionsLogModal({
           onFromChange={onFromChange}
           onToChange={onToChange}
         />
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="sticky top-0 bg-slate-50">
+        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="sticky top-0 bg-muted">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Started"
                     field="started_at"
@@ -148,7 +148,7 @@ export function SessionsLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Ended"
                     field="ended_at"
@@ -157,7 +157,7 @@ export function SessionsLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Duration"
                     field="duration"
@@ -166,7 +166,7 @@ export function SessionsLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="IP Address"
                     field="ip"
@@ -175,7 +175,7 @@ export function SessionsLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Channel"
                     field="channel"
@@ -184,15 +184,15 @@ export function SessionsLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   Protocol
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
               {sortedSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
                     No sessions found for this period
                   </td>
                 </tr>
@@ -204,14 +204,14 @@ export function SessionsLogModal({
                       {s.ended_at ? (
                         formatDateTime(s.ended_at)
                       ) : (
-                        <span className="text-emerald-600">Active</span>
+                        <span className="text-[var(--status-success-text)]">Active</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-sm">{formatDuration(s.duration)}</td>
                     <td className="px-3 py-2 font-mono text-sm">{s.ip || "-"}</td>
                     <td className="px-3 py-2 text-sm">{s.channel || "-"}</td>
                     <td
-                      className="max-w-xs truncate px-3 py-2 text-sm text-slate-500"
+                      className="max-w-xs truncate px-3 py-2 text-sm text-muted-foreground"
                       title={s.user_agent || ""}
                     >
                       {truncateText(s.user_agent || "", 40) || "-"}
@@ -223,7 +223,7 @@ export function SessionsLogModal({
           </table>
         </div>
         {sessions && sessions.pages > 1 && (
-          <div className="text-sm text-slate-600">Total: {sessions.total} records</div>
+          <div className="text-sm text-muted-foreground">Total: {sessions.total} records</div>
         )}
       </div>
     </Modal>
@@ -262,11 +262,11 @@ export function AccessLogModal({
           onFromChange={onFromChange}
           onToChange={onToChange}
         />
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="sticky top-0 bg-slate-50">
+        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="sticky top-0 bg-muted">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Timestamp"
                     field="accessed_at"
@@ -275,7 +275,7 @@ export function AccessLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="IP Address"
                     field="ip"
@@ -284,7 +284,7 @@ export function AccessLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Channel"
                     field="channel"
@@ -293,7 +293,7 @@ export function AccessLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   <SortableHeader
                     label="Action"
                     field="action"
@@ -302,15 +302,15 @@ export function AccessLogModal({
                     onSort={sort.toggleSort}
                   />
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground">
                   Protocol
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
               {sortedAccess.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-500">
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
                     No access logs found for this period
                   </td>
                 </tr>
@@ -322,7 +322,7 @@ export function AccessLogModal({
                     <td className="px-3 py-2 text-sm">{log.channel || "-"}</td>
                     <td className="px-3 py-2 text-sm">{log.action || "-"}</td>
                     <td
-                      className="max-w-xs truncate px-3 py-2 text-sm text-slate-500"
+                      className="max-w-xs truncate px-3 py-2 text-sm text-muted-foreground"
                       title={log.user_agent || ""}
                     >
                       {truncateText(log.user_agent || "", 40) || "-"}
@@ -334,7 +334,7 @@ export function AccessLogModal({
           </table>
         </div>
         {accessLogs && accessLogs.pages > 1 && (
-          <div className="text-sm text-slate-600">Total: {accessLogs.total} records</div>
+          <div className="text-sm text-muted-foreground">Total: {accessLogs.total} records</div>
         )}
       </div>
     </Modal>

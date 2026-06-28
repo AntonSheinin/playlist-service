@@ -66,21 +66,11 @@ class NimbleClient:
                 "get Nimble streams from WMSPanel",
             )
 
-        streams: list[ProviderStream] = []
-        for item in self._iter_application_streams(payload):
-            name = self._get_first_string(item, "stream", "name", "stream_name")
-            if not name:
-                continue
-            title = self._get_first_string(item, "description", "title") or name
-            streams.append(
-                ProviderStream(
-                    name=name,
-                    title=title,
-                    catchup_days=self._as_int(
-                        self._get_first_value(item, "catchup_days", "dvr_days", "archive_days")
-                    ),
-                )
-            )
+        streams = [
+            stream
+            for item in self._iter_application_streams(payload)
+            if (stream := self._parse_stream(item)) is not None
+        ]
 
         logger.info(
             "Fetched %d streams from Nimble application %s through WMSPanel server %s",
@@ -146,7 +136,13 @@ class NimbleClient:
         url = f"{self.base_url}{path}"
 
         try:
-            response = await client.get(url, params=self._build_auth_params())
+            response = await client.get(
+                url,
+                params={
+                    "client_id": self.client_id,
+                    "api_key": self.api_key,
+                },
+            )
             if response.status_code != 200:
                 raise NimbleError(f"Failed to {operation}: {response.status_code}")
 
@@ -163,12 +159,6 @@ class NimbleClient:
             raise NimbleError(f"Timeout during {operation} at {url}") from None
         except httpx.RequestError as e:
             raise NimbleError(f"Failed to connect to WMSPanel during {operation}: {e}") from e
-
-    def _build_auth_params(self) -> dict[str, str]:
-        return {
-            "client_id": self.client_id,
-            "api_key": self.api_key,
-        }
 
     def _extract_server_payload(self, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -197,6 +187,19 @@ class NimbleClient:
             for item in items
             if self._get_first_string(item, "application", "app", "app_name") == self.application
         ]
+
+    def _parse_stream(self, item: dict[str, Any]) -> ProviderStream | None:
+        name = self._get_first_string(item, "stream", "name", "stream_name")
+        if not name:
+            return None
+        title = self._get_first_string(item, "description", "title") or name
+        return ProviderStream(
+            name=name,
+            title=title,
+            catchup_days=self._as_int(
+                self._get_first_value(item, "catchup_days", "dvr_days", "archive_days")
+            ),
+        )
 
     def _is_broken_stream(self, item: dict[str, Any]) -> bool:
         status = self._get_first_string(item, "status", "state", "stream_status")

@@ -6,11 +6,23 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.models import StreamSource, SyncStatus, UserStatus
 
 T = TypeVar("T")
+Health = Literal["up", "degraded", "down"]
+
+
+class OrmModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+def validate_validity_window(
+    valid_from: datetime | None,
+    valid_until: datetime | None,
+) -> None:
+    if valid_from is not None and valid_until is not None and valid_until <= valid_from:
+        raise ValueError("valid_until must be after valid_from")
 
 
 # Common response wrappers
 class SuccessResponse(BaseModel, Generic[T]):
-    model_config = ConfigDict(from_attributes=True)
     success: bool = True
     data: T
 
@@ -26,7 +38,6 @@ class ErrorResponse(BaseModel):
 
 
 class PaginatedData(BaseModel, Generic[T]):
-    model_config = ConfigDict(from_attributes=True)
     items: list[T]
     total: int
     page: int
@@ -60,8 +71,7 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class AdminResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class AdminResponse(OrmModel):
     id: int
     username: str
 
@@ -87,7 +97,7 @@ class ActiveSourceCounters(BaseModel):
 
 
 class StreamProviderDashboardStats(BaseModel):
-    health: Literal["up", "degraded", "down"]
+    health: Health
     checked_at: datetime
     incoming_kbit: int | None = None
     outgoing_kbit: int | None = None
@@ -100,7 +110,7 @@ class StreamProviderDashboardStats(BaseModel):
 
 
 class AuthDashboardStats(BaseModel):
-    health: Literal["up", "degraded", "down"]
+    health: Health
     checked_at: datetime
     active_tokens: int | None = None
     active_sessions: int | None = None
@@ -108,7 +118,7 @@ class AuthDashboardStats(BaseModel):
 
 
 class EpgDashboardStats(BaseModel):
-    health: Literal["up", "degraded", "down"]
+    health: Health
     checked_at: datetime
     next_fetch_at: datetime | None = None
     last_epg_update_at: datetime | None = None
@@ -118,7 +128,7 @@ class EpgDashboardStats(BaseModel):
 
 
 class RutvDashboardStats(BaseModel):
-    health: Literal["up", "degraded", "down"]
+    health: Health
     checked_at: datetime
     window_seconds: int | None = None
     from_at: datetime | None = None
@@ -137,8 +147,7 @@ class GroupUpdate(BaseModel):
     name: str
 
 
-class GroupResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class GroupResponse(OrmModel):
     id: int
     name: str
     sort_order: int
@@ -150,8 +159,7 @@ class GroupWithCount(GroupResponse):
     channel_count: int
 
 
-class GroupLookup(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class GroupLookup(OrmModel):
     id: int
     name: str
 
@@ -167,8 +175,7 @@ class PackageUpdate(BaseModel):
     description: str | None = None
 
 
-class PackageResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PackageResponse(OrmModel):
     id: int
     name: str
     description: str | None = None
@@ -185,8 +192,7 @@ class PackageDeleteInfo(BaseModel):
     users: int
 
 
-class PackageLookup(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PackageLookup(OrmModel):
     id: int
     name: str
 
@@ -195,7 +201,7 @@ class PackageLookup(BaseModel):
 class TariffCreate(BaseModel):
     name: str
     description: str | None = None
-    package_ids: list[int] = []
+    package_ids: list[int] = Field(default_factory=list)
 
 
 class TariffUpdate(BaseModel):
@@ -204,12 +210,11 @@ class TariffUpdate(BaseModel):
     package_ids: list[int] | None = None
 
 
-class TariffResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class TariffResponse(OrmModel):
     id: int
     name: str
     description: str | None = None
-    packages: list[PackageLookup] = []
+    packages: list[PackageLookup] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -222,8 +227,7 @@ class TariffDeleteInfo(BaseModel):
     users: int
 
 
-class TariffLookup(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class TariffLookup(OrmModel):
     id: int
     name: str
 
@@ -255,7 +259,7 @@ class ChannelBulkUpdate(BaseModel):
 
 
 class ChannelGroupsUpdate(BaseModel):
-    group_ids: list[int] = []
+    group_ids: list[int] = Field(default_factory=list)
 
 
 class ChannelPackagesUpdate(BaseModel):
@@ -275,8 +279,7 @@ class SyncResultResponse(BaseModel):
     orphaned: int
 
 
-class ChannelLookup(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ChannelLookup(OrmModel):
     id: int
     source: StreamSource
     stream_name: str
@@ -285,11 +288,10 @@ class ChannelLookup(BaseModel):
 
 
 class PackageDetail(PackageResponse):
-    channels: list[ChannelLookup] = []
+    channels: list[ChannelLookup] = Field(default_factory=list)
 
 
-class ChannelResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ChannelResponse(OrmModel):
     id: int
     source: StreamSource
     stream_name: str
@@ -301,8 +303,8 @@ class ChannelResponse(BaseModel):
     channel_number: int | None = None
     sort_order: int = 0
     sync_status: SyncStatus = SyncStatus.SYNCED
-    groups: list[GroupLookup] = []
-    packages: list[PackageLookup] = []
+    groups: list[GroupLookup] = Field(default_factory=list)
+    packages: list[PackageLookup] = Field(default_factory=list)
     last_seen_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -317,15 +319,13 @@ class UserCreate(BaseModel):
     status: UserStatus = UserStatus.ENABLED
     valid_from: datetime | None = None
     valid_until: datetime | None = None
-    tariff_ids: list[int] = []
-    package_ids: list[int] = []
-    channel_ids: list[int] = []
+    tariff_ids: list[int] = Field(default_factory=list)
+    package_ids: list[int] = Field(default_factory=list)
+    channel_ids: list[int] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_validity_window(self) -> "UserCreate":
-        if self.valid_from is not None and self.valid_until is not None:
-            if self.valid_until <= self.valid_from:
-                raise ValueError("valid_until must be after valid_from")
+        validate_validity_window(self.valid_from, self.valid_until)
         return self
 
 
@@ -345,14 +345,11 @@ class UserUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_validity_window(self) -> "UserUpdate":
-        if self.valid_from is not None and self.valid_until is not None:
-            if self.valid_until <= self.valid_from:
-                raise ValueError("valid_until must be after valid_from")
+        validate_validity_window(self.valid_from, self.valid_until)
         return self
 
 
-class UserResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class UserResponse(OrmModel):
     id: int
     first_name: str
     last_name: str
@@ -363,15 +360,14 @@ class UserResponse(BaseModel):
     valid_until: datetime | None = None
     token: str
     auth_token_id: int | None = None
-    tariffs: list[TariffLookup] = []
-    packages: list[PackageLookup] = []
-    channels: list[ChannelLookup] = []
+    tariffs: list[TariffLookup] = Field(default_factory=list)
+    packages: list[PackageLookup] = Field(default_factory=list)
+    channels: list[ChannelLookup] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
 
-class UserListItem(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class UserListItem(OrmModel):
     id: int
     first_name: str
     last_name: str
@@ -379,20 +375,36 @@ class UserListItem(BaseModel):
     status: UserStatus
     max_sessions: int
     created_at: datetime
-    tariffs: list[TariffLookup] = []
+    tariffs: list[TariffLookup] = Field(default_factory=list)
 
 
-class ResolvedChannel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ResolvedChannel(OrmModel):
     id: int
     source: StreamSource
     stream_name: str
     display_name: str | None = None
     tvg_name: str | None = None
-    group_names: list[str] = []
+    group_names: list[str] = Field(default_factory=list)
 
 
 class PlaylistPreview(BaseModel):
     filename: str
     content: str
     channel_count: int
+
+
+class SessionEntry(BaseModel):
+    started_at: str | None = None
+    ended_at: str | None = None
+    duration: int | None = None
+    ip: str | None = None
+    channel: str | None = None
+    user_agent: str | None = None
+
+
+class AccessLogEntry(BaseModel):
+    accessed_at: str | None = None
+    ip: str | None = None
+    channel: str | None = None
+    action: str | None = None
+    user_agent: str | None = None

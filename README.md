@@ -14,7 +14,7 @@ IPTV Playlist Service for Flussonic and Nimble stream providers.
 
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2.0
 - **Database**: PostgreSQL 15+
-- **Frontend**: Jinja2, HTMX, Tailwind CSS
+- **Frontend**: React, Vite, TypeScript, Material UI
 
 ## Quick Start with Docker
 
@@ -126,9 +126,8 @@ playlist-service/
 │   ├── services/               # Business logic
 │   ├── routes/                 # API endpoints
 │   ├── clients/                # External API clients
-│   ├── templates/              # Jinja2 templates
-│   ├── static/                 # Static files
 │   └── utils/                  # Utility functions
+├── frontend/                   # React admin UI
 ├── alembic/                    # Database migrations
 ├── scripts/                    # Utility scripts
 ├── docker-compose.yml          # Docker Compose configuration

@@ -164,8 +164,6 @@ class AuthSyncService:
                 logger.info("Updated user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)
-            if recreate_token:
-                raise
 
     async def sync_user_delete(self, user: User) -> None:
         """

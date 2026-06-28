@@ -22,7 +22,6 @@ import { formatStreamSource } from "../utils/channels";
 
 function StatCard({
   iconBg,
-  iconColor,
   icon,
   title,
   value,
@@ -30,7 +29,6 @@ function StatCard({
   linkTo,
 }: {
   iconBg: string;
-  iconColor: string;
   icon: ReactNode;
   title: string;
   value: string | number;
@@ -41,15 +39,15 @@ function StatCard({
     <Card className="p-5">
       <div className="flex items-start gap-4">
         <div className={`rounded-lg p-3 ${iconBg}`}>
-          <div className={iconColor}>{icon}</div>
+          {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="text-2xl font-semibold text-slate-900">{value}</p>
-          {meta && <div className="mt-1 text-xs text-slate-500">{meta}</div>}
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-2xl font-semibold text-card-foreground">{value}</p>
+          {meta && <div className="mt-1 text-xs text-muted-foreground">{meta}</div>}
         </div>
       </div>
-      <Link to={linkTo} className="mt-4 block text-sm font-medium text-sky-700 hover:text-sky-800">
+      <Link to={linkTo} className="mt-4 block text-sm font-medium text-accent-foreground hover:brightness-90">
         View All &rarr;
       </Link>
     </Card>
@@ -128,15 +126,14 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          iconBg="bg-sky-100"
-          iconColor="text-sky-700"
+          iconBg="status-info"
           linkTo="/channels"
           title="Channels"
           value={stats?.channels_total ?? "-"}
           meta={
             <>
               {stats?.channels_synced ?? "-"} synced,{" "}
-              <span className="text-amber-600">{stats?.channels_orphaned ?? "-"}</span> orphaned
+              <span className="text-[var(--status-warning-text)]">{stats?.channels_orphaned ?? "-"}</span> orphaned
             </>
           }
           icon={
@@ -146,8 +143,7 @@ export function DashboardPage() {
           }
         />
         <StatCard
-          iconBg="bg-emerald-100"
-          iconColor="text-emerald-700"
+          iconBg="status-success"
           linkTo="/groups"
           title="Groups"
           value={stats?.groups ?? "-"}
@@ -158,8 +154,7 @@ export function DashboardPage() {
           }
         />
         <StatCard
-          iconBg="bg-indigo-100"
-          iconColor="text-indigo-700"
+          iconBg="status-neutral"
           linkTo="/packages"
           title="Packages / Tariffs"
           value={`${stats?.packages ?? "-"} / ${stats?.tariffs ?? "-"}`}
@@ -170,15 +165,14 @@ export function DashboardPage() {
           }
         />
         <StatCard
-          iconBg="bg-amber-100"
-          iconColor="text-amber-700"
+          iconBg="status-warning"
           linkTo="/users"
           title="Users"
           value={stats?.users ?? "-"}
           meta={
             <>
-              <span className="text-emerald-600">{stats?.users_enabled ?? "-"}</span> enabled,{" "}
-              <span className="text-rose-600">{stats?.users_disabled ?? "-"}</span> disabled
+              <span className="text-[var(--status-success-text)]">{stats?.users_enabled ?? "-"}</span> enabled,{" "}
+              <span className="text-[var(--status-danger-text)]">{stats?.users_disabled ?? "-"}</span> disabled
             </>
           }
           icon={
@@ -210,31 +204,31 @@ export function DashboardPage() {
             </Button>
           }
         >
-          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="w-full rounded-xl border border-border bg-muted p-4">
             <div className="flex flex-col">
-              <div className="space-y-2 text-sm text-slate-700">
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   Last fetch:{" "}
-                  <span className="font-semibold text-slate-900">{formatDateTime(epgStats?.last_epg_update_at)}</span>
+                  <span className="font-semibold text-foreground">{formatDateTime(epgStats?.last_epg_update_at)}</span>
                 </p>
                 <p>
                   Next fetch:{" "}
-                  <span className="font-semibold text-slate-900">{formatDateTime(epgStats?.next_fetch_at)}</span>
+                  <span className="font-semibold text-foreground">{formatDateTime(epgStats?.next_fetch_at)}</span>
                 </p>
                 <p>
                   Last updated channels:{" "}
-                  <span className="font-semibold text-slate-900">{epgStats?.last_updated_channels_count ?? "N/A"}</span>
+                  <span className="font-semibold text-foreground">{epgStats?.last_updated_channels_count ?? "N/A"}</span>
                 </p>
                 <p>
                   Total sources:{" "}
-                  <span className="font-semibold text-slate-900">{epgStats?.sources_total ?? "N/A"}</span>
+                  <span className="font-semibold text-foreground">{epgStats?.sources_total ?? "N/A"}</span>
                 </p>
               </div>
             </div>
           </div>
           {epgStats?.error && (
-            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm text-rose-800">{epgStats.error}</p>
+            <div className="status-danger w-full rounded-lg border p-4">
+              <p className="text-sm">{epgStats.error}</p>
             </div>
           )}
         </SectionCard>
@@ -251,33 +245,33 @@ export function DashboardPage() {
           )}
           bodyClassName="flex flex-col gap-4"
         >
-          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="w-full rounded-xl border border-border bg-muted p-4">
             <div className="flex flex-col">
-              <div className="space-y-2 text-sm text-slate-700">
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   Unique visits:{" "}
-                  <span className="font-semibold text-slate-900">{rutvStats?.unique_visits ?? "N/A"}</span>
+                  <span className="font-semibold text-foreground">{rutvStats?.unique_visits ?? "N/A"}</span>
                 </p>
                 <p>
                   Contact forms:{" "}
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-foreground">
                     {rutvStats?.successful_contact_forms ?? "N/A"}
                   </span>
                 </p>
                 <p>
                   Window start:{" "}
-                  <span className="font-semibold text-slate-900">{formatDateTime(rutvStats?.from_at)}</span>
+                  <span className="font-semibold text-foreground">{formatDateTime(rutvStats?.from_at)}</span>
                 </p>
                 <p>
                   Window end:{" "}
-                  <span className="font-semibold text-slate-900">{formatDateTime(rutvStats?.to_at)}</span>
+                  <span className="font-semibold text-foreground">{formatDateTime(rutvStats?.to_at)}</span>
                 </p>
               </div>
             </div>
           </div>
           {rutvStats?.error && (
-            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm text-rose-800">{rutvStats.error}</p>
+            <div className="status-danger w-full rounded-lg border p-4">
+              <p className="text-sm">{rutvStats.error}</p>
             </div>
           )}
         </SectionCard>
@@ -309,50 +303,50 @@ export function DashboardPage() {
           }
         >
           {isNotConfigured(flussonicStats?.error) ? (
-            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">Flussonic is not configured in the current environment.</p>
+            <div className="w-full rounded-xl border border-border bg-muted p-4">
+              <p className="text-sm text-muted-foreground">Flussonic is not configured in the current environment.</p>
             </div>
           ) : (
-            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="w-full rounded-xl border border-border bg-muted p-4">
               <div className="flex flex-col">
-                <div className="space-y-2 text-sm text-slate-700">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <p>
                     Incoming:{" "}
-                    <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.incoming_kbit)}</span>
+                    <span className="font-semibold text-foreground">{formatTrafficKbit(flussonicStats?.incoming_kbit)}</span>
                   </p>
                   <p>
                     Outgoing:{" "}
-                    <span className="font-semibold text-slate-900">{formatTrafficKbit(flussonicStats?.outgoing_kbit)}</span>
+                    <span className="font-semibold text-foreground">{formatTrafficKbit(flussonicStats?.outgoing_kbit)}</span>
                   </p>
                   <p>
                     Clients:{" "}
-                    <span className="font-semibold text-slate-900">{flussonicStats?.total_clients ?? "N/A"}</span>
+                    <span className="font-semibold text-foreground">{flussonicStats?.total_clients ?? "N/A"}</span>
                   </p>
                   <p>
                     Total sources:{" "}
-                    <span className="font-semibold text-slate-900">{flussonicStats?.total_sources ?? "N/A"}</span>
+                    <span className="font-semibold text-foreground">{flussonicStats?.total_sources ?? "N/A"}</span>
                   </p>
                   <p>
                     Good/Broken:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {flussonicStats?.good_sources ?? "N/A"} / {flussonicStats?.broken_sources ?? "N/A"}
                     </span>
                   </p>
                   <p>
                     Active online24:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {flussonicStats?.active_source_counters?.online24 ?? "N/A"}
                     </span>
                   </p>
                   <p>
                     Active restream.pw / 185.96.80.44:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {flussonicStats?.active_source_counters?.restream ?? "N/A"}
                     </span>
                   </p>
                   <p>
                     Active other:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {flussonicStats?.active_source_counters?.other ?? "N/A"}
                     </span>
                   </p>
@@ -361,8 +355,8 @@ export function DashboardPage() {
             </div>
           )}
           {flussonicStats?.error && !isNotConfigured(flussonicStats.error) && (
-            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm text-rose-800">{flussonicStats.error}</p>
+            <div className="status-danger w-full rounded-lg border p-4">
+              <p className="text-sm">{flussonicStats.error}</p>
             </div>
           )}
         </SectionCard>
@@ -394,32 +388,32 @@ export function DashboardPage() {
           }
         >
           {isNotConfigured(nimbleStats?.error) ? (
-            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">Nimble is not configured in the current environment.</p>
+            <div className="w-full rounded-xl border border-border bg-muted p-4">
+              <p className="text-sm text-muted-foreground">Nimble is not configured in the current environment.</p>
             </div>
           ) : (
-            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="w-full rounded-xl border border-border bg-muted p-4">
               <div className="flex flex-col">
-                <div className="space-y-2 text-sm text-slate-700">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <p>
                     Incoming:{" "}
-                    <span className="font-semibold text-slate-900">{formatTrafficKbit(nimbleStats?.incoming_kbit)}</span>
+                    <span className="font-semibold text-foreground">{formatTrafficKbit(nimbleStats?.incoming_kbit)}</span>
                   </p>
                   <p>
                     Outgoing:{" "}
-                    <span className="font-semibold text-slate-900">{formatTrafficKbit(nimbleStats?.outgoing_kbit)}</span>
+                    <span className="font-semibold text-foreground">{formatTrafficKbit(nimbleStats?.outgoing_kbit)}</span>
                   </p>
                   <p>
                     Clients:{" "}
-                    <span className="font-semibold text-slate-900">{nimbleStats?.total_clients ?? "N/A"}</span>
+                    <span className="font-semibold text-foreground">{nimbleStats?.total_clients ?? "N/A"}</span>
                   </p>
                   <p>
                     Total sources:{" "}
-                    <span className="font-semibold text-slate-900">{nimbleStats?.total_sources ?? "N/A"}</span>
+                    <span className="font-semibold text-foreground">{nimbleStats?.total_sources ?? "N/A"}</span>
                   </p>
                   <p>
                     Good/Broken:{" "}
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {nimbleStats?.good_sources ?? "N/A"} / {nimbleStats?.broken_sources ?? "N/A"}
                     </span>
                   </p>
@@ -428,8 +422,8 @@ export function DashboardPage() {
             </div>
           )}
           {nimbleStats?.error && !isNotConfigured(nimbleStats.error) && (
-            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm text-rose-800">{nimbleStats.error}</p>
+            <div className="status-danger w-full rounded-lg border p-4">
+              <p className="text-sm">{nimbleStats.error}</p>
             </div>
           )}
         </SectionCard>
@@ -446,31 +440,31 @@ export function DashboardPage() {
           )}
           bodyClassName="flex flex-col gap-4"
         >
-          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="w-full rounded-xl border border-border bg-muted p-4">
             <div className="flex flex-col">
-              <div className="space-y-2 text-sm text-slate-700">
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   Active tokens:{" "}
-                  <span className="font-semibold text-slate-900">{authStats?.active_tokens ?? "N/A"}</span>
+                  <span className="font-semibold text-foreground">{authStats?.active_tokens ?? "N/A"}</span>
                 </p>
                 <p>
                   Active sessions:{" "}
-                  <span className="font-semibold text-slate-900">{authStats?.active_sessions ?? "N/A"}</span>
+                  <span className="font-semibold text-foreground">{authStats?.active_sessions ?? "N/A"}</span>
                 </p>
               </div>
             </div>
           </div>
           {authStats?.error && (
-            <div className="w-full rounded-lg border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm text-rose-800">{authStats.error}</p>
+            <div className="status-danger w-full rounded-lg border p-4">
+              <p className="text-sm">{authStats.error}</p>
             </div>
           )}
         </SectionCard>
       </div>
 
       {syncMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm text-emerald-800">{syncMessage}</p>
+        <div className="status-success rounded-lg border p-4">
+          <p className="text-sm">{syncMessage}</p>
         </div>
       )}
     </div>

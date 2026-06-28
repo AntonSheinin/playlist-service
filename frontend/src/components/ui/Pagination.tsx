@@ -1,4 +1,5 @@
-import { Box, Button, MenuItem, TextField, Typography } from "@mui/material";
+import { Button } from "./Button";
+import { Select } from "./Select";
 
 interface PaginationProps {
   page: number;
@@ -24,28 +25,28 @@ export function Pagination({
   if (pages <= 1 && !onPerPageChange) return null;
 
   return (
-    <Box sx={{ borderTop: 1, borderColor: "divider", px: 2, py: 1.5 }}>
-      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", gap: 1.5 }}>
-        <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "center" }, gap: 1.5 }}>
-          <Typography variant="body2" color="text.secondary">
+    <div className="border-t border-border px-4 py-3">
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <p className="text-sm text-muted-foreground">
             Page {page} of {pages} ({total} {label})
-          </Typography>
+          </p>
           {onPerPageChange && perPage && (
-            <TextField
-              select
+            <Select
+              aria-label="Items per page"
               value={perPage}
               onChange={(e) => onPerPageChange(Number(e.target.value))}
-              sx={{ width: 140 }}
+              className="w-36"
             >
               {perPageOptions.map((n) => (
-                <MenuItem key={n} value={n}>
+                <option key={n} value={n}>
                   {n} per page
-                </MenuItem>
+                </option>
               ))}
-            </TextField>
+            </Select>
           )}
-        </Box>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+        </div>
+        <div className="flex flex-wrap gap-2">
           {onPerPageChange && (
             <Button variant="outlined" onClick={() => onPageChange(1)} disabled={page <= 1}>
               First
@@ -62,8 +63,8 @@ export function Pagination({
               Last
             </Button>
           )}
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }

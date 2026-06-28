@@ -32,8 +32,6 @@ class ProviderDashboardStats:
 
 
 class StreamProvider(Protocol):
-    source: StreamSource
-
     async def get_streams(self) -> list[ProviderStream]:
         ...
 
@@ -45,12 +43,14 @@ class StreamProvider(Protocol):
 
 
 def get_stream_provider(source: StreamSource) -> StreamProvider:
-    if source == StreamSource.FLUSSONIC:
-        from app.clients.flussonic import FlussonicClient
+    match source:
+        case StreamSource.FLUSSONIC:
+            from app.clients.flussonic import FlussonicClient
 
-        return FlussonicClient()
-    if source == StreamSource.NIMBLE:
-        from app.clients.nimble import NimbleClient
+            return FlussonicClient()
+        case StreamSource.NIMBLE:
+            from app.clients.nimble import NimbleClient
 
-        return NimbleClient()
-    raise ValueError(f"Unsupported stream source: {source}")
+            return NimbleClient()
+        case _:
+            raise ValueError(f"Unsupported stream source: {source}")

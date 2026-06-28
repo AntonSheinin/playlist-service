@@ -14,6 +14,8 @@ from app.schemas import (
     PaginatedResponse,
     PlaylistPreview,
     ResolvedChannel,
+    AccessLogEntry,
+    SessionEntry,
     SuccessResponse,
     UserCreate,
     UserListItem,
@@ -291,7 +293,7 @@ async def preview_playlist(
     )
 
 
-@router.get("/{user_id}/sessions", response_model=SuccessResponse)
+@router.get("/{user_id}/sessions", response_model=SuccessResponse[PaginatedData[SessionEntry]])
 async def get_user_sessions(
     user_id: int,
     _admin_id: CurrentAdminId,
@@ -302,7 +304,7 @@ async def get_user_sessions(
     sort_dir: str = "desc",
     from_date: datetime | None = Query(None),
     to_date: datetime | None = Query(None),
-) -> SuccessResponse:
+) -> SuccessResponse[PaginatedData[SessionEntry]]:
     """Get active sessions (live state) for a user from Auth Service."""
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
@@ -347,17 +349,17 @@ async def get_user_sessions(
     items = items[start:end]
 
     return SuccessResponse(
-        data={
-            "items": items,
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": pages,
-        }
+        data=PaginatedData(
+            items=[SessionEntry(**item) for item in items],
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=pages,
+        )
     )
 
 
-@router.get("/{user_id}/access-logs", response_model=SuccessResponse)
+@router.get("/{user_id}/access-logs", response_model=SuccessResponse[PaginatedData[AccessLogEntry]])
 async def get_user_access_logs(
     user_id: int,
     _admin_id: CurrentAdminId,
@@ -368,7 +370,7 @@ async def get_user_access_logs(
     sort_dir: str = "desc",
     from_date: datetime | None = Query(None),
     to_date: datetime | None = Query(None),
-) -> SuccessResponse:
+) -> SuccessResponse[PaginatedData[AccessLogEntry]]:
     """Get access log entries (immutable audit trail) for a user from Auth Service."""
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
@@ -398,11 +400,11 @@ async def get_user_access_logs(
     pages = 0 if total == 0 else (page + 1 if has_more else page)
 
     return SuccessResponse(
-        data={
-            "items": items,
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": pages,
-        }
+        data=PaginatedData(
+            items=[AccessLogEntry(**item) for item in items],
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=pages,
+        )
     )

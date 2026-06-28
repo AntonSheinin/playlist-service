@@ -108,14 +108,13 @@ class AuthServiceClient:
 
     async def create_token(self, data: AuthTokenCreate) -> int:
         """Create a token in Auth Service. Returns the auth_token_id."""
-        response = await self._request(
+        result = await self._request_json_object(
             "POST",
             "/api/tokens",
             json=data.model_dump(mode="json", exclude_none=True),
             accept_statuses={200, 201},
             operation=f"create token for {data.user_id}",
         )
-        result = response.json()
         logger.info("Created auth token %d for user %s", result["id"], data.user_id)
         return result["id"]
 
@@ -132,17 +131,13 @@ class AuthServiceClient:
 
     async def find_token_by_value(self, token: str, *, limit: int = 1000) -> dict[str, Any] | None:
         """Find an Auth Service token record by token value."""
-        response = await self._request(
+        payload = await self._request_json_list(
             "GET",
             "/api/tokens",
             params={"skip": 0, "limit": limit},
             accept_statuses={200},
             operation="find token by value",
         )
-        payload = response.json()
-        if not isinstance(payload, list):
-            raise AuthServiceError("Unexpected token list response format")
-
         for item in payload:
             if isinstance(item, dict) and item.get("token") == token:
                 return item
@@ -175,7 +170,10 @@ class AuthServiceClient:
         )
         if response.status_code == 404:
             return []
-        return response.json()
+        payload = response.json()
+        if isinstance(payload, list):
+            return payload
+        raise AuthServiceError("Unexpected sessions response format")
 
     async def get_access_logs(
         self,
@@ -204,33 +202,72 @@ class AuthServiceClient:
         )
         if response.status_code == 404:
             return []
-        return response.json()
+        payload = response.json()
+        if isinstance(payload, list):
+            return payload
+        raise AuthServiceError("Unexpected access logs response format")
 
     async def get_health(self) -> dict[str, Any]:
         """Get Auth Service health payload."""
-        response = await self._request(
+        return await self._request_json_object(
             "GET",
             "/health",
             accept_statuses={200},
             operation="get auth health",
         )
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise AuthServiceError("Unexpected Auth health response format")
-        return payload
 
     async def get_stats(self) -> dict[str, Any]:
         """Get Auth Service stats payload."""
-        response = await self._request(
+        return await self._request_json_object(
             "GET",
             "/stats",
             accept_statuses={200},
             operation="get auth stats",
         )
+
+    async def _request_json_object(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        accept_statuses: set[int] = frozenset({200}),
+        operation: str = "request",
+    ) -> dict[str, Any]:
+        response = await self._request(
+            method,
+            path,
+            json=json,
+            params=params,
+            accept_statuses=accept_statuses,
+            operation=operation,
+        )
         payload = response.json()
-        if not isinstance(payload, dict):
-            raise AuthServiceError("Unexpected Auth stats response format")
-        return payload
+        if isinstance(payload, dict):
+            return payload
+        raise AuthServiceError(f"Unexpected Auth response format during {operation}")
+
+    async def _request_json_list(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        accept_statuses: set[int] = frozenset({200}),
+        operation: str = "request",
+    ) -> list[Any]:
+        response = await self._request(
+            method,
+            path,
+            params=params,
+            accept_statuses=accept_statuses,
+            operation=operation,
+        )
+        payload = response.json()
+        if isinstance(payload, list):
+            return payload
+        raise AuthServiceError(f"Unexpected Auth response format during {operation}")
 
     async def get_dashboard_stats(self) -> dict[str, Any]:
         """Fetch normalized Auth Service dashboard stats."""

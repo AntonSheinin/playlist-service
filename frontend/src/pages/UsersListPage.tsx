@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
+import { Pencil, Trash2 } from "lucide-react";
 import { useUsers, useUpdateUser, useDeleteUser } from "../hooks/useUsers";
 import { useLookupTariffs } from "../hooks/useLookup";
 import { useToast } from "../hooks/useToast";
@@ -24,6 +26,12 @@ import type { UserListItem } from "../api/types";
 function parsePage(value: string | null): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function getUserInitials(user: UserListItem): string {
+  const first = user.first_name?.trim().charAt(0) || "";
+  const last = user.last_name?.trim().charAt(0) || "";
+  return `${first}${last}`.toUpperCase() || "?";
 }
 
 export function UsersListPage() {
@@ -88,6 +96,23 @@ export function UsersListPage() {
   const users = data?.items || [];
   const totalPages = data?.pages || 0;
   const total = data?.total || 0;
+  const userColumns = useMemo<ColumnDef<UserListItem>[]>(
+    () => [
+      { id: "name", accessorFn: (user) => `${user.last_name} ${user.first_name}` },
+      { accessorKey: "agreement_number", id: "agreement" },
+      { id: "tariffs", accessorFn: (user) => user.tariffs?.map((tariff) => tariff.name).join(", ") ?? "" },
+      { accessorKey: "max_sessions", id: "sessions" },
+      { accessorKey: "status", id: "status" },
+      { id: "actions" },
+    ],
+    []
+  );
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const userTable = useReactTable({
+    data: users,
+    columns: userColumns,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   async function handleToggleStatus(user: UserListItem) {
     const nextStatus = user.status === "enabled" ? "disabled" : "enabled";
@@ -174,10 +199,10 @@ export function UsersListPage() {
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table
-            className="resizable-table min-w-full divide-y divide-slate-200"
+            className="resizable-table min-w-full divide-y divide-border"
             style={{ width: "100%" }}
           >
-            <thead className="bg-slate-50">
+            <thead className="bg-muted">
             <tr>
               <ResizableHeader colKey="name" width={widths.name} onResize={onResize}>
                 <SortableHeader label="Name" field="name" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
@@ -199,37 +224,48 @@ export function UsersListPage() {
               </ResizableHeader>
             </tr>
           </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
             {users.length === 0 ? (
               <EmptyState message="No users found" colSpan={6} />
             ) : (
-              users.map((user) => (
-                <tr
-                  key={user.id}
-                  className={user.status === "disabled" ? "bg-slate-50/60" : ""}
-                >
+              userTable.getRowModel().rows.map((row) => {
+                const user = row.original;
+                return (
+                <tr key={user.id} className={user.status === "disabled" ? "table-row-muted" : ""}>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">
-                      {user.last_name} {user.first_name}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="status-info flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                        {getUserInitials(user)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-foreground" title={`${user.last_name} ${user.first_name}`}>
+                          {user.last_name} {user.first_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">User #{user.id}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-slate-600">{user.agreement_number}</span>
+                    <span className="inline-flex rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
+                      {user.agreement_number}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap">
+                    <div className="flex flex-wrap gap-1">
                       {user.tariffs && user.tariffs.length > 0
                         ? user.tariffs.map((t) => (
-                            <Badge key={t.id} variant="blue" className="mr-1 mb-1">
+                            <Badge key={t.id} variant="blue">
                               {t.name}
                             </Badge>
                           ))
-                        : <span className="text-xs text-slate-400">-</span>
+                        : <span className="text-xs text-muted-foreground">-</span>
                       }
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm">{user.max_sessions}</span>
+                    <span className="inline-flex min-w-8 justify-center rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold text-foreground">
+                      {user.max_sessions}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <Badge
@@ -240,17 +276,33 @@ export function UsersListPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
+                    <div className="flex justify-end gap-2">
                       <Link to={`/users/${user.id}`}>
-                        <Button size="sm" variant="secondary">Edit</Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 w-8 px-0"
+                          aria-label={`Edit user ${user.last_name} ${user.first_name}`}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
                       </Link>
-                      <Button size="sm" variant="danger" onClick={() => setDeleteTarget(user)}>
-                        Delete
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        className="h-8 w-8 px-0"
+                        onClick={() => setDeleteTarget(user)}
+                        aria-label={`Delete user ${user.last_name} ${user.first_name}`}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
           </table>

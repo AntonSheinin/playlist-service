@@ -1,4 +1,5 @@
 from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import NotFoundError, ValidationError
@@ -12,13 +13,12 @@ from app.models import (
     package_channels,
     user_channels,
 )
-from app.services.base import BaseService
 from app.utils.pagination import PaginatedResult, PaginationParams
 
 
-class ChannelService(BaseService[Channel]):
-    model_class = Channel
-    not_found_message = "Channel not found"
+class ChannelService:
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
 
     def _group_sort_subquery(self):
         return (
@@ -290,3 +290,13 @@ class ChannelService(BaseService[Channel]):
         ).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def reorder(self, order: list[dict[str, int]]) -> None:
+        """Reorder channels, preserving current behavior of ignoring missing IDs."""
+        for item in order:
+            stmt = select(Channel).where(Channel.id == item["id"])
+            result = await self.db.execute(stmt)
+            channel = result.scalar_one_or_none()
+            if channel:
+                channel.sort_order = item["sort_order"]
+        await self.db.flush()

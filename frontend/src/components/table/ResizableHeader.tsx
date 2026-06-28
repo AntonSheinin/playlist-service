@@ -1,5 +1,5 @@
 import { useCallback, useRef, type ReactNode } from "react";
-import { TableCell } from "@mui/material";
+import { cn } from "../../lib/utils";
 
 interface ResizableHeaderProps {
   colKey: string;
@@ -15,6 +15,7 @@ export function ResizableHeader({
   width,
   onResize,
   children,
+  className,
   minWidth = 56,
 }: ResizableHeaderProps) {
   const thRef = useRef<HTMLTableCellElement>(null);
@@ -61,14 +62,18 @@ export function ResizableHeader({
   );
 
   return (
-    <TableCell
+    <th
       ref={thRef}
       data-col-key={colKey}
+      scope="col"
+      className={cn(
+        "relative border-r border-border bg-muted px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground",
+        className
+      )}
       style={width ? { width: `${Math.max(width, minWidth)}px` } : { minWidth: `${minWidth}px` }}
-      sx={{ position: "relative", overflow: "hidden", borderRight: 1, borderColor: "divider" }}
     >
       {children}
       <span className="resize-handle" onMouseDown={handleMouseDown} />
-    </TableCell>
+    </th>
   );
 }

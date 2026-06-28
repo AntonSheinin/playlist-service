@@ -1,4 +1,6 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Pencil, Trash2 } from "lucide-react";
 import {
   usePackages,
   useCreatePackage,
@@ -24,16 +26,30 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
+import { Pagination } from "../components/ui/Pagination";
 import { fieldControlClass, fieldLabelClass } from "../components/ui/fieldStyles";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { PackageWithCount, TariffWithCount } from "../api/types";
 import { formatChannelPrimary, formatChannelSecondary } from "../utils/channels";
 
+const defaultPerPage = 20;
+
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export function PackagesPage() {
   const { data: packages, isLoading: packagesLoading } = usePackages();
   const { data: tariffs, isLoading: tariffsLoading } = useTariffs();
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const pkgPage = parsePositiveInt(searchParams.get("pkgPage"), 1);
+  const pkgPerPage = parsePositiveInt(searchParams.get("pkgPerPage"), defaultPerPage);
+  const tariffPage = parsePositiveInt(searchParams.get("tariffPage"), 1);
+  const tariffPerPage = parsePositiveInt(searchParams.get("tariffPerPage"), defaultPerPage);
 
   // Package sort
   const pkgSort = useSortable("name");
@@ -83,6 +99,13 @@ export function PackagesPage() {
     });
   }, [packages, pkgSort.sortBy, pkgSort.sortDir]);
 
+  const pkgTotalPages = Math.max(1, Math.ceil(sortedPackages.length / pkgPerPage));
+  const pkgCurrentPage = Math.min(pkgPage, pkgTotalPages);
+  const pagedPackages = useMemo(
+    () => sortedPackages.slice((pkgCurrentPage - 1) * pkgPerPage, pkgCurrentPage * pkgPerPage),
+    [pkgCurrentPage, pkgPerPage, sortedPackages],
+  );
+
   // Sorted tariffs
   const sortedTariffs = useMemo(() => {
     if (!tariffs) return [];
@@ -94,6 +117,22 @@ export function PackagesPage() {
       return 0;
     });
   }, [tariffs, tariffSort.sortBy, tariffSort.sortDir]);
+
+  const tariffTotalPages = Math.max(1, Math.ceil(sortedTariffs.length / tariffPerPage));
+  const tariffCurrentPage = Math.min(tariffPage, tariffTotalPages);
+  const pagedTariffs = useMemo(
+    () => sortedTariffs.slice((tariffCurrentPage - 1) * tariffPerPage, tariffCurrentPage * tariffPerPage),
+    [tariffCurrentPage, tariffPerPage, sortedTariffs],
+  );
+
+  function updateParams(patch: Record<string, string | undefined>) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) {
+      if (!value) next.delete(key);
+      else next.set(key, value);
+    }
+    setSearchParams(next);
+  }
 
   // Package handlers
   function openAddPkg() {
@@ -232,15 +271,15 @@ export function PackagesPage() {
         description="Manage channel packages and compose tariffs from those packages."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         <Card>
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Packages</h2>
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-card-foreground">Packages</h2>
             <Button size="sm" onClick={openAddPkg}>+ Add</Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
-              <thead className="bg-slate-50">
+            <table className="resizable-table min-w-full divide-y divide-border" style={{ width: "100%" }}>
+              <thead className="bg-muted">
                 <tr>
                   <ResizableHeader colKey="name" width={pkgResize.widths.name} onResize={pkgResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={pkgSort.sortBy} sortDir={pkgSort.sortDir} onSort={pkgSort.toggleSort} />
@@ -256,19 +295,45 @@ export function PackagesPage() {
                   </ResizableHeader>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="divide-y divide-border bg-card">
                 {sortedPackages.length === 0 ? (
                   <EmptyState message="No packages yet" colSpan={4} />
                 ) : (
-                  sortedPackages.map((p) => (
+                  pagedPackages.map((p) => (
                     <tr key={p.id}>
-                      <td className="px-6 py-3"><div className="font-medium">{p.name}</div></td>
-                      <td className="px-6 py-3"><div className="text-sm text-slate-500">{p.description || "-"}</div></td>
-                      <td className="px-6 py-3"><span className="text-slate-600">{p.channel_count}</span></td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-1">
-                          <Button size="sm" variant="secondary" onClick={() => openEditPkg(p)}>Edit</Button>
-                          <Button size="sm" variant="danger" onClick={() => setDeletePkgTarget(p)}>Delete</Button>
+                      <td className="px-4 py-3">
+                        <div className="truncate font-semibold text-foreground" title={p.name}>{p.name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="truncate text-sm text-muted-foreground" title={p.description || undefined}>{p.description || "-"}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex min-w-8 justify-center rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold text-foreground">
+                          {p.channel_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 w-8 px-0"
+                            onClick={() => openEditPkg(p)}
+                            aria-label={`Edit package ${p.name}`}
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            className="h-8 w-8 px-0"
+                            onClick={() => setDeletePkgTarget(p)}
+                            aria-label={`Delete package ${p.name}`}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -277,16 +342,27 @@ export function PackagesPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={pkgCurrentPage}
+            pages={pkgTotalPages}
+            total={sortedPackages.length}
+            onPageChange={(nextPage) => updateParams({ pkgPage: String(nextPage) })}
+            perPage={pkgPerPage}
+            onPerPageChange={(nextPerPage) => {
+              updateParams({ pkgPerPage: String(nextPerPage), pkgPage: "1" });
+            }}
+            label="packages"
+          />
         </Card>
 
         <Card>
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Tariffs</h2>
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-card-foreground">Tariffs</h2>
             <Button size="sm" onClick={openAddTariff}>+ Add</Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
-              <thead className="bg-slate-50">
+            <table className="resizable-table min-w-full divide-y divide-border" style={{ width: "100%" }}>
+              <thead className="bg-muted">
                 <tr>
                   <ResizableHeader colKey="name" width={tariffResize.widths.name} onResize={tariffResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
@@ -302,19 +378,45 @@ export function PackagesPage() {
                   </ResizableHeader>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="divide-y divide-border bg-card">
                 {sortedTariffs.length === 0 ? (
                   <EmptyState message="No tariffs yet" colSpan={4} />
                 ) : (
-                  sortedTariffs.map((t) => (
+                  pagedTariffs.map((t) => (
                     <tr key={t.id}>
-                      <td className="px-6 py-3"><div className="font-medium">{t.name}</div></td>
-                      <td className="px-6 py-3"><div className="text-sm text-slate-500">{t.description || "-"}</div></td>
-                      <td className="px-6 py-3"><span className="text-slate-600">{t.package_count}</span></td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-1">
-                          <Button size="sm" variant="secondary" onClick={() => openEditTariff(t)}>Edit</Button>
-                          <Button size="sm" variant="danger" onClick={() => setDeleteTariffTarget(t)}>Delete</Button>
+                      <td className="px-4 py-3">
+                        <div className="truncate font-semibold text-foreground" title={t.name}>{t.name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="truncate text-sm text-muted-foreground" title={t.description || undefined}>{t.description || "-"}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex min-w-8 justify-center rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold text-foreground">
+                          {t.package_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 w-8 px-0"
+                            onClick={() => openEditTariff(t)}
+                            aria-label={`Edit tariff ${t.name}`}
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            className="h-8 w-8 px-0"
+                            onClick={() => setDeleteTariffTarget(t)}
+                            aria-label={`Delete tariff ${t.name}`}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -323,6 +425,17 @@ export function PackagesPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={tariffCurrentPage}
+            pages={tariffTotalPages}
+            total={sortedTariffs.length}
+            onPageChange={(nextPage) => updateParams({ tariffPage: String(nextPage) })}
+            perPage={tariffPerPage}
+            onPerPageChange={(nextPerPage) => {
+              updateParams({ tariffPerPage: String(nextPerPage), tariffPage: "1" });
+            }}
+            label="tariffs"
+          />
         </Card>
       </div>
 
@@ -358,9 +471,9 @@ export function PackagesPage() {
           {editingPkg ? (
             <div>
               <label className={fieldLabelClass}>Assigned Channels</label>
-              <div className="mt-2 max-h-48 overflow-y-auto divide-y rounded-md border border-slate-200">
+              <div className="mt-2 max-h-48 overflow-y-auto divide-y divide-border rounded-md border border-border">
                 {pkgChannels.length === 0 ? (
-                  <div className="px-3 py-3 text-sm text-slate-500">No channels assigned.</div>
+                  <div className="px-3 py-3 text-sm text-muted-foreground">No channels assigned.</div>
                 ) : (
                   [...pkgChannels]
                     .sort((a, b) => {
@@ -374,8 +487,8 @@ export function PackagesPage() {
                       return (
                         <div key={ch.id} className="flex items-center justify-between px-3 py-2">
                           <div>
-                            <div className="text-sm text-slate-900">{primary}</div>
-                            {secondary && <div className="text-xs text-slate-500">{secondary}</div>}
+                            <div className="text-sm text-foreground">{primary}</div>
+                            {secondary && <div className="text-xs text-muted-foreground">{secondary}</div>}
                           </div>
                           <Button
                             type="button"
@@ -392,7 +505,7 @@ export function PackagesPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Note: Channels are assigned from the Channels page.</p>
+            <p className="text-sm text-muted-foreground">Note: Channels are assigned from the Channels page.</p>
           )}
         </div>
       </Modal>
@@ -441,14 +554,14 @@ export function PackagesPage() {
           </div>
           <div>
             <label className={`${fieldLabelClass} mb-2`}>Packages</label>
-            <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-2">
+            <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-border p-2">
               {(packages || []).map((p) => (
                 <label key={p.id} className="flex items-center">
                   <input
                     type="checkbox"
                     checked={selectedPkgIds.includes(p.id)}
                     onChange={() => togglePkgId(p.id)}
-                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    className="rounded border-input text-primary focus:ring-ring"
                   />
                   <span className="ml-2 text-sm">{p.name}</span>
                 </label>

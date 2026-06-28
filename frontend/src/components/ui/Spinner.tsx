@@ -1,4 +1,5 @@
-import { CircularProgress, Box } from "@mui/material";
+import { Loader2 } from "lucide-react";
+import { cn } from "../../lib/utils";
 
 export function Spinner({
   className,
@@ -8,11 +9,11 @@ export function Spinner({
   label?: string;
 }) {
   return (
-    <Box className={className} component="span" role="status" aria-live="polite" sx={{ display: "inline-flex", alignItems: "center" }}>
-      <CircularProgress size={28} aria-hidden="true" />
-      <Box component="span" sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+    <span className={cn("inline-flex items-center", className)} role="status" aria-live="polite">
+      <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden="true" />
+      <span className="sr-only">
         {label}
-      </Box>
-    </Box>
+      </span>
+    </span>
   );
 }

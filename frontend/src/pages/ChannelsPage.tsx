@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import {
   useChannels,
   useBulkUpdateChannels,
@@ -54,7 +56,7 @@ function parsePositiveInt(value: string | null, fallback: number) {
 }
 
 const compactCellInputClass =
-  "h-8 rounded-md border border-slate-300 px-1.5 py-1 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100";
+  "h-8 rounded-md border border-input bg-card px-1.5 py-1 text-sm text-card-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20";
 
 function isNotConfigured(error: string | null | undefined): boolean {
   return error === "Not configured";
@@ -165,6 +167,27 @@ export function ChannelsPage() {
 
   const channels = data?.items || [];
   const pendingCount = Object.keys(pendingChanges).length;
+  const channelColumns = useMemo<ColumnDef<ChannelResponse>[]>(
+    () => [
+      { accessorKey: "channel_number", id: "number" },
+      { accessorKey: "tvg_logo", id: "logo" },
+      { accessorKey: "display_name", id: "name" },
+      { accessorKey: "source", id: "source" },
+      { accessorKey: "tvg_id", id: "tvg-id" },
+      { id: "groups", accessorFn: (channel) => channel.groups.map((group) => group.name).join(", ") },
+      { accessorKey: "catchup_days", id: "archive" },
+      { id: "packages", accessorFn: (channel) => channel.packages.map((pkg) => pkg.name).join(", ") },
+      { accessorKey: "sync_status", id: "status" },
+      { id: "actions" },
+    ],
+    []
+  );
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const channelTable = useReactTable({
+    data: channels,
+    columns: channelColumns,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   // Track inline change
   const trackChange = useCallback((channelId: number, field: string, value: string) => {
@@ -375,7 +398,7 @@ export function ChannelsPage() {
             <Button
               onClick={handleApplyAll}
               loading={bulkUpdate.isPending}
-              className="border-emerald-600 bg-emerald-600 hover:bg-emerald-700"
+              className="status-success border hover:brightness-95"
             >
               Apply All ({pendingCount})
             </Button>
@@ -400,7 +423,7 @@ export function ChannelsPage() {
         }
       />
 
-      <FilterBar>
+      <FilterBar contentClassName="xl:grid-cols-[minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(16rem,1.6fr)]">
         <Select
           label="Group"
           value={groupFilter}
@@ -441,7 +464,7 @@ export function ChannelsPage() {
           <option value="flussonic">Flussonic</option>
           <option value="nimble">Nimble</option>
         </Select>
-        <div className="md:col-span-2">
+        <div>
           <Input
             label="Search"
             value={searchInput}
@@ -453,8 +476,8 @@ export function ChannelsPage() {
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 resizable-table" style={{ width: "100%" }}>
-            <thead className="bg-slate-50">
+          <table className="resizable-table min-w-full divide-y divide-border" style={{ width: "100%" }}>
+            <thead className="bg-muted">
             <tr>
               <ResizableHeader colKey="number" width={widths.number} onResize={onResize} className="w-16">
                 <SortableHeader label="#" field="channel_number" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
@@ -488,11 +511,12 @@ export function ChannelsPage() {
               </ResizableHeader>
             </tr>
           </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
+            <tbody className="divide-y divide-border bg-card">
             {channels.length === 0 ? (
               <EmptyState message="No channels found" colSpan={10} />
             ) : (
-              channels.map((ch) => {
+              channelTable.getRowModel().rows.map((row) => {
+                const ch = row.original;
                 const pending = pendingChanges[ch.id];
                 const currentNumber = pending?.channel_number !== undefined ? (pending.channel_number ?? "") : (ch.channel_number ?? "");
                 const currentTvgId = pending?.tvg_id !== undefined ? pending.tvg_id : (ch.tvg_id || "");
@@ -502,7 +526,10 @@ export function ChannelsPage() {
                 const catchupDisplay = ch.catchup_days == null ? "-" : String(ch.catchup_days);
 
                 return (
-                  <tr key={ch.id} className={`${isOrphaned ? "bg-slate-50 text-slate-500" : ""} ${hasChanges ? "bg-amber-50" : ""}`}>
+                  <tr
+                    key={ch.id}
+                    className={`${isOrphaned ? "table-row-muted text-muted-foreground" : ""} ${hasChanges ? "table-row-edited" : ""}`}
+                  >
                     <td className="px-2 py-2">
                       <input
                         type="number"
@@ -519,13 +546,13 @@ export function ChannelsPage() {
                         <button
                           type="button"
                           onClick={() => openLogoModal(ch)}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent hover:border-sky-200 hover:bg-sky-50"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card shadow-sm transition hover:border-ring hover:bg-muted"
                           title="Edit logo"
                           aria-label={`Edit logo for ${ch.display_name || ch.stream_name}`}
                         >
                           <img
                             src={currentLogo}
-                            className="h-8 w-8 object-contain"
+                            className="h-9 w-9 object-contain"
                             alt=""
                           />
                         </button>
@@ -533,7 +560,7 @@ export function ChannelsPage() {
                         <button
                           type="button"
                           onClick={() => openLogoModal(ch)}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-dashed border-slate-300 text-xs text-slate-400 hover:border-sky-500 hover:text-sky-500"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-dashed border-input bg-card text-sm font-semibold text-muted-foreground transition hover:border-ring hover:bg-muted hover:text-foreground"
                           title="Add logo"
                           aria-label={`Add logo for ${ch.display_name || ch.stream_name}`}
                         >
@@ -542,8 +569,14 @@ export function ChannelsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2">
-                      <div className="font-medium text-sm">{formatChannelPrimary(ch)}</div>
-                      <div className="text-xs text-slate-500">{formatChannelSecondary(ch)}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground" title={formatChannelPrimary(ch)}>
+                          {formatChannelPrimary(ch)}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground" title={formatChannelSecondary(ch)}>
+                          {formatChannelSecondary(ch)}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <Badge variant={ch.source === "flussonic" ? "blue" : "gray"}>
@@ -570,7 +603,7 @@ export function ChannelsPage() {
                       />
                     </td>
                     <td className="px-2 py-2">
-                      <span className={`text-sm ${catchupDisplay === "-" ? "text-slate-400" : "text-slate-700"}`}>{catchupDisplay}</span>
+                      <span className={`text-sm ${catchupDisplay === "-" ? "text-muted-foreground" : "text-foreground"}`}>{catchupDisplay}</span>
                     </td>
                     <td className="px-2 py-2">
                       <MultiSelect
@@ -583,22 +616,42 @@ export function ChannelsPage() {
                     </td>
                     <td className="px-2 py-2">
                       <Badge variant={ch.sync_status === "synced" ? "green" : "yellow"}>
-                        {ch.sync_status === "synced" ? "sync" : "orph"}
+                        {ch.sync_status === "synced" ? "Synced" : "Orphaned"}
                       </Badge>
                     </td>
                     <td className="px-2 py-2">
-                      <div className="flex items-center gap-1">
+                      <div className="flex justify-end gap-2">
                         <Button
                           size="sm"
                           variant={hasChanges ? "primary" : "ghost"}
+                          className={hasChanges ? "status-success h-8 w-8 border px-0 hover:brightness-95" : "h-8 w-8 px-0"}
                           disabled={!hasChanges}
                           onClick={() => handleApplyRow(ch.id)}
-                          className={hasChanges ? "border-emerald-600 bg-emerald-600 hover:bg-emerald-700" : ""}
+                          aria-label={`Save changes for ${ch.display_name || ch.stream_name}`}
+                          title="Save"
                         >
-                          Apply
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => openEditModal(ch)}>Edit</Button>
-                        <Button size="sm" variant="danger" onClick={() => setDeleteTarget(ch)}>Del</Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 w-8 px-0"
+                          onClick={() => openEditModal(ch)}
+                          aria-label={`Edit channel ${ch.display_name || ch.stream_name}`}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          className="h-8 w-8 px-0"
+                          onClick={() => setDeleteTarget(ch)}
+                          aria-label={`Delete channel ${ch.display_name || ch.stream_name}`}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -649,11 +702,11 @@ export function ChannelsPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-center">
               {logoRemovalMode || (!logoFile && !logoUrl) ? (
-                <div className="flex h-32 w-32 items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-400">No logo</div>
+                <div className="flex h-32 w-32 items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted text-muted-foreground">No logo</div>
               ) : (
                 <img
                   src={logoFilePreview || logoUrl}
-                  className="h-32 w-32 rounded-lg border border-slate-200 object-contain"
+                  className="h-32 w-32 rounded-lg border border-border bg-muted object-contain"
                   alt="Channel logo preview"
                 />
               )}
@@ -669,7 +722,7 @@ export function ChannelsPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                className="border-destructive text-destructive hover:bg-destructive/10"
                 onClick={() => { setLogoRemovalMode("db"); setLogoFile(null); setLogoFilePreview(""); setLogoUrl(""); }}
               >
                 Remove URL
@@ -707,9 +760,9 @@ export function ChannelsPage() {
           }
         >
           <div className="space-y-4">
-            <Input label="Stream Name" type="text" readOnly value={editChannel.stream_name} className="bg-slate-50 text-slate-500" />
-            <Input label="Source" type="text" readOnly value={formatStreamSource(editChannel.source)} className="bg-slate-50 text-slate-500" />
-            <Input label="Display Name" type="text" readOnly value={editChannel.display_name || ""} className="bg-slate-50 text-slate-500" />
+            <Input label="Stream Name" type="text" readOnly value={editChannel.stream_name} className="bg-muted text-muted-foreground" />
+            <Input label="Source" type="text" readOnly value={formatStreamSource(editChannel.source)} className="bg-muted text-muted-foreground" />
+            <Input label="Display Name" type="text" readOnly value={editChannel.display_name || ""} className="bg-muted text-muted-foreground" />
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Channel #"
@@ -721,10 +774,10 @@ export function ChannelsPage() {
               />
               <div>
                 <label className={fieldLabelClass}>Archive Days</label>
-                <div className="mt-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                <div className="mt-1 rounded-lg border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
                   {editChannel.catchup_days == null ? "-" : String(editChannel.catchup_days)}
                 </div>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Imported from {formatStreamSource(editChannel.source)}.
                 </p>
               </div>
@@ -734,7 +787,7 @@ export function ChannelsPage() {
               <label className={fieldLabelClass}>Logo</label>
               <div className="mt-1 flex flex-wrap items-center gap-4">
                 {!editLogoRemoved && editLogoPreview && (
-                  <img src={editLogoPreview} className="h-16 w-16 rounded border border-slate-200 object-contain" alt="Edit logo preview" />
+                  <img src={editLogoPreview} className="h-16 w-16 rounded border border-border bg-muted object-contain" alt="Edit logo preview" />
                 )}
                 <input ref={editLogoFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -746,7 +799,7 @@ export function ChannelsPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                  className="border-destructive text-destructive hover:bg-destructive/10"
                   onClick={() => { setEditLogoRemoved(true); setEditLogoFile(null); setEditLogoPreview(""); }}
                 >
                   Remove
