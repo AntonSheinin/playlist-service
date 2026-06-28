@@ -1,4 +1,3 @@
-import { Alert, Stack, Typography } from "@mui/material";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 
@@ -39,10 +38,12 @@ export function ConfirmDialog({
         </>
       }
     >
-      <Stack spacing={1.5}>
-        <Alert severity="warning">{message}</Alert>
-        {details && <Typography color="text.secondary">{details}</Typography>}
-      </Stack>
+      <div className="space-y-3">
+        <div className="status-warning rounded-md border px-3 py-2 text-sm">
+          {message}
+        </div>
+        {details && <p className="text-sm text-muted-foreground">{details}</p>}
+      </div>
     </Modal>
   );
 }

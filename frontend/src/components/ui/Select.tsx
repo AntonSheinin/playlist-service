@@ -1,31 +1,45 @@
-import type { ChangeEventHandler, ReactNode } from "react";
-import { TextField } from "@mui/material";
+import type { ReactNode, SelectHTMLAttributes } from "react";
+import { ChevronDown } from "lucide-react";
+import { cn } from "../../lib/utils";
 
-interface SelectProps {
+interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> {
   id?: string;
   name?: string;
   label?: string;
-  value?: string | number | readonly string[];
-  defaultValue?: string | number | readonly string[];
-  onChange?: ChangeEventHandler<HTMLInputElement>;
-  disabled?: boolean;
-  required?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 export function Select({ label, id, children, className, ...props }: SelectProps) {
+  const selectId = id || props.name;
+
   return (
-    <TextField
-      id={id}
-      label={label}
-      select
-      fullWidth
-      className={className}
-      slotProps={{ select: { native: true } }}
-      {...props}
-    >
-      {children}
-    </TextField>
+    <label className="block">
+      {label && (
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+          {label}
+          {props.required && <span className="text-destructive"> *</span>}
+        </span>
+      )}
+      <span className="relative block">
+        <select
+          id={selectId}
+          className={cn(
+            "block h-10 w-full appearance-none rounded-md border border-input bg-card py-0 pl-3 pr-10 text-sm leading-10 text-card-foreground shadow-sm outline-none transition",
+            "hover:border-ring",
+            "focus:border-ring focus:ring-2 focus:ring-ring/20",
+            "disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground",
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+      </span>
+    </label>
   );
 }

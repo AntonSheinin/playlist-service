@@ -26,6 +26,14 @@ class FakeAuthClient:
         return self.existing_token
 
 
+class FakeAuthClientContext(FakeAuthClient):
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return None
+
+
 @pytest.mark.asyncio
 async def test_auth_sync_recreates_missing_auth_token_id(db_session):
     user = User(
@@ -83,3 +91,24 @@ async def test_auth_sync_recreate_failure_propagates_for_explicit_recreate(db_se
 
     with pytest.raises(AuthServiceError):
         await AuthSyncService(db_session)._do_recreate(FakeAuthClient(fail_create=True), user)
+
+
+@pytest.mark.asyncio
+async def test_auth_sync_update_swallows_recreate_failure(monkeypatch, db_session):
+    user = User(
+        first_name="A",
+        last_name="B",
+        agreement_number="203",
+        status=UserStatus.ENABLED,
+        max_sessions=1,
+        token="token",
+        auth_token_id=10,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    client = FakeAuthClientContext(fail_create=True)
+    monkeypatch.setattr("app.services.auth_sync.AuthServiceClient", lambda: client)
+
+    await AuthSyncService(db_session).sync_user_update(user, recreate_token=True)
+
+    assert client.deleted == [10]

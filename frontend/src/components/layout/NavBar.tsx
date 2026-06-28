@@ -1,37 +1,16 @@
 import { useState } from "react";
 import { Link as RouterLink, useLocation } from "react-router-dom";
-import {
-  AppBar,
-  Avatar,
-  Box,
-  Divider,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import GroupsIcon from "@mui/icons-material/FolderCopy";
-import InventoryIcon from "@mui/icons-material/Inventory2";
-import LiveTvIcon from "@mui/icons-material/LiveTv";
-import LogoutIcon from "@mui/icons-material/Logout";
-import MenuIcon from "@mui/icons-material/Menu";
-import PeopleIcon from "@mui/icons-material/People";
+import { Folder, Gauge, LogOut, Menu, Package, Tv, Users, X } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import { drawerWidth } from "../../theme";
+import { cn } from "../../lib/utils";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navLinks = [
-  { to: "/", label: "Dashboard", key: "dashboard", icon: <DashboardIcon fontSize="small" /> },
-  { to: "/channels", label: "Channels", key: "channels", icon: <LiveTvIcon fontSize="small" /> },
-  { to: "/groups", label: "Groups", key: "groups", icon: <GroupsIcon fontSize="small" /> },
-  { to: "/packages", label: "Packages & Tariffs", key: "packages", icon: <InventoryIcon fontSize="small" /> },
-  { to: "/users", label: "Users", key: "users", icon: <PeopleIcon fontSize="small" /> },
+  { to: "/", label: "Dashboard", key: "dashboard", icon: Gauge },
+  { to: "/channels", label: "Channels", key: "channels", icon: Tv },
+  { to: "/groups", label: "Groups", key: "groups", icon: Folder },
+  { to: "/packages", label: "Packages & Tariffs", key: "packages", icon: Package },
+  { to: "/users", label: "Users", key: "users", icon: Users },
 ];
 
 function isActive(key: string, pathname: string): boolean {
@@ -39,108 +18,111 @@ function isActive(key: string, pathname: string): boolean {
   return pathname.startsWith(`/${key}`);
 }
 
-export function NavBar() {
+function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
   const { admin, logout } = useAuth();
   const { pathname } = useLocation();
-  const theme = useTheme();
-  const desktop = useMediaQuery(theme.breakpoints.up("md"));
-  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const drawer = (
-    <Box sx={{ display: "flex", minHeight: "100%", flexDirection: "column" }}>
-      <Toolbar sx={{ gap: 1.5, minHeight: 64 }}>
-        <Avatar src="/media/rutv-logo.png" alt="RUTV logo" variant="rounded" sx={{ width: 34, height: 34 }} />
-        <Box sx={{ minWidth: 0 }}>
-          <Typography noWrap variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Playlist Service
-          </Typography>
-          <Typography noWrap variant="caption" color="text.secondary">
-            Admin console
-          </Typography>
-        </Box>
-      </Toolbar>
-      <Divider />
-      <List dense sx={{ flex: 1, px: 1, py: 1.5 }}>
+  return (
+    <div className="flex min-h-full flex-col bg-card text-card-foreground">
+      <div className="flex min-h-16 items-center gap-3 border-b border-border px-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+          <img src="/media/rutv-logo.png" alt="RUTV logo" className="h-8 w-8 object-contain" />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-card-foreground">RuTV Middleware</div>
+          <div className="truncate text-xs text-muted-foreground">Admin console</div>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1 px-2 py-3" aria-label="Main navigation">
         {navLinks.map((link) => {
           const active = isActive(link.key, pathname);
+          const Icon = link.icon;
           return (
-            <ListItemButton
+            <RouterLink
               key={link.key}
-              component={RouterLink}
               to={link.to}
-              selected={active}
-              onClick={() => setMobileOpen(false)}
-              sx={{
-                mb: 0.5,
-                borderRadius: 1,
-                "&.Mui-selected": {
-                  bgcolor: "#e0f2fe",
-                },
-              }}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
+                active
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
             >
-              <ListItemIcon sx={{ minWidth: 36, color: active ? "primary.main" : "text.secondary" }}>
-                {link.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={<Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>{link.label}</Typography>}
-              />
-            </ListItemButton>
+              <Icon className={cn("h-4 w-4", active ? "text-accent-foreground" : "text-muted-foreground")} aria-hidden="true" />
+              <span className="truncate">{link.label}</span>
+            </RouterLink>
           );
         })}
-      </List>
-      <Divider />
-      <Box sx={{ p: 1.5 }}>
-        <Typography noWrap variant="body2" color="text.secondary" sx={{ px: 1, mb: 1 }}>
-          {admin?.username}
-        </Typography>
-        <ListItemButton onClick={() => void logout()} sx={{ borderRadius: 1, color: "error.main" }}>
-          <ListItemIcon sx={{ minWidth: 36, color: "error.main" }}>
-            <LogoutIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary={<Typography sx={{ fontSize: 14, fontWeight: 600 }}>Logout</Typography>} />
-        </ListItemButton>
-      </Box>
-    </Box>
+      </nav>
+
+      <div className="border-t border-border p-3">
+        <div className="mb-2 flex items-center justify-between gap-2 px-2">
+          <div className="min-w-0 truncate text-sm text-muted-foreground">{admin?.username}</div>
+          <ThemeToggle className="hidden md:inline-flex" />
+        </div>
+        <button
+          type="button"
+          onClick={() => void logout()}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          Logout
+        </button>
+      </div>
+    </div>
   );
+}
+
+export function NavBar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <>
-      {!desktop && (
-        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Toolbar variant="dense">
-            <IconButton edge="start" color="inherit" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="subtitle1" sx={{ ml: 1, fontWeight: 700 }}>
-              Playlist Service
-            </Typography>
-          </Toolbar>
-        </AppBar>
+      <header className="sticky top-0 z-40 border-b border-border bg-card text-card-foreground md:hidden">
+        <div className="flex h-12 items-center gap-2 px-3">
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <span className="min-w-0 flex-1 truncate text-sm font-bold text-card-foreground">RuTV Middleware</span>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-border bg-card md:block"
+        aria-label="Main navigation"
+      >
+        <DrawerContent />
+      </aside>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/70"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          />
+          <aside className="relative h-full w-[248px] shadow-xl">
+            <button
+              type="button"
+              className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <DrawerContent onNavigate={() => setMobileOpen(false)} />
+          </aside>
+        </div>
       )}
-      <Box component="nav" aria-label="Main navigation">
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          open
-          sx={{
-            display: { xs: "none", md: "block" },
-            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-      </Box>
     </>
   );
 }

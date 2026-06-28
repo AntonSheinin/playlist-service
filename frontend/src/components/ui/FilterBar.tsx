@@ -1,23 +1,18 @@
 import type { ReactNode } from "react";
-import { Box, Paper } from "@mui/material";
+import { cn } from "../../lib/utils";
 
 interface FilterBarProps {
   children: ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
-export function FilterBar({ children }: FilterBarProps) {
+export function FilterBar({ children, className, contentClassName }: FilterBarProps) {
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "repeat(4, minmax(0, 1fr))" },
-          gap: 2,
-        }}
-      >
+    <div className={cn("rounded-lg border border-border bg-card p-4 shadow-sm", className)}>
+      <div className={cn("grid grid-cols-1 gap-4 md:grid-cols-4", contentClassName)}>
         {children}
-      </Box>
-    </Paper>
+      </div>
+    </div>
   );
 }

@@ -49,14 +49,14 @@ export function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-8">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_10%,#dbeafe,transparent_40%),radial-gradient(circle_at_85%_15%,#cffafe,transparent_35%),linear-gradient(#f8fafc,#f8fafc)]" />
+      <div className="absolute inset-0 -z-10 bg-background" />
       <Card className="w-full max-w-md p-8 shadow-panel">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
             <img src="/media/rutv-logo.png" alt="" className="h-8 w-8 object-contain" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Playlist Service</h1>
-          <p className="mt-2 text-slate-600">Sign in to your account</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-card-foreground">RuTV Middleware</h1>
+          <p className="mt-2 text-muted-foreground">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -81,7 +81,7 @@ export function LoginPage() {
           />
 
           {error && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <div className="status-danger rounded-lg border px-3 py-2 text-sm">
               {error}
             </div>
           )}

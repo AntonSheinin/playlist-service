@@ -328,13 +328,13 @@ export function UserDetailPage() {
                     type="text"
                     readOnly
                     value={user.token}
-                    className="bg-slate-50 font-mono text-sm text-slate-600"
+                    className="bg-muted font-mono text-sm text-muted-foreground"
                   />
                   <Button
                     type="button"
                     onClick={() => setRegenOpen(true)}
                     variant="secondary"
-                    className="whitespace-nowrap border-amber-300 text-amber-700 hover:bg-amber-50"
+                    className="whitespace-nowrap border-[var(--status-warning-border)] text-[var(--status-warning-text)] hover:bg-[var(--status-warning-bg)]"
                   >
                     Regenerate
                   </Button>
@@ -378,15 +378,15 @@ export function UserDetailPage() {
             }
           />
           {isEdit && resolvedChannels && (
-            <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-              <span className="text-sm text-slate-600">
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <span className="text-sm text-muted-foreground">
                 Resolved Channels: <strong>{resolvedChannels.length}</strong> total
               </span>
             </div>
           )}
         </SectionCard>
 
-        <Card className="border border-slate-200 bg-slate-50 p-4">
+        <Card className="border border-border bg-muted p-4">
           <div className="flex flex-wrap justify-end gap-3">
             <Link to="/users">
               <Button type="button" variant="secondary">Cancel</Button>

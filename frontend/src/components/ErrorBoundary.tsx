@@ -29,8 +29,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center px-4 py-8">
           <Card className="w-full max-w-2xl p-8">
-            <h1 className="mb-4 text-xl font-semibold text-rose-600">Something went wrong</h1>
-            <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm text-slate-800">
+            <h1 className="mb-4 text-xl font-semibold text-destructive">Something went wrong</h1>
+            <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
               {this.state.error.message}
               {"\n\n"}
               {this.state.error.stack}

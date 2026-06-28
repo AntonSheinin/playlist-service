@@ -20,7 +20,7 @@ export function UserDetailHeader({
 }: UserDetailHeaderProps) {
   return (
     <div className="space-y-3">
-      <Link to="/users" className="inline-flex text-sm text-slate-600 hover:text-slate-900">
+      <Link to="/users" className="inline-flex text-sm text-muted-foreground hover:text-foreground">
         &larr; Back to Users
       </Link>
       <PageHeader
@@ -33,7 +33,7 @@ export function UserDetailHeader({
                   label="Playlist URL"
                   readOnly
                   value={playlistUrl}
-                  className="bg-slate-50 text-xs font-mono text-slate-600"
+                  className="bg-muted text-xs font-mono text-muted-foreground"
                 />
               </div>
               <Button variant="secondary" type="button" onClick={onOpenPreview}>
