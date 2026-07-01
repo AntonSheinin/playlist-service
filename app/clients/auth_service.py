@@ -16,7 +16,7 @@ class AuthTokenCreate(BaseModel):
     """Request payload for creating a token in Auth Service."""
 
     token: str
-    user_id: str  # agreement_number
+    user_id: str  # stringified playlist-service users.id
     status: str  # "active" or "suspended"
     max_sessions: int
     valid_from: datetime | None = None
@@ -128,6 +128,15 @@ class AuthServiceClient:
             operation=f"update token {auth_token_id}",
         )
         logger.info("Updated auth token %d", auth_token_id)
+
+    async def get_token(self, auth_token_id: int) -> dict[str, Any]:
+        """Get a token record from Auth Service by ID."""
+        return await self._request_json_object(
+            "GET",
+            f"/api/tokens/{auth_token_id}",
+            accept_statuses={200},
+            operation=f"get token {auth_token_id}",
+        )
 
     async def find_token_by_value(self, token: str, *, limit: int = 1000) -> dict[str, Any] | None:
         """Find an Auth Service token record by token value."""

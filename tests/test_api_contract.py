@@ -123,6 +123,16 @@ class FakeAuthServiceClient:
         ]
 
 
+class RecordingAuthSyncService:
+    calls: list[dict] = []
+
+    def __init__(self, db):
+        self.db = db
+
+    async def sync_user_update(self, user, *, recreate_token=False):
+        self.calls.append({"user_id": user.id, "recreate_token": recreate_token})
+
+
 @pytest.mark.asyncio
 async def test_sessions_and_access_logs_keep_field_names(db_session, monkeypatch):
     from app.routes import users as users_route
@@ -160,3 +170,112 @@ async def test_sessions_and_access_logs_keep_field_names(db_session, monkeypatch
         "action",
         "user_agent",
     }
+
+
+@pytest.mark.asyncio
+async def test_sessions_and_access_logs_query_auth_by_playlist_user_id(db_session, monkeypatch):
+    from app.routes import users as users_route
+
+    calls = {"sessions": [], "access_logs": []}
+
+    class RecordingAuthServiceClient(FakeAuthServiceClient):
+        async def get_user_sessions(self, **kwargs):
+            calls["sessions"].append(kwargs)
+            return await super().get_user_sessions(**kwargs)
+
+        async def get_access_logs(self, **kwargs):
+            calls["access_logs"].append(kwargs)
+            return await super().get_access_logs(**kwargs)
+
+    monkeypatch.setattr(users_route, "AuthServiceClient", RecordingAuthServiceClient)
+    user = User(
+        first_name="A",
+        last_name="B",
+        agreement_number="300",
+        status=UserStatus.ENABLED,
+        max_sessions=1,
+        token="token",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    async with _client_with_db(db_session) as client:
+        await client.get(f"/api/v1/users/{user.id}/sessions")
+        await client.get(f"/api/v1/users/{user.id}/access-logs")
+
+    assert calls["sessions"][0]["user_id"] == str(user.id)
+    assert calls["access_logs"][0]["user_id"] == str(user.id)
+
+
+@pytest.mark.asyncio
+async def test_name_only_user_update_does_not_sync_auth(db_session, monkeypatch):
+    from app.routes import users as users_route
+
+    RecordingAuthSyncService.calls = []
+    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    user = User(
+        first_name="A",
+        last_name="B",
+        agreement_number="301",
+        status=UserStatus.ENABLED,
+        max_sessions=1,
+        token="token",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    async with _client_with_db(db_session) as client:
+        response = await client.patch(f"/api/v1/users/{user.id}", json={"first_name": "Changed"})
+
+    assert response.status_code == 200
+    assert RecordingAuthSyncService.calls == []
+
+
+@pytest.mark.asyncio
+async def test_agreement_number_only_user_update_does_not_sync_auth(db_session, monkeypatch):
+    from app.routes import users as users_route
+
+    RecordingAuthSyncService.calls = []
+    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    user = User(
+        first_name="A",
+        last_name="B",
+        agreement_number="302",
+        status=UserStatus.ENABLED,
+        max_sessions=1,
+        token="token",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    async with _client_with_db(db_session) as client:
+        response = await client.patch(
+            f"/api/v1/users/{user.id}", json={"agreement_number": "303"}
+        )
+
+    assert response.status_code == 200
+    assert RecordingAuthSyncService.calls == []
+
+
+@pytest.mark.asyncio
+async def test_auth_relevant_user_update_syncs_auth(db_session, monkeypatch):
+    from app.routes import users as users_route
+
+    RecordingAuthSyncService.calls = []
+    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    user = User(
+        first_name="A",
+        last_name="B",
+        agreement_number="304",
+        status=UserStatus.ENABLED,
+        max_sessions=1,
+        token="token",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    async with _client_with_db(db_session) as client:
+        response = await client.patch(f"/api/v1/users/{user.id}", json={"max_sessions": 2})
+
+    assert response.status_code == 200
+    assert RecordingAuthSyncService.calls == [{"user_id": user.id, "recreate_token": False}]

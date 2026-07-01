@@ -133,7 +133,11 @@ async def update_user(
     current_user = await user_service.get_by_id(user_id)
     current_valid_from = current_user.valid_from
     current_valid_until = current_user.valid_until
-    current_agreement_number = current_user.agreement_number
+    current_status = current_user.status
+    current_max_sessions = current_user.max_sessions
+    current_tariff_ids = {tariff.id for tariff in current_user.tariffs}
+    current_package_ids = {package.id for package in current_user.packages}
+    current_channel_ids = {channel.id for channel in current_user.channels}
 
     next_valid_from = current_valid_from
     if data.clear_valid_from:
@@ -148,9 +152,27 @@ async def update_user(
         next_valid_until = data.valid_until
 
     valid_from_changed = next_valid_from != current_valid_from
+    valid_until_changed = next_valid_until != current_valid_until
     valid_until_cleared = current_valid_until is not None and next_valid_until is None
-    agreement_number_changed = (
-        data.agreement_number is not None and data.agreement_number != current_agreement_number
+    status_changed = data.status is not None and data.status != current_status
+    max_sessions_changed = (
+        data.max_sessions is not None and data.max_sessions != current_max_sessions
+    )
+    tariffs_changed = data.tariff_ids is not None and set(data.tariff_ids) != current_tariff_ids
+    packages_changed = (
+        data.package_ids is not None and set(data.package_ids) != current_package_ids
+    )
+    channels_changed = (
+        data.channel_ids is not None and set(data.channel_ids) != current_channel_ids
+    )
+    auth_fields_changed = (
+        status_changed
+        or max_sessions_changed
+        or valid_from_changed
+        or valid_until_changed
+        or tariffs_changed
+        or packages_changed
+        or channels_changed
     )
     if next_valid_from is not None and next_valid_until is not None:
         if next_valid_until <= next_valid_from:
@@ -172,11 +194,13 @@ async def update_user(
         channel_ids=data.channel_ids,
     )
 
-    # Sync to Auth Service
-    await auth_sync.sync_user_update(
-        user,
-        recreate_token=valid_from_changed or valid_until_cleared or agreement_number_changed,
-    )
+    if auth_fields_changed:
+        # Clearing valid_until requires recreate because Auth Backend PATCH omits null fields.
+        await auth_sync.sync_user_update(
+            user,
+            recreate_token=valid_from_changed or valid_until_cleared,
+        )
+        user = await user_service.get_by_id(user_id)
 
     return SuccessResponse(data=UserResponse.model_validate(user))
 
@@ -315,7 +339,7 @@ async def get_user_sessions(
 
     async with AuthServiceClient() as auth_client:
         sessions = await auth_client.get_user_sessions(
-            user_id=user.agreement_number,
+            user_id=str(user.id),
             skip=0,
             limit=1000,
         )
@@ -382,7 +406,7 @@ async def get_user_access_logs(
     skip = (page - 1) * per_page
     async with AuthServiceClient() as auth_client:
         logs = await auth_client.get_access_logs(
-            user_id=user.agreement_number,
+            user_id=str(user.id),
             start_time=from_date,
             end_time=to_date,
             skip=skip,

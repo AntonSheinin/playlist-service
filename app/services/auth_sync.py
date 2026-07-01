@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,21 @@ class AuthSyncService:
     def _build_allowed_streams(self, channels: list[Channel]) -> list[str]:
         """Build provider-agnostic allowed stream names without duplicates."""
         return list(dict.fromkeys(ch.stream_name for ch in channels))
+
+    def _parse_auth_datetime(self, value: object) -> datetime | None:
+        if not isinstance(value, str):
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def _datetimes_match(self, left: datetime | None, right: datetime | None) -> bool:
+        if left is None or right is None:
+            return left is right
+        if left.tzinfo is None or right.tzinfo is None:
+            return left.replace(tzinfo=None) == right.replace(tzinfo=None)
+        return left == right
 
     async def get_user_ids_for_packages(self, package_ids: list[int]) -> list[int]:
         """Find users whose resolved channels can change when packages change."""
@@ -69,16 +85,12 @@ class AuthSyncService:
 
         data = AuthTokenCreate(
             token=user.token,
-            user_id=user.agreement_number,
+            user_id=str(user.id),
             status=self._map_status(user.status),
             max_sessions=user.max_sessions,
             valid_from=user.valid_from,
             valid_until=user.valid_until,
             allowed_streams=allowed_streams,
-            meta={
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-            },
         )
 
         auth_token_id = await client.create_token(data)
@@ -136,32 +148,8 @@ class AuthSyncService:
                     logger.info("Recreated user %d token in Auth Service", user.id)
                     return
 
-                channels = await self.user_service.resolve_channels(user.id)
-                allowed_streams = self._build_allowed_streams(channels)
-
-                data = AuthTokenUpdate(
-                    status=self._map_status(user.status),
-                    max_sessions=user.max_sessions,
-                    valid_until=user.valid_until,
-                    allowed_streams=allowed_streams,
-                    meta={
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                    },
-                )
-
-                try:
-                    await client.update_token(user.auth_token_id, data)
-                except AuthServiceNotFoundError:
-                    logger.warning(
-                        "Auth token %d for user %d is missing in Auth Service; recreating it",
-                        user.auth_token_id,
-                        user.id,
-                    )
-                    await self._do_recreate(client, user)
-                    return
-
-                logger.info("Updated user %d in Auth Service", user.id)
+                action = await self._sync_user_verified(client, user)
+                logger.info("Auth sync for user %d completed with action %s", user.id, action)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)
 
@@ -190,3 +178,116 @@ class AuthSyncService:
             logger.info("Regenerated token for user %d in Auth Service", user.id)
         except AuthServiceError as e:
             logger.warning("Failed to regenerate token for user %d in Auth Service: %s", user.id, e)
+
+    async def sync_all_users(self) -> dict[str, int]:
+        """Resync all Playlist users to Auth Service and return summary counts."""
+        result = await self.db.execute(select(User).order_by(User.id))
+        users = list(result.scalars().all())
+        summary = {
+            "total": len(users),
+            "patched": 0,
+            "recreated": 0,
+            "recovered": 0,
+            "mismatched": 0,
+            "failed": 0,
+        }
+        playlist_tokens = {user.token for user in users}
+
+        async with AuthServiceClient() as client:
+            for user in users:
+                try:
+                    action = await self._sync_user_verified(
+                        client,
+                        user,
+                        playlist_tokens=playlist_tokens,
+                    )
+                    summary[action] += 1
+                except AuthServiceError as e:
+                    logger.warning("Failed full auth resync for user %d: %s", user.id, e)
+                    summary["failed"] += 1
+
+        return summary
+
+    async def _sync_user_verified(
+        self,
+        client: AuthServiceClient,
+        user: User,
+        *,
+        playlist_tokens: set[str] | None = None,
+    ) -> str:
+        """Patch a verified Auth token or recreate/recover when ownership is stale."""
+        expected_user_id = str(user.id)
+
+        if user.auth_token_id is not None:
+            try:
+                auth_token = await client.get_token(user.auth_token_id)
+            except AuthServiceNotFoundError:
+                await self._do_recreate(client, user)
+                return "recreated"
+
+            token_value = auth_token.get("token")
+            auth_user_id = auth_token.get("user_id")
+            if token_value != user.token:
+                stale_auth_token_id = user.auth_token_id
+                logger.warning(
+                    "Auth token_id %d for user %d points to a different token; recovering by token value",
+                    stale_auth_token_id,
+                    user.id,
+                )
+                existing_token = await client.find_token_by_value(user.token)
+                if existing_token is not None:
+                    existing_token_id = existing_token.get("id")
+                    if isinstance(existing_token_id, int):
+                        await client.delete_token(existing_token_id)
+                await self._do_create(client, user)
+                if playlist_tokens is not None and token_value not in playlist_tokens:
+                    await client.delete_token(stale_auth_token_id)
+                return "recovered"
+
+            if auth_user_id != expected_user_id:
+                logger.warning(
+                    "Auth token_id %d for user %d has user_id %r; recreating with %r",
+                    user.auth_token_id,
+                    user.id,
+                    auth_user_id,
+                    expected_user_id,
+                )
+                await self._do_recreate(client, user)
+                return "mismatched"
+
+            if user.valid_until is None and auth_token.get("valid_until") is not None:
+                logger.info(
+                    "Auth token_id %d for user %d has valid_until but Playlist user does not; recreating",
+                    user.auth_token_id,
+                    user.id,
+                )
+                await self._do_recreate(client, user)
+                return "recreated"
+
+            auth_valid_from = self._parse_auth_datetime(auth_token.get("valid_from"))
+            if user.valid_from is not None and not self._datetimes_match(user.valid_from, auth_valid_from):
+                logger.info(
+                    "Auth token_id %d for user %d has different valid_from; recreating",
+                    user.auth_token_id,
+                    user.id,
+                )
+                await self._do_recreate(client, user)
+                return "recreated"
+        else:
+            await self._do_recreate(client, user)
+            return "recreated"
+
+        channels = await self.user_service.resolve_channels(user.id)
+        data = AuthTokenUpdate(
+            status=self._map_status(user.status),
+            max_sessions=user.max_sessions,
+            valid_until=user.valid_until,
+            allowed_streams=self._build_allowed_streams(channels),
+        )
+        try:
+            await client.update_token(user.auth_token_id, data)
+        except AuthServiceNotFoundError:
+            await self._do_recreate(client, user)
+            return "recreated"
+
+        return "patched"
