@@ -53,14 +53,21 @@ class ChannelService:
         # Apply filters
         if search:
             search_filter = f"%{search}%"
-            stmt = stmt.where(
-                or_(
-                    Channel.stream_name.ilike(search_filter),
-                    Channel.display_name.ilike(search_filter),
-                    Channel.tvg_name.ilike(search_filter),
-                    Channel.tvg_id.ilike(search_filter),
+            search_conditions = [
+                Channel.stream_name.ilike(search_filter),
+                Channel.display_name.ilike(search_filter),
+                Channel.tvg_name.ilike(search_filter),
+                Channel.tvg_id.ilike(search_filter),
+            ]
+            if search.isdigit():
+                search_number = int(search)
+                search_conditions.extend(
+                    [
+                        Channel.id == search_number,
+                        Channel.channel_number == search_number,
+                    ]
                 )
-            )
+            stmt = stmt.where(or_(*search_conditions))
 
         if group_id is not None:
             stmt = stmt.where(Channel.groups.any(Group.id == group_id))

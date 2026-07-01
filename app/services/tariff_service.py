@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.exceptions import DuplicateEntryError, NotFoundError
-from app.models import Package, Tariff, tariff_packages, user_tariffs
+from app.models import Package, Tariff, package_channels, tariff_packages, user_tariffs
 
 
 class TariffService:
@@ -46,17 +46,22 @@ class TariffService:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_all_with_counts(self) -> list[tuple[Tariff, int]]:
-        """Get all tariffs with package counts in a single query."""
+    async def get_all_with_counts(self) -> list[tuple[Tariff, int, int]]:
+        """Get all tariffs with package and channel counts in a single query."""
         stmt = (
-            select(Tariff, func.count(tariff_packages.c.package_id).label("package_count"))
+            select(
+                Tariff,
+                func.count(func.distinct(tariff_packages.c.package_id)).label("package_count"),
+                func.count(func.distinct(package_channels.c.channel_id)).label("channel_count"),
+            )
             .outerjoin(tariff_packages, Tariff.id == tariff_packages.c.tariff_id)
+            .outerjoin(package_channels, tariff_packages.c.package_id == package_channels.c.package_id)
             .group_by(Tariff.id)
             .order_by(Tariff.name)
             .options(selectinload(Tariff.packages))
         )
         result = await self.db.execute(stmt)
-        return [(row.Tariff, row.package_count) for row in result.all()]
+        return [(row.Tariff, row.package_count, row.channel_count) for row in result.all()]
 
     async def create(
         self,

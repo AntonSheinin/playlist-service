@@ -120,7 +120,7 @@ export function MultiSelect({
             <Popover.Content
               align="start"
               sideOffset={4}
-              className="z-[1500] w-[var(--radix-popover-trigger-width)] rounded-md border border-border bg-popover p-0 shadow-lg"
+              className="z-[1500] max-h-[min(22rem,calc(100dvh-2rem))] w-[min(var(--radix-popover-trigger-width),calc(100vw-1rem))] overflow-hidden rounded-md border border-border bg-popover p-0 shadow-lg"
             >
               <Command shouldFilter={!onInputChange}>
                 <CommandInput value={query} onValueChange={setSearch} placeholder="Search..." />

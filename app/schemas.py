@@ -221,6 +221,7 @@ class TariffResponse(OrmModel):
 
 class TariffWithCount(TariffResponse):
     package_count: int
+    channel_count: int
 
 
 class TariffDeleteInfo(BaseModel):

@@ -92,13 +92,14 @@ class UserService:
         # Apply filters
         if search:
             search_filter = f"%{search}%"
-            stmt = stmt.where(
-                or_(
-                    User.first_name.ilike(search_filter),
-                    User.last_name.ilike(search_filter),
-                    User.agreement_number.ilike(search_filter),
-                )
-            )
+            search_conditions = [
+                User.first_name.ilike(search_filter),
+                User.last_name.ilike(search_filter),
+                User.agreement_number.ilike(search_filter),
+            ]
+            if search.isdigit():
+                search_conditions.append(User.id == int(search))
+            stmt = stmt.where(or_(*search_conditions))
 
         if status is not None:
             stmt = stmt.where(User.status == status)

@@ -36,7 +36,7 @@ export function Pagination({
               aria-label="Items per page"
               value={perPage}
               onChange={(e) => onPerPageChange(Number(e.target.value))}
-              className="w-36"
+              className="w-full sm:w-36"
             >
               {perPageOptions.map((n) => (
                 <option key={n} value={n}>
@@ -46,20 +46,20 @@ export function Pagination({
             </Select>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {onPerPageChange && (
-            <Button variant="outlined" onClick={() => onPageChange(1)} disabled={page <= 1}>
+            <Button variant="outlined" className="min-h-11 sm:min-h-9" onClick={() => onPageChange(1)} disabled={page <= 1}>
               First
             </Button>
           )}
-          <Button variant="outlined" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
+          <Button variant="outlined" className="min-h-11 sm:min-h-9" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
             Previous
           </Button>
-          <Button variant="outlined" onClick={() => onPageChange(page + 1)} disabled={page >= pages}>
+          <Button variant="outlined" className="min-h-11 sm:min-h-9" onClick={() => onPageChange(page + 1)} disabled={page >= pages}>
             Next
           </Button>
           {onPerPageChange && (
-            <Button variant="outlined" onClick={() => onPageChange(pages)} disabled={page >= pages}>
+            <Button variant="outlined" className="min-h-11 sm:min-h-9" onClick={() => onPageChange(pages)} disabled={page >= pages}>
               Last
             </Button>
           )}

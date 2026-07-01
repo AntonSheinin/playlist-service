@@ -4,6 +4,12 @@ import { Spinner } from "../ui/Spinner";
 import { SortableHeader } from "../table/SortableHeader";
 import { DatePicker } from "../ui/DatePicker";
 import {
+  MobileField,
+  MobileRecordItem,
+  MobileRecordList,
+  MobileSortSelect,
+} from "../ui/MobileData";
+import {
   formatDateTime,
   formatDuration,
   formatDate,
@@ -29,6 +35,21 @@ interface DateRangeProps {
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
 }
+
+const sessionSortOptions = [
+  { value: "started_at", label: "Started" },
+  { value: "ended_at", label: "Ended" },
+  { value: "duration", label: "Duration" },
+  { value: "ip", label: "IP Address" },
+  { value: "channel", label: "Channel" },
+];
+
+const accessSortOptions = [
+  { value: "accessed_at", label: "Timestamp" },
+  { value: "ip", label: "IP Address" },
+  { value: "channel", label: "Channel" },
+  { value: "action", label: "Action" },
+];
 
 function DateRangeFilters({
   from,
@@ -135,7 +156,33 @@ export function SessionsLogModal({
           onFromChange={onFromChange}
           onToChange={onToChange}
         />
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
+        <MobileSortSelect
+          value={sort.sortBy}
+          direction={sort.sortDir}
+          options={sessionSortOptions}
+          onSort={sort.toggleSort}
+        />
+        <MobileRecordList
+          empty={<div className="px-4 py-8 text-center text-sm text-muted-foreground">No sessions found for this period</div>}
+        >
+          {sortedSessions.map((s, i) => (
+            <MobileRecordItem key={`${s.started_at}-${i}`}>
+              <div className="grid grid-cols-2 gap-3">
+                <MobileField label="Started">{formatDateTime(s.started_at)}</MobileField>
+                <MobileField label="Ended">
+                  {s.ended_at ? formatDateTime(s.ended_at) : <span className="text-[var(--status-success-text)]">Active</span>}
+                </MobileField>
+                <MobileField label="Duration">{formatDuration(s.duration)}</MobileField>
+                <MobileField label="IP Address"><span className="font-mono">{s.ip || "-"}</span></MobileField>
+                <MobileField label="Channel" className="col-span-2">{s.channel || "-"}</MobileField>
+                <MobileField label="Protocol" className="col-span-2">
+                  <span className="break-words text-muted-foreground">{truncateText(s.user_agent || "", 80) || "-"}</span>
+                </MobileField>
+              </div>
+            </MobileRecordItem>
+          ))}
+        </MobileRecordList>
+        <div className="hidden max-h-[60vh] overflow-auto rounded-lg border border-border sm:block">
           <table className="min-w-full divide-y divide-border">
             <thead className="sticky top-0 bg-muted">
               <tr>
@@ -262,7 +309,30 @@ export function AccessLogModal({
           onFromChange={onFromChange}
           onToChange={onToChange}
         />
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
+        <MobileSortSelect
+          value={sort.sortBy}
+          direction={sort.sortDir}
+          options={accessSortOptions}
+          onSort={sort.toggleSort}
+        />
+        <MobileRecordList
+          empty={<div className="px-4 py-8 text-center text-sm text-muted-foreground">No access logs found for this period</div>}
+        >
+          {sortedAccess.map((log, i) => (
+            <MobileRecordItem key={`${log.accessed_at}-${i}`}>
+              <div className="grid grid-cols-2 gap-3">
+                <MobileField label="Timestamp">{formatDateTime(log.accessed_at)}</MobileField>
+                <MobileField label="IP Address"><span className="font-mono">{log.ip || "-"}</span></MobileField>
+                <MobileField label="Channel">{log.channel || "-"}</MobileField>
+                <MobileField label="Action">{log.action || "-"}</MobileField>
+                <MobileField label="Protocol" className="col-span-2">
+                  <span className="break-words text-muted-foreground">{truncateText(log.user_agent || "", 80) || "-"}</span>
+                </MobileField>
+              </div>
+            </MobileRecordItem>
+          ))}
+        </MobileRecordList>
+        <div className="hidden max-h-[60vh] overflow-auto rounded-lg border border-border sm:block">
           <table className="min-w-full divide-y divide-border">
             <thead className="sticky top-0 bg-muted">
               <tr>

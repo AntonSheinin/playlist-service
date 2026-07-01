@@ -27,6 +27,7 @@ export function ConfirmDialog({
       open={open}
       onClose={onClose}
       title={title}
+      footerClassName="flex-col sm:flex-row"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

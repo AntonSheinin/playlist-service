@@ -145,6 +145,7 @@ export interface TariffWithCount {
   description: string | null;
   packages: PackageLookup[];
   package_count: number;
+  channel_count: number;
   created_at: string;
   updated_at: string;
 }

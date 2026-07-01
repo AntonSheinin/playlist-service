@@ -21,6 +21,7 @@ import { FilterBar } from "../components/ui/FilterBar";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
+import { MobileFilterToggle } from "../components/ui/MobileData";
 import type { UserListItem } from "../api/types";
 
 function parsePage(value: string | null): number {
@@ -96,6 +97,7 @@ export function UsersListPage() {
   const users = data?.items || [];
   const totalPages = data?.pages || 0;
   const total = data?.total || 0;
+  const activeFilterCount = [statusFilter, tariffFilter].filter(Boolean).length;
   const userColumns = useMemo<ColumnDef<UserListItem>[]>(
     () => [
       { id: "name", accessorFn: (user) => `${user.last_name} ${user.first_name}` },
@@ -159,34 +161,76 @@ export function UsersListPage() {
       />
 
       <FilterBar>
-        <Select
-          label="Status"
-          value={statusFilter}
-          onChange={(e) =>
-            updateFilters({ status: e.target.value || undefined, page: "1" })
-          }
-        >
-          <option value="">All Status</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
-        </Select>
+        <div className="sm:hidden">
+          <Input
+            label="Search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name or agreement number..."
+          />
+          <div className="mt-4">
+            <MobileFilterToggle activeCount={activeFilterCount}>
+              <Select
+                label="Status"
+                value={statusFilter}
+                onChange={(e) =>
+                  updateFilters({ status: e.target.value || undefined, page: "1" })
+                }
+              >
+                <option value="">All Status</option>
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </Select>
 
-        <Select
-          label="Tariff"
-          value={tariffFilter}
-          onChange={(e) =>
-            updateFilters({ tariff: e.target.value || undefined, page: "1" })
-          }
-        >
-          <option value="">All Tariffs</option>
-          {(tariffs || []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </Select>
+              <Select
+                label="Tariff"
+                value={tariffFilter}
+                onChange={(e) =>
+                  updateFilters({ tariff: e.target.value || undefined, page: "1" })
+                }
+              >
+                <option value="">All Tariffs</option>
+                {(tariffs || []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </MobileFilterToggle>
+          </div>
+        </div>
+        <div className="hidden sm:block">
+          <Select
+            label="Status"
+            value={statusFilter}
+            onChange={(e) =>
+              updateFilters({ status: e.target.value || undefined, page: "1" })
+            }
+          >
+            <option value="">All Status</option>
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </Select>
+        </div>
 
-        <div className="md:col-span-2">
+        <div className="hidden sm:block">
+          <Select
+            label="Tariff"
+            value={tariffFilter}
+            onChange={(e) =>
+              updateFilters({ tariff: e.target.value || undefined, page: "1" })
+            }
+          >
+            <option value="">All Tariffs</option>
+            {(tariffs || []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="hidden sm:block md:col-span-2">
           <Input
             label="Search"
             value={searchInput}
@@ -210,10 +254,10 @@ export function UsersListPage() {
               <ResizableHeader colKey="agreement" width={widths.agreement} onResize={onResize}>
                 <SortableHeader label="Agreement" field="agreement_number" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="tariffs" width={widths.tariffs} onResize={onResize}>
+              <ResizableHeader colKey="tariffs" width={widths.tariffs} onResize={onResize} className="hidden sm:table-cell">
                 Tariffs
               </ResizableHeader>
-              <ResizableHeader colKey="sessions" width={widths.sessions} onResize={onResize} className="w-24">
+              <ResizableHeader colKey="sessions" width={widths.sessions} onResize={onResize} className="hidden w-24 sm:table-cell">
                 <SortableHeader label="Sessions" field="max_sessions" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
               <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="w-24">
@@ -250,7 +294,7 @@ export function UsersListPage() {
                       {user.agreement_number}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden px-4 py-3 sm:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {user.tariffs && user.tariffs.length > 0
                         ? user.tariffs.map((t) => (
@@ -262,7 +306,7 @@ export function UsersListPage() {
                       }
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden px-4 py-3 sm:table-cell">
                     <span className="inline-flex min-w-8 justify-center rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold text-foreground">
                       {user.max_sessions}
                     </span>

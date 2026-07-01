@@ -34,6 +34,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Select } from "../components/ui/Select";
 import { MultiSelect } from "../components/ui/MultiSelect";
 import { fieldLabelClass } from "../components/ui/fieldStyles";
+import { MobileFilterToggle } from "../components/ui/MobileData";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import type { ChannelResponse, ChannelBulkUpdateItem, StreamSource } from "../api/types";
@@ -151,6 +152,7 @@ export function ChannelsPage() {
   const [editNumber, setEditNumber] = useState("");
   const [editTvgId, setEditTvgId] = useState("");
   const [editGroupIds, setEditGroupIds] = useState<number[]>([]);
+  const [editPackageIds, setEditPackageIds] = useState<number[]>([]);
   const editLogoFileRef = useRef<HTMLInputElement>(null);
   const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
@@ -332,12 +334,18 @@ export function ChannelsPage() {
 
   // Edit modal
   function openEditModal(channel: ChannelResponse) {
+    const pending = pendingChanges[channel.id];
     setEditChannel(channel);
-    setEditNumber(channel.channel_number?.toString() || "");
-    setEditTvgId(channel.tvg_id || "");
+    setEditNumber(
+      pending?.channel_number !== undefined
+        ? pending.channel_number?.toString() || ""
+        : channel.channel_number?.toString() || ""
+    );
+    setEditTvgId(pending?.tvg_id !== undefined ? pending.tvg_id : channel.tvg_id || "");
     setEditGroupIds(channel.groups.map((g) => g.id));
+    setEditPackageIds(channel.packages.map((p) => p.id));
     setEditLogoFile(null);
-    setEditLogoPreview(channel.tvg_logo || "");
+    setEditLogoPreview(pending?.tvg_logo !== undefined ? pending.tvg_logo : channel.tvg_logo || "");
     setEditLogoRemoved(false);
   }
 
@@ -361,6 +369,13 @@ export function ChannelsPage() {
 
       // Update groups
       await updateGroups.mutateAsync({ id: editChannel.id, groupIds: editGroupIds });
+      await updatePackages.mutateAsync({ id: editChannel.id, packageIds: editPackageIds });
+
+      setPendingChanges((prev) => {
+        const next = { ...prev };
+        delete next[editChannel.id];
+        return next;
+      });
 
       showToast("Channel updated", "success");
       setEditChannel(null);
@@ -379,6 +394,8 @@ export function ChannelsPage() {
     [packages]
   );
 
+  const activeFilterCount = [groupFilter, packageFilter, statusFilter, sourceFilter].filter(Boolean).length;
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -393,7 +410,7 @@ export function ChannelsPage() {
         title="Channels"
         description="Manage channel metadata, logos, groups, and package assignments."
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-none sm:flex sm:flex-wrap">
           {pendingCount > 0 && (
             <Button
               onClick={handleApplyAll}
@@ -424,47 +441,107 @@ export function ChannelsPage() {
       />
 
       <FilterBar contentClassName="xl:grid-cols-[minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(7.5rem,0.8fr)_minmax(16rem,1.6fr)]">
-        <Select
-          label="Group"
-          value={groupFilter}
-          onChange={(e) => updateParams({ group: e.target.value || undefined, page: "1" })}
-        >
-          <option value="">All Groups</option>
-          <option value="none">No Group</option>
-          {(groups || []).map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </Select>
-        <Select
-          label="Package"
-          value={packageFilter}
-          onChange={(e) => updateParams({ package: e.target.value || undefined, page: "1" })}
-        >
-          <option value="">All Packages</option>
-          <option value="none">No Package</option>
-          {(packages || []).map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </Select>
-        <Select
-          label="Status"
-          value={statusFilter}
-          onChange={(e) => updateParams({ status: e.target.value || undefined, page: "1" })}
-        >
-          <option value="">All Status</option>
-          <option value="synced">Synced</option>
-          <option value="orphaned">Orphaned</option>
-        </Select>
-        <Select
-          label="Source"
-          value={sourceFilter}
-          onChange={(e) => updateParams({ source: e.target.value || undefined, page: "1" })}
-        >
-          <option value="">All Sources</option>
-          <option value="flussonic">Flussonic</option>
-          <option value="nimble">Nimble</option>
-        </Select>
-        <div>
+        <div className="sm:hidden">
+          <Input
+            label="Search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search channels..."
+          />
+          <div className="mt-4">
+            <MobileFilterToggle activeCount={activeFilterCount}>
+              <Select
+                label="Group"
+                value={groupFilter}
+                onChange={(e) => updateParams({ group: e.target.value || undefined, page: "1" })}
+              >
+                <option value="">All Groups</option>
+                <option value="none">No Group</option>
+                {(groups || []).map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </Select>
+              <Select
+                label="Package"
+                value={packageFilter}
+                onChange={(e) => updateParams({ package: e.target.value || undefined, page: "1" })}
+              >
+                <option value="">All Packages</option>
+                <option value="none">No Package</option>
+                {(packages || []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </Select>
+              <Select
+                label="Status"
+                value={statusFilter}
+                onChange={(e) => updateParams({ status: e.target.value || undefined, page: "1" })}
+              >
+                <option value="">All Status</option>
+                <option value="synced">Synced</option>
+                <option value="orphaned">Orphaned</option>
+              </Select>
+              <Select
+                label="Source"
+                value={sourceFilter}
+                onChange={(e) => updateParams({ source: e.target.value || undefined, page: "1" })}
+              >
+                <option value="">All Sources</option>
+                <option value="flussonic">Flussonic</option>
+                <option value="nimble">Nimble</option>
+              </Select>
+            </MobileFilterToggle>
+          </div>
+        </div>
+        <div className="hidden sm:block">
+          <Select
+            label="Group"
+            value={groupFilter}
+            onChange={(e) => updateParams({ group: e.target.value || undefined, page: "1" })}
+          >
+            <option value="">All Groups</option>
+            <option value="none">No Group</option>
+            {(groups || []).map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="hidden sm:block">
+          <Select
+            label="Package"
+            value={packageFilter}
+            onChange={(e) => updateParams({ package: e.target.value || undefined, page: "1" })}
+          >
+            <option value="">All Packages</option>
+            <option value="none">No Package</option>
+            {(packages || []).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="hidden sm:block">
+          <Select
+            label="Status"
+            value={statusFilter}
+            onChange={(e) => updateParams({ status: e.target.value || undefined, page: "1" })}
+          >
+            <option value="">All Status</option>
+            <option value="synced">Synced</option>
+            <option value="orphaned">Orphaned</option>
+          </Select>
+        </div>
+        <div className="hidden sm:block">
+          <Select
+            label="Source"
+            value={sourceFilter}
+            onChange={(e) => updateParams({ source: e.target.value || undefined, page: "1" })}
+          >
+            <option value="">All Sources</option>
+            <option value="flussonic">Flussonic</option>
+            <option value="nimble">Nimble</option>
+          </Select>
+        </div>
+        <div className="hidden sm:block">
           <Input
             label="Search"
             value={searchInput}
@@ -488,22 +565,22 @@ export function ChannelsPage() {
               <ResizableHeader colKey="name" width={widths.name} onResize={onResize}>
                 <SortableHeader label="Name" field="display_name" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="source" width={widths.source} onResize={onResize} className="w-28">
+              <ResizableHeader colKey="source" width={widths.source} onResize={onResize} className="hidden w-28 sm:table-cell">
                 <SortableHeader label="Source" field="source" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="tvg-id" width={widths["tvg-id"]} onResize={onResize} className="w-28">
+              <ResizableHeader colKey="tvg-id" width={widths["tvg-id"]} onResize={onResize} className="hidden w-28 sm:table-cell">
                 <SortableHeader label="TVG ID" field="tvg_id" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="group" width={widths.group} onResize={onResize} className="w-32">
+              <ResizableHeader colKey="group" width={widths.group} onResize={onResize} className="hidden w-32 sm:table-cell">
                 Groups
               </ResizableHeader>
-              <ResizableHeader colKey="archive" width={widths.archive} onResize={onResize} className="w-16">
+              <ResizableHeader colKey="archive" width={widths.archive} onResize={onResize} className="hidden w-16 sm:table-cell">
                 <SortableHeader label="Archive" field="catchup_days" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
-              <ResizableHeader colKey="packages" width={widths.packages} onResize={onResize} className="w-40">
+              <ResizableHeader colKey="packages" width={widths.packages} onResize={onResize} className="hidden w-40 sm:table-cell">
                 Packages
               </ResizableHeader>
-              <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="w-20">
+              <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="hidden w-20 sm:table-cell">
                 <SortableHeader label="Status" field="sync_status" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
               <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
@@ -578,12 +655,12 @@ export function ChannelsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <Badge variant={ch.source === "flussonic" ? "blue" : "gray"}>
                         {formatStreamSource(ch.source)}
                       </Badge>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <input
                         type="text"
                         value={currentTvgId}
@@ -593,7 +670,7 @@ export function ChannelsPage() {
                         aria-label={`TVG ID for ${ch.display_name || ch.stream_name}`}
                       />
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <MultiSelect
                         options={groupOptions}
                         value={groupOptions.filter((o) => ch.groups.some((g) => g.id === o.value))}
@@ -602,10 +679,10 @@ export function ChannelsPage() {
                         }}
                       />
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <span className={`text-sm ${catchupDisplay === "-" ? "text-muted-foreground" : "text-foreground"}`}>{catchupDisplay}</span>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <MultiSelect
                         options={packageOptions}
                         value={packageOptions.filter((o) => ch.packages.some((p) => p.id === o.value))}
@@ -614,7 +691,7 @@ export function ChannelsPage() {
                         }}
                       />
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <Badge variant={ch.sync_status === "synced" ? "green" : "yellow"}>
                         {ch.sync_status === "synced" ? "Synced" : "Orphaned"}
                       </Badge>
@@ -763,7 +840,7 @@ export function ChannelsPage() {
             <Input label="Stream Name" type="text" readOnly value={editChannel.stream_name} className="bg-muted text-muted-foreground" />
             <Input label="Source" type="text" readOnly value={formatStreamSource(editChannel.source)} className="bg-muted text-muted-foreground" />
             <Input label="Display Name" type="text" readOnly value={editChannel.display_name || ""} className="bg-muted text-muted-foreground" />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Channel #"
                 type="number"
@@ -813,6 +890,15 @@ export function ChannelsPage() {
                 value={groupOptions.filter((o) => editGroupIds.includes(o.value))}
                 className="mt-1"
                 onChange={(selected) => setEditGroupIds(selected.map((s) => s.value))}
+              />
+            </div>
+            <div>
+              <label className={fieldLabelClass}>Packages</label>
+              <MultiSelect
+                options={packageOptions}
+                value={packageOptions.filter((o) => editPackageIds.includes(o.value))}
+                className="mt-1"
+                onChange={(selected) => setEditPackageIds(selected.map((s) => s.value))}
               />
             </div>
           </div>

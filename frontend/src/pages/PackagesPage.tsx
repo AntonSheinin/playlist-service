@@ -113,7 +113,7 @@ export function PackagesPage() {
       const dir = tariffSort.sortDir === "asc" ? 1 : -1;
       if (tariffSort.sortBy === "name") return dir * a.name.localeCompare(b.name);
       if (tariffSort.sortBy === "description") return dir * (a.description || "").localeCompare(b.description || "");
-      if (tariffSort.sortBy === "package_count") return dir * (a.package_count - b.package_count);
+      if (tariffSort.sortBy === "channel_count") return dir * (a.channel_count - b.channel_count);
       return 0;
     });
   }, [tariffs, tariffSort.sortBy, tariffSort.sortDir]);
@@ -284,7 +284,7 @@ export function PackagesPage() {
                   <ResizableHeader colKey="name" width={pkgResize.widths.name} onResize={pkgResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={pkgSort.sortBy} sortDir={pkgSort.sortDir} onSort={pkgSort.toggleSort} />
                   </ResizableHeader>
-                  <ResizableHeader colKey="description" width={pkgResize.widths.description} onResize={pkgResize.onResize}>
+                  <ResizableHeader colKey="description" width={pkgResize.widths.description} onResize={pkgResize.onResize} className="hidden sm:table-cell">
                     <SortableHeader label="Description" field="description" sortBy={pkgSort.sortBy} sortDir={pkgSort.sortDir} onSort={pkgSort.toggleSort} />
                   </ResizableHeader>
                   <ResizableHeader colKey="channels" width={pkgResize.widths.channels} onResize={pkgResize.onResize} className="w-28">
@@ -304,7 +304,7 @@ export function PackagesPage() {
                       <td className="px-4 py-3">
                         <div className="truncate font-semibold text-foreground" title={p.name}>{p.name}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-4 py-3 sm:table-cell">
                         <div className="truncate text-sm text-muted-foreground" title={p.description || undefined}>{p.description || "-"}</div>
                       </td>
                       <td className="px-4 py-3">
@@ -367,11 +367,11 @@ export function PackagesPage() {
                   <ResizableHeader colKey="name" width={tariffResize.widths.name} onResize={tariffResize.onResize}>
                     <SortableHeader label="Name" field="name" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
                   </ResizableHeader>
-                  <ResizableHeader colKey="description" width={tariffResize.widths.description} onResize={tariffResize.onResize}>
+                  <ResizableHeader colKey="description" width={tariffResize.widths.description} onResize={tariffResize.onResize} className="hidden sm:table-cell">
                     <SortableHeader label="Description" field="description" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
                   </ResizableHeader>
-                  <ResizableHeader colKey="packages" width={tariffResize.widths.packages} onResize={tariffResize.onResize} className="w-28">
-                    <SortableHeader label="Packages" field="package_count" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
+                  <ResizableHeader colKey="channels" width={tariffResize.widths.channels} onResize={tariffResize.onResize} className="w-28">
+                    <SortableHeader label="Channels" field="channel_count" sortBy={tariffSort.sortBy} sortDir={tariffSort.sortDir} onSort={tariffSort.toggleSort} />
                   </ResizableHeader>
                   <ResizableHeader colKey="actions" width={tariffResize.widths.actions} onResize={tariffResize.onResize} className="w-40" minWidth={160}>
                     Actions
@@ -387,12 +387,12 @@ export function PackagesPage() {
                       <td className="px-4 py-3">
                         <div className="truncate font-semibold text-foreground" title={t.name}>{t.name}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-4 py-3 sm:table-cell">
                         <div className="truncate text-sm text-muted-foreground" title={t.description || undefined}>{t.description || "-"}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex min-w-8 justify-center rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold text-foreground">
-                          {t.package_count}
+                          {t.channel_count}
                         </span>
                       </td>
                       <td className="px-4 py-3">

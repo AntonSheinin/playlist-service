@@ -285,6 +285,50 @@ select {
   background: var(--color-ring);
 }
 
+@media (max-width: 639px) {
+  .resize-handle {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .overflow-x-auto:has(> table.resizable-table) {
+    max-width: 100%;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .resizable-table {
+    table-layout: auto;
+    width: 100% !important;
+    min-width: 100%;
+  }
+
+  .resizable-table th {
+    width: auto !important;
+    min-width: 0 !important;
+    padding-left: .5rem;
+    padding-right: .5rem;
+  }
+
+  .resizable-table td {
+    padding-left: .5rem;
+    padding-right: .5rem;
+  }
+
+  .resizable-table th[data-col-key="actions"] {
+    width: 7rem !important;
+  }
+
+  .resizable-table th:last-child,
+  .resizable-table td:last-child {
+    position: static;
+    min-width: 0;
+    box-shadow: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
