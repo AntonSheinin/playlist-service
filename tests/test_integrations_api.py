@@ -328,11 +328,13 @@ async def test_valid_until_requires_timezone_and_calls_strict_auth_sync(db_sessi
 
     assert naive.status_code == 422
     assert aware.status_code == 200
-    assert aware.json()["data"]["valid_until"].startswith("2026-12-31T23:59:59")
+    assert aware.json()["data"]["valid_until"].startswith("2026-12-31T21:59:59")
     assert RecordingStrictAuthSyncService.calls[-1]["strict"] is True
     assert RecordingStrictAuthSyncService.calls[-1]["valid_until"] == datetime(
-        2026, 12, 31, 23, 59, 59, tzinfo=timezone.utc
-    ) or RecordingStrictAuthSyncService.calls[-1]["valid_until"].tzinfo is not None
+        2026, 12, 31, 21, 59, 59
+    )
+    await db_session.refresh(user)
+    assert user.valid_until == datetime(2026, 12, 31, 21, 59, 59)
 
 
 @pytest.mark.asyncio

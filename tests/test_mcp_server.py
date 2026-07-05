@@ -1,7 +1,41 @@
+import logging
+
+import anyio
 import httpx
 import pytest
 
-from app.mcp_server import McpSettings, PlaylistIntegrationClient, create_app, create_mcp
+from app.mcp_server import (
+    ClosedSseWriterFilter,
+    McpSettings,
+    PlaylistIntegrationClient,
+    create_app,
+    create_mcp,
+)
+
+
+def test_closed_sse_writer_filter_only_suppresses_expected_shutdown_error():
+    filter_ = ClosedSseWriterFilter()
+    closed_record = logging.LogRecord(
+        "mcp.server.streamable_http",
+        logging.ERROR,
+        "",
+        0,
+        "Error in standalone SSE writer",
+        (),
+        (anyio.ClosedResourceError, anyio.ClosedResourceError(), None),
+    )
+    other_record = logging.LogRecord(
+        "mcp.server.streamable_http",
+        logging.ERROR,
+        "",
+        0,
+        "Error in standalone SSE writer",
+        (),
+        (RuntimeError, RuntimeError("boom"), None),
+    )
+
+    assert not filter_.filter(closed_record)
+    assert filter_.filter(other_record)
 
 
 @pytest.mark.asyncio

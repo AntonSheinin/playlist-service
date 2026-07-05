@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from typing import Any
 
+import anyio
 import httpx
 import uvicorn
 from mcp.server.fastmcp import FastMCP
@@ -10,6 +12,18 @@ from mcp.server.fastmcp.exceptions import ToolError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+
+class ClosedSseWriterFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.getMessage() != "Error in standalone SSE writer":
+            return True
+
+        exc_type = record.exc_info[0] if record.exc_info else None
+        return exc_type is not anyio.ClosedResourceError
+
+
+logging.getLogger("mcp.server.streamable_http").addFilter(ClosedSseWriterFilter())
 
 
 class McpSettings(BaseSettings):
