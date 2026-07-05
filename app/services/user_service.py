@@ -73,6 +73,34 @@ class UserService:
                 return user
         return None
 
+    async def find_exact_for_integration(self, query: str) -> list[User]:
+        """Find users by exact agreement, first name, last name, or full name."""
+        normalized_query = query.strip().casefold()
+        if not normalized_query:
+            return []
+
+        normalized_full_name = func.lower(
+            func.trim(User.first_name + " " + User.last_name)
+        )
+        normalized_reversed_full_name = func.lower(
+            func.trim(User.last_name + " " + User.first_name)
+        )
+        stmt = (
+            select(User)
+            .where(
+                or_(
+                    func.lower(func.trim(User.agreement_number)) == normalized_query,
+                    func.lower(func.trim(User.first_name)) == normalized_query,
+                    func.lower(func.trim(User.last_name)) == normalized_query,
+                    normalized_full_name == normalized_query,
+                    normalized_reversed_full_name == normalized_query,
+                )
+            )
+            .order_by(User.id.asc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_paginated(
         self,
         pagination: PaginationParams,

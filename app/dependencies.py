@@ -1,6 +1,8 @@
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, status
+import hmac
+
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +51,22 @@ async def get_current_admin_id(
 
 
 CurrentAdminId = Annotated[int, Depends(get_current_admin_id)]
+
+
+async def verify_integration_api_key(
+    settings: AppSettings,
+    api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """Verify API key for service-to-service integration routes."""
+    expected_key = settings.integration_api_key
+    if not expected_key or not api_key or not hmac.compare_digest(api_key, expected_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "UNAUTHORIZED", "message": "Invalid integration API key"},
+        )
+
+
+IntegrationApiKey = Annotated[None, Depends(verify_integration_api_key)]
 
 
 def create_session_token(admin_id: int, settings: Settings) -> str:

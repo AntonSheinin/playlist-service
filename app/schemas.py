@@ -379,6 +379,36 @@ class UserListItem(OrmModel):
     tariffs: list[TariffLookup] = Field(default_factory=list)
 
 
+class IntegrationUserSummary(BaseModel):
+    user_id: int
+    first_name: str
+    last_name: str
+    agreement_number: str
+    status: UserStatus
+    max_sessions: int
+    valid_until: datetime | None = None
+
+
+class IntegrationUserFindResponse(BaseModel):
+    match_type: Literal["single", "candidates"]
+    user: IntegrationUserSummary | None = None
+    candidates: list[IntegrationUserSummary] = Field(default_factory=list)
+
+
+class IntegrationMaxSessionsUpdate(BaseModel):
+    max_sessions: int = Field(ge=1, le=100)
+
+
+class IntegrationValidUntilUpdate(BaseModel):
+    valid_until: datetime
+
+    @model_validator(mode="after")
+    def validate_timezone(self) -> "IntegrationValidUntilUpdate":
+        if self.valid_until.tzinfo is None or self.valid_until.utcoffset() is None:
+            raise ValueError("valid_until must include timezone information")
+        return self
+
+
 class ResolvedChannel(OrmModel):
     id: int
     source: StreamSource

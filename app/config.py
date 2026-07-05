@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = Field(min_length=1)
     session_timeout: int
+    integration_api_key: str | None = None
 
     # Flussonic
     flussonic_url: str | None = None

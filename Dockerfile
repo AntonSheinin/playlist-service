@@ -37,6 +37,6 @@ COPY . .
 # ---- copy built frontend ----
 COPY --from=frontend-build /frontend/dist /app/frontend/dist
 
-EXPOSE 8080
+EXPOSE 8080 8091
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

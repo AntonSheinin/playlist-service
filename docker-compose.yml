@@ -22,6 +22,27 @@ services:
     networks:
       - playlist-network
 
+  playlist-mcp-server:
+    image: ghcr.io/antonsheinin/playlist-service:latest
+    build: .
+    container_name: playlist-mcp-server
+    command: ["python", "-m", "app.mcp_server"]
+    ports:
+      - "8091:8091"
+    env_file:
+      - .env
+    environment:
+      PLAYLIST_SERVICE_API_URL: http://playlist-service:8080
+      PLAYLIST_SERVICE_API_KEY: ${INTEGRATION_API_KEY}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8091
+    depends_on:
+      playlist-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - playlist-network
+
   postgres:
     image: postgres:15-alpine
     container_name: playlist-postgres
