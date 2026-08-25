@@ -74,8 +74,6 @@ class Settings(BaseSettings):
 
     # Server
     base_url: str = Field(min_length=1)
-    api_host: str = Field(min_length=1)
-    api_port: int
 
     # Pagination
     pagination_default_per_page: int

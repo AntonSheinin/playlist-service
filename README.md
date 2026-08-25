@@ -284,8 +284,7 @@ Available tools:
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |
 | `RUTV_SITE_URL` | RUTV site base URL | Required |
 | `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |
-| `API_HOST` | Server bind address | 0.0.0.0 |
-| `API_PORT` | Server port | 8080 |
+| `BASE_URL` | Public Playlist Service base URL, including port when needed | Required |
 | `PLAYLIST_SERVICE_API_URL` | Playlist Service base URL used by the MCP server | http://127.0.0.1:8080 |
 | `PLAYLIST_SERVICE_API_KEY` | Integration API key used by the MCP server outside Docker Compose | Defaults to `${INTEGRATION_API_KEY}` in Compose |
 | `MCP_HOST` | MCP server bind address | 127.0.0.1 |

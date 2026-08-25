@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -15,6 +16,11 @@ from app.services.database import engine
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def _server_port_from_base_url(base_url: str) -> int:
+    """Use BASE_URL's explicit port for direct local uvicorn startup."""
+    return urlparse(base_url).port or 8000
 
 
 @asynccontextmanager
@@ -75,7 +81,7 @@ if __name__ == "__main__":
     settings = get_settings()
     uvicorn.run(
         "app.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
+        host="127.0.0.1",
+        port=_server_port_from_base_url(settings.base_url),
         reload=True,
     )
