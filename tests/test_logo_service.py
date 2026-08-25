@@ -49,3 +49,29 @@ def test_resolve_logo_path_refuses_paths_outside_logo_prefix(tmp_path, monkeypat
     assert logo_service.resolve_logo_path("/not-logos/file.png") is None
     assert logo_service.resolve_logo_path("/media/logos/../secret.png") == tmp_path / "secret.png"
     assert not logo_service.is_safe_logo_path(Path("..") / "secret.png")
+
+
+@pytest.mark.asyncio
+async def test_save_logo_url_reuses_existing_local_logo(tmp_path, monkeypatch):
+    monkeypatch.setattr(logo_service, "LOGO_DIR", tmp_path)
+    (tmp_path / "rossia1hd.png").write_bytes(PNG)
+
+    result = await logo_service.save_logo_url(" /media/logos/rossia1hd.png ")
+
+    assert result == "/media/logos/rossia1hd.png"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/media/logos/missing.png",
+        "/media/logos/../missing.png",
+        "example.com/logo.png",
+    ],
+)
+async def test_save_logo_url_rejects_invalid_local_or_relative_urls(tmp_path, monkeypatch, url):
+    monkeypatch.setattr(logo_service, "LOGO_DIR", tmp_path)
+
+    with pytest.raises(ValidationError):
+        await logo_service.save_logo_url(url)
