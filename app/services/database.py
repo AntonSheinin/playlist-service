@@ -1,7 +1,7 @@
 import logging
+import asyncio
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
@@ -30,7 +30,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except SQLAlchemyError as e:
-            logger.error("Database error, rolling back transaction: %s", e)
+        except asyncio.CancelledError:
+            await session.rollback()
+            raise
+        except Exception as e:
+            logger.error("Request failed, rolling back transaction: %s", e)
             await session.rollback()
             raise

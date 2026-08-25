@@ -12,6 +12,7 @@ Playlist Service is a FastAPI backend with a React/Vite admin UI. It manages IPT
 - `app/routes/`: HTTP route handlers. Keep these thin: validate/request orchestration only.
 - `app/services/`: business workflows and persistence-oriented logic.
 - `app/clients/`: external service clients and provider integrations.
+- `app/mcp_server.py`: remote MCP server process. It must call Playlist Service Integration API over HTTP and must not access the database directly.
 - `app/models.py`: SQLAlchemy models and association tables.
 - `app/schemas.py`: Pydantic API schemas.
 - `alembic/`: database migrations.
@@ -54,6 +55,12 @@ All new or changed code should follow clean code practices and the SOLID, KISS, 
 
 - Keep route handlers thin; move reusable workflow logic to services.
 - Keep external HTTP details inside `app/clients/`.
+- Keep `/api/v1/integrations/*` as a stable service-to-service contract for CRM, automation, and MCP callers.
+- Protect Integration API routes with `X-API-Key` using `INTEGRATION_API_KEY`; do not reuse admin session cookies for service callers.
+- Integration API user mutations that affect playback access must call `AuthSyncService.sync_user_update(..., strict=True)` and must not return success if Auth Service sync fails.
+- Integration API user lookup is exact-only in stage 1: agreement number, first name, last name, full name, and reversed full name. Do not add partial/fuzzy search unless explicitly requested.
+- MCP tools must remain an adapter over Integration API endpoints. Do not import SQLAlchemy models, database sessions, or business services in `app/mcp_server.py`.
+- Remote MCP access is protected by `Authorization: Bearer <MCP_AUTH_TOKEN>`; never log this token.
 - Do not add legacy provider fallbacks. Flussonic support is V3-only; Nimble support is through the configured WMSPanel contract.
 - Preserve provider values: `flussonic` and `nimble`.
 - Preserve response envelopes: `SuccessResponse`, `MessageResponse`, and `PaginatedResponse`.
@@ -73,6 +80,8 @@ All new or changed code should follow clean code practices and the SOLID, KISS, 
 - Add focused tests for changed behavior, not exhaustive duplicate route tests.
 - Prefer unit tests for extracted pure logic and small API compatibility tests for response shape.
 - Mock external services; tests should not require Flussonic, Nimble, Auth, EPG, or RUTV network access.
+- For Integration API writes, test strict Auth Sync and rollback behavior when Auth Service sync fails.
+- For MCP changes, test bearer-token rejection, tool registration, and that tools call the expected Integration API path/method/body.
 - Avoid testing framework or library behavior that FastAPI, Pydantic, SQLAlchemy, or React already owns.
 
 ## Safety Rules
@@ -80,4 +89,5 @@ All new or changed code should follow clean code practices and the SOLID, KISS, 
 - Do not edit `.env` unless explicitly asked.
 - Do not commit secrets, tokens, generated build output, or local caches.
 - Do not revert user changes unless explicitly asked.
+- Do not log API keys, MCP bearer tokens, playlist tokens, Telegram tokens, or full request secrets.
 - Keep public URLs, cookie names, request payloads, and response field names stable by default.

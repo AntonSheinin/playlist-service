@@ -92,11 +92,13 @@ jobs:
 
           echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-          sudo docker compose pull playlist-service
+          sudo docker compose pull playlist-service playlist-mcp-server
           sudo docker compose up -d --no-build --force-recreate playlist-service
           sudo docker compose exec -T playlist-service alembic upgrade head
+          sudo docker compose up -d --no-build --force-recreate playlist-mcp-server
 
           sudo docker compose ps
           curl -fsS http://localhost:8080/health
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8091/mcp)" = "401"
           EOF
           } | ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash

@@ -69,6 +69,8 @@ docker-compose exec -it playlist-service python scripts/create_admin.py
 
 7. Access the application at http://localhost:8080
 
+The Docker Compose stack also starts the remote MCP server at http://localhost:8091/mcp when `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` are configured in `.env`. Compose passes `INTEGRATION_API_KEY` to the MCP container as `PLAYLIST_SERVICE_API_KEY`.
+
 ## Development Setup
 
 1. Install Python 3.12+ and uv:
@@ -116,23 +118,24 @@ uvicorn app.main:app --reload
 
 ```
 playlist-service/
-├── app/
-│   ├── main.py                 # FastAPI application
-│   ├── config.py               # Configuration settings
-│   ├── dependencies.py         # FastAPI dependencies
-│   ├── exceptions.py           # Custom exceptions
-│   ├── models/                 # SQLAlchemy models
-│   ├── schemas/                # Pydantic schemas
-│   ├── services/               # Business logic
-│   ├── routes/                 # API endpoints
-│   ├── clients/                # External API clients
-│   └── utils/                  # Utility functions
-├── frontend/                   # React admin UI
-├── alembic/                    # Database migrations
-├── scripts/                    # Utility scripts
-├── docker-compose.yml          # Docker Compose configuration
-├── Dockerfile                  # Docker image definition
-└── pyproject.toml              # Python project configuration
+|-- app/
+|   |-- main.py                 # FastAPI application
+|   |-- config.py               # Configuration settings
+|   |-- dependencies.py         # FastAPI dependencies
+|   |-- exceptions.py           # Custom exceptions
+|   |-- models.py               # SQLAlchemy models
+|   |-- schemas.py              # Pydantic schemas
+|   |-- services/               # Business logic
+|   |-- routes/                 # API endpoints
+|   |-- clients/                # External API clients
+|   |-- utils/                  # Utility functions
+|   `-- mcp_server.py           # Remote MCP server
+|-- frontend/                   # React admin UI
+|-- alembic/                    # Database migrations
+|-- scripts/                    # Utility scripts
+|-- docker-compose.yml          # Docker Compose configuration
+|-- Dockerfile                  # Docker image definition
+`-- pyproject.toml              # Python project configuration
 ```
 
 ## API Documentation
@@ -140,6 +143,110 @@ playlist-service/
 Once running, API documentation is available at:
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
+
+## Integration API
+
+Playlist Service exposes a narrow service-to-service API for urgent user support actions. CRM, automation, and other non-agent systems call this API directly. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`.
+
+Stage 1 endpoints:
+
+- `GET /api/v1/integrations/users/find?q=...`
+- `GET /api/v1/integrations/users/{user_id}`
+- `POST /api/v1/integrations/users/{user_id}/enable`
+- `POST /api/v1/integrations/users/{user_id}/disable`
+- `PUT /api/v1/integrations/users/{user_id}/max-sessions`
+- `PUT /api/v1/integrations/users/{user_id}/valid-until`
+- `GET /api/v1/integrations/users/{user_id}/sessions`
+
+User search is exact-only in stage 1. It matches agreement number, first name, last name, full name, or reversed full name. It is case-insensitive and trims leading/trailing whitespace, but it does not perform partial or fuzzy matching.
+
+Examples:
+
+```bash
+curl -H "X-API-Key: $INTEGRATION_API_KEY" \
+  "http://localhost:8080/api/v1/integrations/users/find?q=12345"
+```
+
+```bash
+curl -H "X-API-Key: $INTEGRATION_API_KEY" \
+  "http://localhost:8080/api/v1/integrations/users/10"
+```
+
+```bash
+curl -X POST -H "X-API-Key: $INTEGRATION_API_KEY" \
+  "http://localhost:8080/api/v1/integrations/users/10/disable"
+```
+
+```bash
+curl -X PUT -H "X-API-Key: $INTEGRATION_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"max_sessions":2}' \
+  "http://localhost:8080/api/v1/integrations/users/10/max-sessions"
+```
+
+```bash
+curl -X PUT -H "X-API-Key: $INTEGRATION_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"valid_until":"2026-12-31T23:59:59+02:00"}' \
+  "http://localhost:8080/api/v1/integrations/users/10/valid-until"
+```
+
+```bash
+curl -H "X-API-Key: $INTEGRATION_API_KEY" \
+  "http://localhost:8080/api/v1/integrations/users/10/sessions"
+```
+
+Integration writes that affect playback access strictly sync the Auth Service before returning success. If Auth Service sync fails, the local database change is rolled back and the endpoint returns an error. Telegram agents should format datetime values for human display.
+
+## MCP Server
+
+The MCP server is a separate remote HTTP process for agent clients, such as a Telegram bot agent. It calls the Integration API and does not access the database directly.
+
+Standalone MCP process environment:
+
+```env
+PLAYLIST_SERVICE_API_URL=http://localhost:8080
+PLAYLIST_SERVICE_API_KEY=your-integration-api-key
+MCP_HOST=0.0.0.0
+MCP_PORT=8091
+MCP_AUTH_TOKEN=your-mcp-bearer-token
+```
+
+When using Docker Compose, set only `INTEGRATION_API_KEY`; Compose injects it into the MCP container as `PLAYLIST_SERVICE_API_KEY`.
+
+Run it with:
+
+```bash
+python -m app.mcp_server
+```
+
+With Docker Compose, it runs as the `playlist-mcp-server` service:
+
+```bash
+docker-compose up -d playlist-mcp-server
+```
+
+The MCP endpoint is:
+
+```text
+http://<MCP_HOST>:<MCP_PORT>/mcp
+```
+
+Remote MCP clients must send:
+
+```text
+Authorization: Bearer <MCP_AUTH_TOKEN>
+```
+
+Available tools:
+
+- `find_user`
+- `get_user`
+- `enable_user`
+- `disable_user`
+- `set_user_max_sessions`
+- `set_user_valid_until`
+- `get_user_active_sessions`
 
 ## Key Workflows
 
@@ -162,6 +269,7 @@ Once running, API documentation is available at:
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `SECRET_KEY` | Secret key for sessions | Required |
+| `INTEGRATION_API_KEY` | API key accepted by `/api/v1/integrations/*` via `X-API-Key` | Optional unless Integration API is used |
 | `FLUSSONIC_URL` | Flussonic API base URL | Optional |
 | `FLUSSONIC_USERNAME` | Flussonic API username | Optional |
 | `FLUSSONIC_PASSWORD` | Flussonic API password | Optional |
@@ -176,8 +284,12 @@ Once running, API documentation is available at:
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |
 | `RUTV_SITE_URL` | RUTV site base URL | Required |
 | `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |
-| `API_HOST` | Server bind address | 0.0.0.0 |
-| `API_PORT` | Server port | 8080 |
+| `BASE_URL` | Public Playlist Service base URL, including port when needed | Required |
+| `PLAYLIST_SERVICE_API_URL` | Playlist Service base URL used by the MCP server | http://127.0.0.1:8080 |
+| `PLAYLIST_SERVICE_API_KEY` | Integration API key used by the MCP server outside Docker Compose | Defaults to `${INTEGRATION_API_KEY}` in Compose |
+| `MCP_HOST` | MCP server bind address | 127.0.0.1 |
+| `MCP_PORT` | MCP server port | 8091 |
+| `MCP_AUTH_TOKEN` | Bearer token required by remote MCP clients | Required for MCP |
 
 ## License
 

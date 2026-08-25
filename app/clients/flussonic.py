@@ -1,7 +1,4 @@
-import asyncio
 import logging
-import time
-from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
@@ -23,24 +20,6 @@ V3_STATS_ENDPOINT = "/streamer/api/v3/config/stats"
 ONLINE24_HOST_MARKER = "online24"
 RESTREAM_HOST = "restream.pw"
 RESTREAM_IP = "185.96.80.44"
-ACTIVE_SOURCE_COUNTERS_CACHE_TTL_SECONDS = 30.0
-
-
-@dataclass(frozen=True)
-class _StreamDerivedStats:
-    total_sources: int
-    broken_sources: int
-    active_source_counters: ProviderActiveSourceCounters
-
-
-@dataclass(frozen=True)
-class _StreamStatsCacheEntry:
-    expires_at: float
-    stats: _StreamDerivedStats
-
-
-_stream_stats_cache: dict[str, _StreamStatsCacheEntry] = {}
-_stream_stats_cache_lock = asyncio.Lock()
 
 
 class FlussonicClient:
@@ -73,11 +52,12 @@ class FlussonicClient:
             auth = httpx.BasicAuth(self.username, self.password)
             health_probe_ok = await self._check_v3_health(client, auth)
             stats = await self._get_v3_server_stats(client, auth)
-            stream_stats = await self._get_cached_stream_stats(client, auth)
+            stream_items = await self._get_v3_stream_items(client, auth)
 
-        total_sources = stream_stats.total_sources
-        broken_sources = stream_stats.broken_sources
+        total_sources = len(stream_items)
+        broken_sources = self._count_broken_sources(stream_items)
         good_sources = max(total_sources - broken_sources, 0)
+        active_source_counters = self._count_active_source_counters(stream_items)
 
         streamer_status = stats.get("streamer_status")
         health = "up"
@@ -94,7 +74,7 @@ class FlussonicClient:
             total_sources=total_sources,
             good_sources=good_sources,
             broken_sources=broken_sources,
-            active_source_counters=stream_stats.active_source_counters,
+            active_source_counters=active_source_counters,
         )
 
     async def get_streams(self) -> list[ProviderStream]:
@@ -214,33 +194,6 @@ class FlussonicClient:
         except httpx.RequestError as e:
             logger.error("Connection error during %s: %s", operation, e)
             raise FlussonicError(f"Failed to {operation}: {e}") from e
-
-    async def _get_cached_stream_stats(
-        self, client: httpx.AsyncClient, auth: httpx.BasicAuth
-    ) -> _StreamDerivedStats:
-        cache_key = self.base_url
-        now = time.monotonic()
-        cached = _stream_stats_cache.get(cache_key)
-        if cached is not None and cached.expires_at > now:
-            return cached.stats
-
-        async with _stream_stats_cache_lock:
-            now = time.monotonic()
-            cached = _stream_stats_cache.get(cache_key)
-            if cached is not None and cached.expires_at > now:
-                return cached.stats
-
-            items = await self._get_v3_stream_items(client, auth)
-            stream_stats = _StreamDerivedStats(
-                total_sources=len(items),
-                broken_sources=self._count_broken_sources(items),
-                active_source_counters=self._count_active_source_counters(items),
-            )
-            _stream_stats_cache[cache_key] = _StreamStatsCacheEntry(
-                expires_at=now + ACTIVE_SOURCE_COUNTERS_CACHE_TTL_SECONDS,
-                stats=stream_stats,
-            )
-            return stream_stats
 
     def _extract_v3_items(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract stream items from a Flussonic V3 response page."""

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,12 @@ from app.models import (
 from app.services.playlist_generator import PlaylistGenerator
 from app.utils.pagination import PaginatedResult, PaginationParams
 from app.utils.token import generate_token
+
+
+def _to_db_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
 class UserService:
@@ -72,6 +78,34 @@ class UserService:
             if generator.get_filename(user).casefold() == target_key:
                 return user
         return None
+
+    async def find_exact_for_integration(self, query: str) -> list[User]:
+        """Find users by exact agreement, first name, last name, or full name."""
+        normalized_query = query.strip().casefold()
+        if not normalized_query:
+            return []
+
+        normalized_full_name = func.lower(
+            func.trim(User.first_name + " " + User.last_name)
+        )
+        normalized_reversed_full_name = func.lower(
+            func.trim(User.last_name + " " + User.first_name)
+        )
+        stmt = (
+            select(User)
+            .where(
+                or_(
+                    func.lower(func.trim(User.agreement_number)) == normalized_query,
+                    func.lower(func.trim(User.first_name)) == normalized_query,
+                    func.lower(func.trim(User.last_name)) == normalized_query,
+                    normalized_full_name == normalized_query,
+                    normalized_reversed_full_name == normalized_query,
+                )
+            )
+            .order_by(User.id.asc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_paginated(
         self,
@@ -164,8 +198,8 @@ class UserService:
             agreement_number=agreement_number,
             max_sessions=max_sessions,
             status=status,
-            valid_from=valid_from,
-            valid_until=valid_until,
+            valid_from=_to_db_datetime(valid_from) if valid_from is not None else None,
+            valid_until=_to_db_datetime(valid_until) if valid_until is not None else None,
             token=token,
         )
 
@@ -227,12 +261,12 @@ class UserService:
             user.status = status
 
         if valid_from is not None:
-            user.valid_from = valid_from
+            user.valid_from = _to_db_datetime(valid_from)
         elif clear_valid_from:
             user.valid_from = None
 
         if valid_until is not None:
-            user.valid_until = valid_until
+            user.valid_until = _to_db_datetime(valid_until)
         elif clear_valid_until:
             user.valid_until = None
 

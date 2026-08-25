@@ -129,13 +129,19 @@ class AuthSyncService:
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d to Auth Service: %s", user.id, e)
 
-    async def sync_user_update(self, user: User, *, recreate_token: bool = False) -> None:
+    async def sync_user_update(
+        self,
+        user: User,
+        *,
+        recreate_token: bool = False,
+        strict: bool = False,
+    ) -> None:
         """
         Sync user updates to Auth Service.
         Updates token with new settings and allowed streams.
         Recreates the Auth Service token when fields unsupported by the update
         endpoint need to be replaced, while keeping the playlist token stable.
-        Failures are logged but don't prevent user update.
+        Failures are logged but don't prevent user update unless strict=True.
         """
         try:
             async with AuthServiceClient() as client:
@@ -152,6 +158,8 @@ class AuthSyncService:
                 logger.info("Auth sync for user %d completed with action %s", user.id, action)
         except AuthServiceError as e:
             logger.warning("Failed to sync user %d update to Auth Service: %s", user.id, e)
+            if strict:
+                raise
 
     async def sync_user_delete(self, user: User) -> None:
         """

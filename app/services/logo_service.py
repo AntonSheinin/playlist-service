@@ -122,8 +122,27 @@ async def save_logo_url(
     stream_name: str | None = None,
     channel_id: int | None = None,
 ) -> str:
+    url = url.strip()
     if not url:
         raise ValidationError("Logo URL is required")
+
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme and not parsed_url.netloc and parsed_url.path.startswith(LOGO_URL_PREFIX):
+        logo_path = resolve_logo_path(url)
+        canonical_url = f"{LOGO_URL_PREFIX}{logo_path.name}" if logo_path else ""
+        if (
+            logo_path is None
+            or parsed_url.path != canonical_url
+            or not is_safe_logo_path(logo_path)
+            or not logo_path.is_file()
+        ):
+            raise ValidationError("Local logo file does not exist")
+        return canonical_url
+
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise ValidationError(
+            "Logo URL must start with http:// or https://, or use an existing /media/logos/ path"
+        )
 
     timeout = httpx.Timeout(10.0, connect=5.0)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
