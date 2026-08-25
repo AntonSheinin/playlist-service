@@ -99,6 +99,20 @@ jobs:
 
           sudo docker compose ps
           curl -fsS http://localhost:8080/health
-          test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8091/mcp)" = "401"
+
+          mcp_status=""
+          for attempt in $(seq 1 15); do
+            mcp_status="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8091/mcp || true)"
+            if [ "$mcp_status" = "401" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$mcp_status" != "401" ]; then
+            echo "MCP server did not become ready; last HTTP status: $mcp_status"
+            sudo docker compose logs --tail=100 playlist-mcp-server
+            exit 1
+          fi
           EOF
           } | ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash
