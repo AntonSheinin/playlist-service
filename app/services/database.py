@@ -1,10 +1,11 @@
-import logging
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
+from app.exceptions import PlaylistServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except asyncio.CancelledError:
             await session.rollback()
             raise
-        except Exception as e:
-            logger.error("Request failed, rolling back transaction: %s", e)
+        except PlaylistServiceError as error:
             await session.rollback()
+            log = logger.debug if error.status_code < 500 else logger.error
+            log("Request failed, rolling back transaction: %s", error)
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error("Request failed, rolling back transaction: %s", e)
             raise

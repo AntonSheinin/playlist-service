@@ -100,7 +100,7 @@ async def _run_strict_user_update(
 async def find_user(
     _api_key: IntegrationApiKey,
     db: DBSession,
-    q: str = Query(..., min_length=2),
+    q: str = Query(..., min_length=1),
 ) -> SuccessResponse[IntegrationUserFindResponse]:
     service = UserService(db)
     matches = await service.find_exact_for_integration(q)

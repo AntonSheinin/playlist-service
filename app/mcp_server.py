@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import secrets
-from typing import Any
+from typing import Annotated, Any
 
 import anyio
 import httpx
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -39,6 +40,13 @@ class McpSettings(BaseSettings):
     mcp_host: str = "127.0.0.1"
     mcp_port: int = 8091
     mcp_auth_token: str | None = None
+
+
+class PlaylistIntegrationError(ToolError):
+    def __init__(self, status_code: int, message: str) -> None:
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f"Playlist Service returned {status_code}: {message}")
 
 
 class BearerTokenMiddleware:
@@ -94,7 +102,7 @@ class PlaylistIntegrationClient:
         if response.is_error:
             payload = self._parse_json_or_none(response)
             message = self._extract_error_message(payload)
-            raise ToolError(f"Playlist Service returned {response.status_code}: {message}")
+            raise PlaylistIntegrationError(response.status_code, message)
 
         payload = self._parse_json(response)
         if isinstance(payload, dict) and payload.get("success") is True:
@@ -118,13 +126,32 @@ class PlaylistIntegrationClient:
     def _extract_error_message(self, payload: Any) -> str:
         if isinstance(payload, dict):
             error = payload.get("error")
-            if isinstance(error, dict) and error.get("message"):
-                return str(error["message"])
+            if isinstance(error, dict) and isinstance(error.get("message"), str):
+                message = error["message"].strip()
+                if message:
+                    return message
+
             detail = payload.get("detail")
-            if isinstance(detail, dict) and detail.get("message"):
-                return str(detail["message"])
+            if isinstance(detail, list):
+                for item in detail:
+                    if not isinstance(item, dict) or not isinstance(item.get("msg"), str):
+                        continue
+                    message = item["msg"].strip()
+                    if not message:
+                        continue
+                    location = item.get("loc")
+                    if isinstance(location, (list, tuple)) and location:
+                        return f"{'.'.join(str(part) for part in location)}: {message}"
+                    return message
+
+            if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+                message = detail["message"].strip()
+                if message:
+                    return message
             if isinstance(detail, str):
-                return detail
+                message = detail.strip()
+                if message:
+                    return message
         return "Unexpected error"
 
 
@@ -140,13 +167,32 @@ def create_mcp(settings: McpSettings | None = None) -> FastMCP:
     )
 
     @mcp.tool()
-    async def find_user(q: str) -> dict[str, Any]:
-        """Find a user by exact agreement number, first name, last name, or full name."""
-        return await client.request(
-            "GET",
-            "/api/v1/integrations/users/find",
-            params={"q": q},
-        )
+    async def find_user(
+        q: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "Administrator-provided agreement number or name; matching is exact-only"
+                ),
+            ),
+        ],
+    ) -> dict[str, Any]:
+        """Find a user by an exact administrator-provided value.
+
+        Returns match_type `none` when no user matches, `single` with one user,
+        or `candidates` when the administrator must select among exact matches.
+        """
+        try:
+            return await client.request(
+                "GET",
+                "/api/v1/integrations/users/find",
+                params={"q": q},
+            )
+        except PlaylistIntegrationError as error:
+            if error.status_code != 404:
+                raise
+            return {"match_type": "none", "user": None, "candidates": []}
 
     @mcp.tool()
     async def get_user(user_id: int) -> dict[str, Any]:
@@ -183,7 +229,7 @@ def create_mcp(settings: McpSettings | None = None) -> FastMCP:
 
     @mcp.tool()
     async def get_user_active_sessions(user_id: int) -> list[dict[str, Any]]:
-        """Get currently active sessions for a user."""
+        """Get active sessions using user_id from find_user's single match or selected candidate."""
         return await client.request("GET", f"/api/v1/integrations/users/{user_id}/sessions")
 
     return mcp

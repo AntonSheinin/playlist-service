@@ -1,39 +1,15 @@
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import httpx
 import pytest
-
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/test")
-os.environ.setdefault("DB_POOL_SIZE", "5")
-os.environ.setdefault("DB_MAX_OVERFLOW", "10")
-os.environ.setdefault("DB_POOL_TIMEOUT", "30")
-os.environ.setdefault("DB_ECHO", "false")
-os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("SESSION_TIMEOUT", "86400")
-os.environ.setdefault("AUTH_SERVICE_URL", "http://auth.test")
-os.environ.setdefault("AUTH_SERVICE_API_KEY", "test-key")
-os.environ.setdefault("AUTH_SERVICE_TIMEOUT", "30")
-os.environ.setdefault("EPG_SERVICE_URL", "http://epg.test")
-os.environ.setdefault("EPG_SERVICE_TIMEOUT", "30")
-os.environ.setdefault("EPG_SERVICE_FETCH_TIMEOUT", "300")
-os.environ.setdefault("RUTV_SITE_URL", "http://rutv.test")
-os.environ.setdefault("RUTV_STATS_TOKEN", "test-token")
-os.environ.setdefault("RUTV_SITE_TIMEOUT", "30")
-os.environ.setdefault("BASE_URL", "http://playlist.test")
-os.environ.setdefault("PAGINATION_DEFAULT_PER_PAGE", "20")
-os.environ.setdefault("PAGINATION_MAX_PER_PAGE", "100")
-os.environ.setdefault("LOOKUP_DEFAULT_LIMIT", "50")
-os.environ.setdefault("LOOKUP_MAX_LIMIT", "1000")
-os.environ.setdefault("TOKEN_LENGTH", "32")
-os.environ.setdefault("LOG_LEVEL", "INFO")
-os.environ.setdefault("INTEGRATION_API_KEY", "integration-test-key")
+from pydantic import ValidationError as PydanticValidationError
 
 from app.config import get_settings
 from app.main import app
 from app.models import User, UserStatus
+from app.schemas import IntegrationUserFindResponse
 from app.services.database import get_db
 
 
@@ -224,11 +200,28 @@ async def test_find_user_exact_matches_and_candidates(db_session):
 
 
 @pytest.mark.asyncio
-async def test_find_user_rejects_too_short_query(db_session):
-    async with _client_with_db(db_session) as client:
-        response = await client.get("/api/v1/integrations/users/find?q=a", headers=_headers())
+async def test_find_user_accepts_one_character_query_and_preserves_miss_behavior(db_session):
+    user = await _create_user(db_session, agreement_number="A")
+    user_id = user.id
 
-    assert response.status_code == 422
+    async with _client_with_db(db_session) as client:
+        match = await client.get("/api/v1/integrations/users/find?q=a", headers=_headers())
+        miss = await client.get("/api/v1/integrations/users/find?q=z", headers=_headers())
+        empty = await client.get("/api/v1/integrations/users/find?q=", headers=_headers())
+        missing = await client.get("/api/v1/integrations/users/find", headers=_headers())
+        whitespace = await client.get("/api/v1/integrations/users/find?q=%20", headers=_headers())
+
+    assert match.status_code == 200
+    assert match.json()["data"]["user"]["user_id"] == user_id
+    assert miss.status_code == 404
+    assert empty.status_code == 422
+    assert missing.status_code == 422
+    assert whitespace.status_code == 404
+
+
+def test_integration_find_response_does_not_allow_mcp_none_outcome():
+    with pytest.raises(PydanticValidationError):
+        IntegrationUserFindResponse(match_type="none")
 
 
 @pytest.mark.asyncio
