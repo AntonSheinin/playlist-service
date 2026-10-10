@@ -333,7 +333,7 @@ export function DashboardPage() {
                     </span>
                   </p>
                   <p>
-                    Active online24:{" "}
+                    Active lb.wisp.cat:{" "}
                     <span className="font-semibold text-foreground">
                       {flussonicStats?.active_source_counters?.online24 ?? "N/A"}
                     </span>

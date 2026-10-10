@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 V3_READINESS_ENDPOINT = "/streamer/api/v3/monitoring/readiness"
 V3_STATS_ENDPOINT = "/streamer/api/v3/config/stats"
-ONLINE24_HOST_MARKER = "online24"
+LB_WISP_HOSTS = ("lb.wisp.cat", "cdn.shinda.tv")
 RESTREAM_HOST = "restream.pw"
 RESTREAM_IP = "185.96.80.44"
 
@@ -275,7 +275,8 @@ class FlussonicClient:
         hostname = urlparse(value).hostname or ""
         normalized = hostname.strip().lower()
 
-        if ONLINE24_HOST_MARKER in normalized:
+        if normalized in LB_WISP_HOSTS:
+            # Preserve the existing dashboard API counter key.
             return "online24"
         if normalized == RESTREAM_IP or normalized == RESTREAM_HOST or normalized.endswith(
             f".{RESTREAM_HOST}"
