@@ -97,6 +97,7 @@ async def _create_user(
     token="token",
 ) -> User:
     user = User(
+        playlist_name=f"playlist_{agreement_number}",
         first_name=first_name,
         last_name=last_name,
         agreement_number=agreement_number,

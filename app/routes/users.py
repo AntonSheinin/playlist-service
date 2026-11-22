@@ -23,7 +23,7 @@ from app.schemas import (
     UserUpdate,
 )
 from app.services.auth_sync import AuthSyncService
-from app.services.playlist_generator import PlaylistGenerator
+from app.services.playlist_service import PlaylistService
 from app.services.user_service import UserService
 from app.utils.log_mapping import (
     ACCESS_LOG_SORT_FIELDS,
@@ -181,6 +181,7 @@ async def update_user(
 
     user = await user_service.update(
         user_id,
+        playlist_name=data.playlist_name,
         first_name=data.first_name,
         last_name=data.last_name,
         agreement_number=data.agreement_number,
@@ -278,19 +279,11 @@ async def download_playlist(
     db: DBSession,
 ) -> PlainTextResponse:
     """Download M3U playlist file for a user."""
-    user_service = UserService(db)
-    generator = PlaylistGenerator()
-
-    user = await user_service.get_by_id(user_id)
-    channels = await user_service.resolve_channels(user_id)
-
-    content = generator.generate(user, channels)
-    filename = generator.get_filename(user)
-
+    playlist = await PlaylistService(db).generate(user_id=user_id)
     return PlainTextResponse(
-        content=content,
+        content=playlist.content,
         media_type="audio/x-mpegurl",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": playlist.content_disposition},
     )
 
 
@@ -301,20 +294,12 @@ async def preview_playlist(
     db: DBSession,
 ) -> SuccessResponse[PlaylistPreview]:
     """Preview playlist content for a user."""
-    user_service = UserService(db)
-    generator = PlaylistGenerator()
-
-    user = await user_service.get_by_id(user_id)
-    channels = await user_service.resolve_channels(user_id)
-
-    content = generator.generate(user, channels)
-    filename = generator.get_filename(user)
-
+    playlist = await PlaylistService(db).generate(user_id=user_id)
     return SuccessResponse(
         data=PlaylistPreview(
-            filename=filename,
-            content=content,
-            channel_count=len(channels),
+            filename=playlist.filename,
+            content=playlist.content,
+            channel_count=playlist.channel_count,
         )
     )
 

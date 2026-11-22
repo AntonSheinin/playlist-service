@@ -112,6 +112,7 @@ async def test_sessions_and_access_logs_keep_field_names(db_session, monkeypatch
 
     monkeypatch.setattr(users_route, "AuthServiceClient", FakeAuthServiceClient)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="300",
@@ -162,6 +163,7 @@ async def test_sessions_and_access_logs_query_auth_by_playlist_user_id(db_sessio
 
     monkeypatch.setattr(users_route, "AuthServiceClient", RecordingAuthServiceClient)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="300",
@@ -187,6 +189,7 @@ async def test_name_only_user_update_does_not_sync_auth(db_session, monkeypatch)
     RecordingAuthSyncService.calls = []
     monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="301",
@@ -211,6 +214,7 @@ async def test_agreement_number_only_user_update_does_not_sync_auth(db_session, 
     RecordingAuthSyncService.calls = []
     monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="302",
@@ -237,6 +241,7 @@ async def test_auth_relevant_user_update_syncs_auth(db_session, monkeypatch):
     RecordingAuthSyncService.calls = []
     monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="304",

@@ -47,6 +47,7 @@ class FakeAuthClientContext(FakeAuthClient):
 @pytest.mark.asyncio
 async def test_auth_sync_recreates_missing_auth_token_id(db_session):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="200",
@@ -70,6 +71,7 @@ async def test_auth_sync_recreates_missing_auth_token_id(db_session):
 @pytest.mark.asyncio
 async def test_auth_sync_deletes_stale_token_by_value_before_recreate(db_session):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="201",
@@ -91,6 +93,7 @@ async def test_auth_sync_deletes_stale_token_by_value_before_recreate(db_session
 @pytest.mark.asyncio
 async def test_full_resync_recreates_wrong_auth_user_id(db_session, monkeypatch):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="204",
@@ -117,6 +120,7 @@ async def test_full_resync_recovers_wrong_token_value_then_deletes_unknown_point
     db_session, monkeypatch
 ):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="205",
@@ -143,6 +147,7 @@ async def test_runtime_update_recovers_wrong_token_value_without_deleting_pointe
     db_session, monkeypatch
 ):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="206",
@@ -166,6 +171,7 @@ async def test_runtime_update_recovers_wrong_token_value_without_deleting_pointe
 @pytest.mark.asyncio
 async def test_sync_users_by_ids_verifies_auth_user_id_before_patch(db_session, monkeypatch):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="207",
@@ -190,6 +196,7 @@ async def test_sync_users_by_ids_verifies_auth_user_id_before_patch(db_session, 
 @pytest.mark.asyncio
 async def test_full_resync_recreates_to_clear_auth_valid_until(db_session, monkeypatch):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="208",
@@ -222,6 +229,7 @@ async def test_full_resync_recreates_to_clear_auth_valid_until(db_session, monke
 async def test_full_resync_recreates_when_explicit_valid_from_differs(db_session, monkeypatch):
     valid_from = datetime(2026, 1, 2)
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="209",
@@ -254,6 +262,7 @@ async def test_full_resync_recreates_when_explicit_valid_from_differs(db_session
 @pytest.mark.asyncio
 async def test_auth_sync_recreate_failure_propagates_for_explicit_recreate(db_session):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="202",
@@ -271,6 +280,7 @@ async def test_auth_sync_recreate_failure_propagates_for_explicit_recreate(db_se
 @pytest.mark.asyncio
 async def test_auth_sync_update_swallows_recreate_failure(monkeypatch, db_session):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="203",

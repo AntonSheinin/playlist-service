@@ -29,6 +29,7 @@ async def test_resolve_channels_deduplicates_assignments_and_preserves_order(db_
     package = Package(name="Base", channels=[shared, no_number])
     tariff = Tariff(name="Premium", packages=[package])
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="100",
@@ -50,6 +51,7 @@ async def test_resolve_channels_deduplicates_assignments_and_preserves_order(db_
 @pytest.mark.asyncio
 async def test_resolve_channels_returns_empty_for_user_without_assignments(db_session):
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="101",
@@ -73,6 +75,7 @@ def test_provider_variants_remain_playlist_rows_but_auth_sync_deduplicates_strea
         lambda source: FakeProvider(),
     )
     user = User(
+        playlist_name="test_playlist",
         first_name="A",
         last_name="B",
         agreement_number="102",

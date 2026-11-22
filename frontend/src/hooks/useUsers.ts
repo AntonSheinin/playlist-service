@@ -56,7 +56,8 @@ export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UserUpdate }) => updateUser(id, data),
-    onSuccess: (_, vars) => {
+    onSuccess: (updated, vars) => {
+      qc.setQueryData(queryKeys.users.detail(vars.id), updated);
       qc.invalidateQueries({ queryKey: queryKeys.users.detail(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.users.resolvedChannels(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.users.playlist(vars.id) });

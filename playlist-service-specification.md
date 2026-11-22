@@ -57,6 +57,16 @@ Playlists are generated from resolved user channels.
 - The playlist structure and token embedding behavior remain unchanged
 - Each channel row uses its own provider to build the playback URL
 - Public playlist routes and preview routes remain unchanged
+- Public delivery, admin downloads, and previews share an internal PlaylistService
+- Users have a required saved `playlist_name`, initially generated with the existing
+  sanitized last-name/first-name/agreement format; later personal-detail edits preserve it
+- User details allow editing the URL name without the fixed `.m3u8` suffix
+- Names contain 1–302 alphanumeric characters, underscores, or hyphens; input is
+  rejected rather than silently rewritten
+- Uniqueness and public lookup use PostgreSQL `lower()` and a unique expression index
+- A rename replaces the URL immediately, without aliases, token changes, or Auth sync
+- Migration `007` backfills existing names exactly and stops on collisions; deploy
+  with writers stopped, as the previous application cannot populate the new column
 
 ## Dashboard Behavior
 

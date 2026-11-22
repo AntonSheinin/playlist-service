@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select, union
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.exceptions import DuplicateEntryError, NotFoundError
+from app.exceptions import DuplicateEntryError, NotFoundError, ValidationError
 from app.models import (
     Channel,
     Package,
@@ -17,8 +18,8 @@ from app.models import (
     user_packages,
     user_tariffs,
 )
-from app.services.playlist_generator import PlaylistGenerator
 from app.utils.pagination import PaginatedResult, PaginationParams
+from app.utils.playlist_name import generate_playlist_name, validate_playlist_name
 from app.utils.token import generate_token
 
 
@@ -47,6 +48,28 @@ class UserService:
         if result.scalar_one_or_none() is not None:
             raise DuplicateEntryError(f"Agreement number '{agreement_number}' already exists")
 
+    async def _ensure_playlist_name_available(
+        self, playlist_name: str, *, exclude_id: int | None = None
+    ) -> None:
+        stmt = select(User.id).where(func.lower(User.playlist_name) == func.lower(playlist_name))
+        if exclude_id is not None:
+            stmt = stmt.where(User.id != exclude_id)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none() is not None:
+            raise DuplicateEntryError("Playlist URL name is already in use")
+
+    async def _flush_user(self) -> None:
+        try:
+            await self.db.flush()
+        except IntegrityError as error:
+            cause = error.orig.__cause__
+            if (
+                getattr(cause, "constraint_name", None) == "uq_users_playlist_name_lower"
+                or "index 'uq_users_playlist_name_lower'" in str(error.orig)
+            ):
+                raise DuplicateEntryError("Playlist URL name is already in use") from error
+            raise
+
     async def get_by_id(self, user_id: int) -> User:
         """Get user by ID with all relationships."""
         stmt = (
@@ -65,19 +88,6 @@ class UserService:
             raise NotFoundError(self.not_found_message)
 
         return user
-
-    async def get_by_playlist_name(self, playlist_name: str) -> User | None:
-        """Resolve a user by playlist filename without the .m3u8 extension."""
-        generator = PlaylistGenerator()
-        target_filename = f"{playlist_name}.m3u8"
-        target_key = target_filename.casefold()
-
-        stmt = select(User)
-        result = await self.db.execute(stmt)
-        for user in result.scalars():
-            if generator.get_filename(user).casefold() == target_key:
-                return user
-        return None
 
     async def find_exact_for_integration(self, query: str) -> list[User]:
         """Find users by exact agreement, first name, last name, or full name."""
@@ -194,6 +204,12 @@ class UserService:
         """Create a new user."""
         await self._ensure_agreement_available(agreement_number)
 
+        try:
+            playlist_name = generate_playlist_name(first_name, last_name, agreement_number)
+        except ValueError as error:
+            raise ValidationError(str(error)) from error
+        await self._ensure_playlist_name_available(playlist_name)
+
         # Generate unique token
         token = generate_token()
 
@@ -201,6 +217,7 @@ class UserService:
             first_name=first_name,
             last_name=last_name,
             agreement_number=agreement_number,
+            playlist_name=playlist_name,
             max_sessions=max_sessions,
             status=status,
             portal_allowed=portal_allowed,
@@ -228,7 +245,7 @@ class UserService:
             user.channels = list(result.scalars().all())
 
         self.db.add(user)
-        await self.db.flush()
+        await self._flush_user()
         return await self.get_by_id(user.id)
 
     async def update(
@@ -247,9 +264,19 @@ class UserService:
         clear_valid_from: bool = False,
         clear_valid_until: bool = False,
         portal_allowed: bool | None = None,
+        playlist_name: str | None = None,
     ) -> User:
         """Update a user."""
         user = await self.get_by_id(user_id)
+        if playlist_name is not None and playlist_name != user.playlist_name:
+            try:
+                validate_playlist_name(playlist_name)
+            except ValueError as error:
+                raise ValidationError(str(error)) from error
+            await self._ensure_playlist_name_available(playlist_name, exclude_id=user_id)
+            user.playlist_name = playlist_name
+            # Enforce uniqueness before further queries can autoflush this change.
+            await self._flush_user()
 
         if first_name is not None:
             user.first_name = first_name
@@ -298,7 +325,7 @@ class UserService:
             result = await self.db.execute(stmt)
             user.channels = list(result.scalars().all())
 
-        await self.db.flush()
+        await self._flush_user()
         return await self.get_by_id(user_id)
 
     async def delete(self, user_id: int) -> User:

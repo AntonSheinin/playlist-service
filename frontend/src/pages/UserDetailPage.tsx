@@ -30,9 +30,10 @@ import {
   PlaylistPreviewModal,
   SessionsLogModal,
 } from "../components/users/UserDetailModals";
+import { ApiError } from "../api/client";
 import { buildPlaylistUrl } from "../utils/playlist";
+import { buildUserUpdate } from "../utils/userForm";
 import { formatDate, parseLocalDate } from "../utils/formatters";
-import type { UserCreate, UserUpdate } from "../api/types";
 import { formatChannelOptionLabel } from "../utils/channels";
 
 function todayStr(): string {
@@ -70,6 +71,8 @@ export function UserDetailPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [agreementNumber, setAgreementNumber] = useState("");
+  const [playlistName, setPlaylistName] = useState("");
+  const [playlistNameError, setPlaylistNameError] = useState("");
   const [maxSessions, setMaxSessions] = useState(1);
   const [status, setStatus] = useState("enabled");
   const [portalAllowed, setPortalAllowed] = useState(false);
@@ -143,6 +146,8 @@ export function UserDetailPage() {
       setFirstName(user.first_name);
       setLastName(user.last_name);
       setAgreementNumber(user.agreement_number);
+      setPlaylistName(user.playlist_name);
+      setPlaylistNameError("");
       setMaxSessions(user.max_sessions);
       setStatus(user.status);
       setPortalAllowed(user.portal_allowed);
@@ -160,11 +165,18 @@ export function UserDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [user]);
 
-  // Playlist URL (live update)
-  const playlistUrl = buildPlaylistUrl(firstName, lastName, agreementNumber);
+  const playlistUrl = user ? buildPlaylistUrl(user.playlist_name) : "";
 
   const onSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault();
+    setPlaylistNameError("");
+    const playlistNameLength = Array.from(playlistName).length;
+    if (isEdit && (
+      playlistNameLength < 1 || playlistNameLength > 302 || !/^[\p{L}\p{N}_-]+$/u.test(playlistName)
+    )) {
+      setPlaylistNameError("Use 1 to 302 letters, numbers, underscores, or hyphens; omit .m3u8.");
+      return;
+    }
     const base = {
       first_name: firstName,
       last_name: lastName,
@@ -175,33 +187,32 @@ export function UserDetailPage() {
       tariff_ids: selectedTariffs.map((t) => t.value),
       package_ids: selectedPackages.map((p) => p.value),
       channel_ids: selectedChannels.map((c) => c.value),
+      valid_from: validFrom ? formatDate(validFrom) + "T00:00:00" : null,
+      valid_until: validUntil ? formatDate(validUntil) + "T23:59:59" : null,
     };
 
     try {
       if (isEdit) {
-        const payload: UserUpdate = {
-          ...base,
-          clear_valid_from: !validFrom,
-          clear_valid_until: !validUntil,
-        };
-        if (validFrom) payload.valid_from = formatDate(validFrom) + "T00:00:00";
-        if (validUntil) payload.valid_until = formatDate(validUntil) + "T23:59:59";
-
+        if (!user) return;
+        const payload = buildUserUpdate(user, { ...base, playlist_name: playlistName });
         await updateUser.mutateAsync({ id: userId!, data: payload });
         showToast("User updated", "success");
       } else {
-        const payload: UserCreate = { ...base };
-        if (validFrom) payload.valid_from = formatDate(validFrom) + "T00:00:00";
-        if (validUntil) payload.valid_until = formatDate(validUntil) + "T23:59:59";
-
-        const newUser = await createUser.mutateAsync(payload);
+        const newUser = await createUser.mutateAsync(base);
         showToast("User created", "success");
         navigate(`/users/${newUser.id}`, { replace: true });
       }
-    } catch {
-      showToast("Failed to save user", "error");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to save user";
+      if (
+        isEdit && error instanceof ApiError && error.code === "DUPLICATE_ENTRY"
+        && message.includes("Playlist URL name")
+      ) {
+        setPlaylistNameError(message);
+      }
+      showToast(message, "error");
     }
-  }, [firstName, lastName, agreementNumber, maxSessions, status, portalAllowed, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, updateUser, createUser, showToast, navigate]);
+  }, [firstName, lastName, agreementNumber, playlistName, maxSessions, status, portalAllowed, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, user, updateUser, createUser, showToast, navigate]);
 
   async function handleRegenToken() {
     if (!userId) return;
@@ -281,6 +292,29 @@ export function UserDetailPage() {
       />
 
       <form onSubmit={onSubmit} className="space-y-6">
+        {isEdit && (
+          <SectionCard title="Playlist" bodyClassName="space-y-2">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input
+                  label="Playlist URL name"
+                  required
+                  value={playlistName}
+                  onChange={(e) => {
+                    setPlaylistName(e.target.value);
+                    setPlaylistNameError("");
+                  }}
+                  error={playlistNameError}
+                />
+              </div>
+              <span className="pb-2 text-sm text-muted-foreground">.m3u8</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Changing this name replaces the playlist URL. Update configured players after saving.
+              Use 1 to 302 letters, numbers, underscores, or hyphens, without .m3u8.
+            </p>
+          </SectionCard>
+        )}
         <SectionCard title="User Information" bodyClassName="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input

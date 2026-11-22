@@ -4,9 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from app.dependencies import DBSession
-from app.exceptions import NotFoundError
-from app.services.playlist_generator import PlaylistGenerator
-from app.services.user_service import UserService
+from app.services.playlist_service import PlaylistService
 
 router = APIRouter()
 
@@ -17,21 +15,11 @@ SPA_HTML_HEADERS = {"Cache-Control": "no-store"}
 @router.get("/{playlist_name}.m3u8", response_class=PlainTextResponse)
 async def public_playlist(playlist_name: str, db: DBSession) -> PlainTextResponse:
     """Serve a public playlist by filename."""
-    generator = PlaylistGenerator()
-    user_service = UserService(db)
-
-    user = await user_service.get_by_playlist_name(playlist_name)
-    if user is None:
-        raise NotFoundError("Playlist not found")
-
-    channels = await user_service.resolve_channels(user.id)
-    content = generator.generate(user, channels)
-    filename = generator.get_filename(user)
-
+    playlist = await PlaylistService(db).generate(playlist_name=playlist_name)
     return PlainTextResponse(
-        content=content,
+        content=playlist.content,
         media_type="audio/x-mpegurl",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": playlist.content_disposition},
     )
 
 

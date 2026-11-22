@@ -317,6 +317,54 @@ Available tools:
 4. Admin downloads the playlist file
 5. Playlist contains all resolved channels with embedded token
 
+### Playlist URL Names
+
+Each user has a saved `playlist_name`, initialized from the existing sanitized
+`{last_name}_{first_name}_{agreement_number}` format. Personal-detail changes no
+longer change this name. In user details, edit **Playlist URL name** and use the
+existing Save action. The application adds `.m3u8` to URLs and download filenames.
+
+Names must contain 1–302 characters, each satisfying Python `str.isalnum()` or
+being an underscore or hyphen. Spaces, extensions, and path separators are
+rejected, without trimming or rewriting input. Case is preserved. Uniqueness and
+public lookup use PostgreSQL `lower()`, replacing the former Python `casefold()`
+matching. Renaming immediately replaces the URL: update configured players;
+the previous name returns 404 unless subsequently assigned to another user.
+Tokens and playback permissions are unaffected by name-only edits.
+
+The edit form submits only changed fields. Leaving a validity date unchanged
+preserves its exact saved timestamp, including its time of day and fractional
+seconds. Only changing or clearing that date updates the corresponding validity
+boundary. After a successful save, the displayed playlist URL uses the returned
+saved name immediately, even if a background refresh fails. Unsaved or rejected
+edits leave the saved URL in place.
+
+Admin user details include `playlist_name`. On `PATCH /api/v1/users/{user_id}`,
+omission preserves the name; null or invalid input returns 422, and a conflicting
+name returns 409. Generated names also must be unique: creation fails with 409
+on collision rather than inventing a suffix. Integration API responses and MCP
+tools remain unchanged.
+
+Migration `007` adds the required column and a unique index on
+`lower(playlist_name)`, preserving existing generated filenames exactly. Use a
+maintenance window: stop application writers, run `uv run alembic upgrade head`,
+deploy the matching application, verify playlist delivery, and resume traffic.
+The migration reports conflicting user IDs/names and rolls back on PostgreSQL;
+resolve reported conflicts deliberately before retrying. Do not run the old
+application against the migrated schema: it does not populate the required field.
+Reverting to the old application after renames breaks custom URLs; downgrading
+the schema discards saved names. Take a database backup before deployment.
+
+Optional PostgreSQL tests use a disposable server and create/drop isolated schemas:
+
+```powershell
+$env:PLAYLIST_TEST_POSTGRES_URL = 'postgresql+asyncpg://postgres@127.0.0.1:55439/postgres'
+.\.venv\Scripts\uv.exe run pytest tests/test_playlist_postgres.py
+```
+
+Playlist rendering remains in-process. `PlaylistService` coordinates the three
+delivery/preview endpoints and reuses the existing channel-resolution rules.
+
 ## Environment Variables
 
 | Variable | Description | Default |

@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, String, Table, Text, UniqueConstraint, false, func
+from sqlalchemy import Column, Enum, ForeignKey, Integer, Index, String, Table, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -176,6 +176,7 @@ class User(Base, TimestampMixin):
     )
     max_sessions: Mapped[int] = mapped_column(default=1, nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    playlist_name: Mapped[str] = mapped_column(String(302), nullable=False)
     portal_allowed: Mapped[bool] = mapped_column(default=False, server_default=false(), nullable=False)
     auth_token_id: Mapped[int | None] = mapped_column(nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -184,3 +185,6 @@ class User(Base, TimestampMixin):
     tariffs: Mapped[list["Tariff"]] = relationship("Tariff", secondary=user_tariffs, lazy="selectin")
     packages: Mapped[list["Package"]] = relationship("Package", secondary=user_packages, lazy="selectin")
     channels: Mapped[list["Channel"]] = relationship("Channel", secondary=user_channels, lazy="selectin")
+
+
+Index("uq_users_playlist_name_lower", func.lower(User.playlist_name), unique=True)

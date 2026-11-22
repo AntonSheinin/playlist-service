@@ -4,6 +4,7 @@ from typing import Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import StreamSource, SyncStatus, UserStatus
+from app.utils.playlist_name import validate_playlist_name
 
 T = TypeVar("T")
 Health = Literal["up", "degraded", "down"]
@@ -332,6 +333,10 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    playlist_name: str | None = Field(
+        default=None, json_schema_extra=lambda schema: schema.pop("default", None)
+    )
+
     first_name: str | None = None
     last_name: str | None = None
     agreement_number: str | None = None
@@ -349,6 +354,13 @@ class UserUpdate(BaseModel):
     package_ids: list[int] | None = None
     channel_ids: list[int] | None = None
 
+    @field_validator("playlist_name", mode="before", json_schema_input_type=str)
+    @classmethod
+    def validate_playlist_url_name(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Playlist URL name must be a string")
+        return validate_playlist_name(value)
+
     @field_validator("portal_allowed", mode="before", json_schema_input_type=bool)
     @classmethod
     def validate_portal_allowed(cls, value: object) -> object:
@@ -363,6 +375,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(OrmModel):
+    playlist_name: str
     id: int
     first_name: str
     last_name: str

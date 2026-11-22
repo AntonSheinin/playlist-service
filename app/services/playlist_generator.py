@@ -65,29 +65,9 @@ class PlaylistGenerator:
 
         return "\n".join(lines) + "\n"
 
-    def get_filename(self, user: User) -> str:
-        """
-        Generate playlist filename for a user.
-
-        Format: {last_name}_{first_name}_{agreement_number}.m3u8
-        """
-        # Sanitize names for filename
-        last_name = self._sanitize_filename(user.last_name)
-        first_name = self._sanitize_filename(user.first_name)
-        agreement = self._sanitize_filename(user.agreement_number)
-
-        return f"{last_name}_{first_name}_{agreement}.m3u8"
-
     def _escape(self, value: str) -> str:
         """Escape special characters in attribute values."""
         return value.replace('"', '\\"')
-
-    def _sanitize_filename(self, value: str) -> str:
-        """Sanitize string for use in filename."""
-        # Replace common problematic characters
-        sanitized = value.replace(" ", "_")
-        sanitized = "".join(c for c in sanitized if c.isalnum() or c in "_-")
-        return sanitized
 
     def _build_logo_url(self, logo: str, base_url: str) -> str:
         """Ensure tvg-logo is a fully-qualified URL when possible."""

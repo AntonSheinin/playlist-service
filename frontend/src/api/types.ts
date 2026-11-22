@@ -212,6 +212,7 @@ export interface UserListItem {
 }
 
 export interface UserResponse {
+  playlist_name: string;
   id: number;
   first_name: string;
   last_name: string;
@@ -245,6 +246,7 @@ export interface UserCreate {
 }
 
 export interface UserUpdate {
+  playlist_name?: string;
   first_name?: string;
   last_name?: string;
   agreement_number?: string;
