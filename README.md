@@ -7,6 +7,7 @@ IPTV Playlist Service for Flussonic and Nimble stream providers.
 - Sync channels from Flussonic and Nimble (read-only cache)
 - Organize channels into groups, packages, and tariffs
 - Manage users with subscription-based channel access
+- Manage Propy portal permissions from the user form and sort users by portal access
 - Generate personalized M3U/M3U8 playlists with authentication tokens
 - Synchronize user tokens with an external Auth Service
 
@@ -14,7 +15,7 @@ IPTV Playlist Service for Flussonic and Nimble stream providers.
 
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2.0
 - **Database**: PostgreSQL 15+
-- **Frontend**: React, Vite, TypeScript, Material UI
+- **Frontend**: React, Vite, TypeScript, Tailwind CSS, Radix UI
 
 ## Quick Start with Docker
 
@@ -71,6 +72,12 @@ docker-compose exec -it playlist-service python scripts/create_admin.py
 
 The Docker Compose stack also starts the remote MCP server at http://localhost:8091/mcp when `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` are configured in `.env`. Compose passes `INTEGRATION_API_KEY` to the MCP container as `PLAYLIST_SERVICE_API_KEY`.
 
+`media/` contains local runtime files and is mounted into the container separately.
+Provision it independently on each host, including `media/rutv-logo.png` for the UI
+and channel logos under `media/logos/`. Git, Docker builds, and the deployment
+workflow exclude this directory; deployments preserve the server's existing media.
+`work/`, `tmp/`, and `temp/` are also local-only and excluded from Git and Docker builds.
+
 ## Development Setup
 
 1. Install Python 3.12+ and uv:
@@ -114,6 +121,22 @@ python scripts/create_admin.py
 uvicorn app.main:app --reload
 ```
 
+Run backend checks from the repository root:
+
+```powershell
+.\.venv\Scripts\uv.exe run python -m compileall app scripts tests
+.\.venv\Scripts\uv.exe run pytest
+```
+
+Run frontend checks from `frontend/`:
+
+```powershell
+npm.cmd run lint
+npm.cmd run build
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for changes awaiting release.
+
 ## Project Structure
 
 ```
@@ -144,6 +167,29 @@ Once running, API documentation is available at:
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
 
+## User Portal Permission
+
+`portal_allowed` is a stored Boolean that indicates whether a user is allowed to
+connect to the Propy portal. New users default to `false`. The admin create/edit
+form includes an **Allow portal access** checkbox, and the users table shows
+**Allowed / Denied** in a sortable **Portal allowed** column.
+
+The existing admin endpoints accept the field:
+
+- `POST /api/v1/users`: omission defaults to `false`.
+- `PATCH /api/v1/users/{user_id}`: omission preserves the value; `true` grants
+  permission and `false` revokes it. Explicit `null` is rejected.
+- User list, detail, create, and update responses include the Boolean.
+
+Sort the admin list with `sort_by=portal_allowed` and `sort_dir=asc` (Denied first)
+or `desc` (Allowed first). Equal values are ordered by user ID ascending. Changing
+the table sort resets pagination to page 1.
+
+Apply Alembic migration `006` before deploying the updated backend and UI. It adds
+the non-nullable column, sets all existing users to `false`, and retains a database
+default of `false` for future inserts. The downgrade removes the column and its
+permission values.
+
 ## Integration API
 
 Playlist Service exposes a narrow service-to-service API for urgent user support actions. CRM, automation, and other non-agent systems call this API directly. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`.
@@ -159,6 +205,14 @@ Stage 1 endpoints:
 - `GET /api/v1/integrations/users/{user_id}/sessions`
 
 User search is exact-only in stage 1. It matches agreement number, first name, last name, full name, or reversed full name. It is case-insensitive and trims leading/trailing whitespace, but it does not perform partial or fuzzy matching.
+
+User detail and exact lookup responses include the `portal_allowed` Boolean
+described in [User Portal Permission](#user-portal-permission).
+
+Propy must read and enforce this permission. Account status and validity do not change
+the flag; any additional status or expiry checks are Propy's responsibility. Changing
+only this flag does not synchronize Auth Service or alter playback access. This change
+does not implement Propy connection checks, caching, or session revocation.
 
 Examples:
 

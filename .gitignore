@@ -37,6 +37,14 @@ env/
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
+
+# Local runtime data and scratch files
+/media/
+/work/
+/tmp/
+/temp/
 
 # Testing
 .pytest_cache/

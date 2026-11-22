@@ -152,6 +152,7 @@ class UserService:
             "agreement_number": (User.agreement_number,),
             "max_sessions": (User.max_sessions,),
             "status": (User.status,),
+            "portal_allowed": (User.portal_allowed,),
             "created_at": (User.created_at,),
         }
         sort_columns = sort_map.get(sort_by, sort_map["name"])
@@ -159,6 +160,9 @@ class UserService:
             sort_columns = tuple(column.desc() for column in sort_columns)
         else:
             sort_columns = tuple(column.asc() for column in sort_columns)
+
+        if sort_by == "portal_allowed":
+            sort_columns = (*sort_columns, User.id.asc())
 
         stmt = stmt.order_by(*sort_columns)
         stmt = stmt.offset(pagination.offset).limit(pagination.limit)
@@ -185,6 +189,7 @@ class UserService:
         tariff_ids: list[int] | None = None,
         package_ids: list[int] | None = None,
         channel_ids: list[int] | None = None,
+        portal_allowed: bool = False,
     ) -> User:
         """Create a new user."""
         await self._ensure_agreement_available(agreement_number)
@@ -198,6 +203,7 @@ class UserService:
             agreement_number=agreement_number,
             max_sessions=max_sessions,
             status=status,
+            portal_allowed=portal_allowed,
             valid_from=_to_db_datetime(valid_from) if valid_from is not None else None,
             valid_until=_to_db_datetime(valid_until) if valid_until is not None else None,
             token=token,
@@ -240,6 +246,7 @@ class UserService:
         channel_ids: list[int] | None = None,
         clear_valid_from: bool = False,
         clear_valid_until: bool = False,
+        portal_allowed: bool | None = None,
     ) -> User:
         """Update a user."""
         user = await self.get_by_id(user_id)
@@ -259,6 +266,9 @@ class UserService:
 
         if status is not None:
             user.status = status
+
+        if portal_allowed is not None:
+            user.portal_allowed = portal_allowed
 
         if valid_from is not None:
             user.valid_from = _to_db_datetime(valid_from)

@@ -37,7 +37,7 @@ function getUserInitials(user: UserListItem): string {
 
 export function UsersListPage() {
   const { showToast } = useToast();
-  const { sortBy, sortDir, toggleSort } = useSortable("name");
+  const { sortBy, sortDir, toggleSort: toggleSortState } = useSortable("name");
   const { widths, onResize } = useColumnResize("usersTableWidths");
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -63,6 +63,11 @@ export function UsersListPage() {
       }
     }
     setSearchParams(next);
+  }
+
+  function toggleSort(field: string) {
+    toggleSortState(field);
+    updateFilters({ page: "1" });
   }
 
   useEffect(() => {
@@ -105,6 +110,7 @@ export function UsersListPage() {
       { id: "tariffs", accessorFn: (user) => user.tariffs?.map((tariff) => tariff.name).join(", ") ?? "" },
       { accessorKey: "max_sessions", id: "sessions" },
       { accessorKey: "status", id: "status" },
+      { accessorKey: "portal_allowed", id: "portal_allowed" },
       { id: "actions" },
     ],
     []
@@ -263,6 +269,9 @@ export function UsersListPage() {
               <ResizableHeader colKey="status" width={widths.status} onResize={onResize} className="w-24">
                 <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
+              <ResizableHeader colKey="portal_allowed" width={widths.portal_allowed} onResize={onResize}>
+                <SortableHeader label="Portal allowed" field="portal_allowed" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              </ResizableHeader>
               <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
                 Actions
               </ResizableHeader>
@@ -270,7 +279,7 @@ export function UsersListPage() {
           </thead>
             <tbody className="divide-y divide-border bg-card">
             {users.length === 0 ? (
-              <EmptyState message="No users found" colSpan={6} />
+              <EmptyState message="No users found" colSpan={7} />
             ) : (
               userTable.getRowModel().rows.map((row) => {
                 const user = row.original;
@@ -317,6 +326,11 @@ export function UsersListPage() {
                       onClick={() => handleToggleStatus(user)}
                     >
                       {user.status}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={user.portal_allowed ? "green" : "red"}>
+                      {user.portal_allowed ? "Allowed" : "Denied"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">

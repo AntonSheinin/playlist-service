@@ -205,6 +205,7 @@ export interface UserListItem {
   last_name: string;
   agreement_number: string;
   status: UserStatus;
+  portal_allowed: boolean;
   max_sessions: number;
   created_at: string;
   tariffs: TariffLookup[];
@@ -217,6 +218,7 @@ export interface UserResponse {
   agreement_number: string;
   max_sessions: number;
   status: UserStatus;
+  portal_allowed: boolean;
   valid_from: string | null;
   valid_until: string | null;
   token: string;
@@ -234,6 +236,7 @@ export interface UserCreate {
   agreement_number: string;
   max_sessions: number;
   status: UserStatus;
+  portal_allowed?: boolean;
   valid_from?: string | null;
   valid_until?: string | null;
   tariff_ids: number[];
@@ -247,6 +250,7 @@ export interface UserUpdate {
   agreement_number?: string;
   max_sessions?: number;
   status?: UserStatus;
+  portal_allowed?: boolean;
   valid_from?: string | null;
   valid_until?: string | null;
   clear_valid_from?: boolean;

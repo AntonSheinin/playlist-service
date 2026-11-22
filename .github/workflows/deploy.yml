@@ -60,11 +60,10 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
 
-      - name: Sync compose file and media
+      - name: Sync compose file
         run: |
           set -euo pipefail
           rsync -az -e "ssh -i ~/.ssh/deploy_key" docker-compose.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yml"
-          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" media/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/media/"
 
       - name: Deploy on server
         env:

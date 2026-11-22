@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import StreamSource, SyncStatus, UserStatus
 
@@ -318,6 +318,7 @@ class UserCreate(BaseModel):
     agreement_number: str
     max_sessions: int = Field(1, ge=1, le=100)
     status: UserStatus = UserStatus.ENABLED
+    portal_allowed: bool = False
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     tariff_ids: list[int] = Field(default_factory=list)
@@ -336,6 +337,10 @@ class UserUpdate(BaseModel):
     agreement_number: str | None = None
     max_sessions: int | None = Field(None, ge=1, le=100)
     status: UserStatus | None = None
+    portal_allowed: bool | None = Field(
+        default=None,
+        json_schema_extra=lambda schema: schema.pop("default", None),
+    )
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     clear_valid_from: bool = False
@@ -343,6 +348,13 @@ class UserUpdate(BaseModel):
     tariff_ids: list[int] | None = None
     package_ids: list[int] | None = None
     channel_ids: list[int] | None = None
+
+    @field_validator("portal_allowed", mode="before", json_schema_input_type=bool)
+    @classmethod
+    def validate_portal_allowed(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("portal_allowed must be a boolean")
+        return value
 
     @model_validator(mode="after")
     def validate_validity_window(self) -> "UserUpdate":
@@ -357,6 +369,7 @@ class UserResponse(OrmModel):
     agreement_number: str
     max_sessions: int
     status: UserStatus
+    portal_allowed: bool
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     token: str
@@ -374,6 +387,7 @@ class UserListItem(OrmModel):
     last_name: str
     agreement_number: str
     status: UserStatus
+    portal_allowed: bool
     max_sessions: int
     created_at: datetime
     tariffs: list[TariffLookup] = Field(default_factory=list)
@@ -385,6 +399,7 @@ class IntegrationUserSummary(BaseModel):
     last_name: str
     agreement_number: str
     status: UserStatus
+    portal_allowed: bool
     max_sessions: int
     valid_until: datetime | None = None
 

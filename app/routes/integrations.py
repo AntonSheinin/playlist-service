@@ -31,6 +31,7 @@ def _user_summary(user: User) -> IntegrationUserSummary:
         last_name=user.last_name,
         agreement_number=user.agreement_number,
         status=user.status,
+        portal_allowed=user.portal_allowed,
         max_sessions=user.max_sessions,
         valid_until=user.valid_until,
     )

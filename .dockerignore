@@ -3,16 +3,19 @@
 .gitignore
 
 # Python
-__pycache__
-*.py[cod]
+**/__pycache__
+**/*.py[cod]
 *$py.class
 *.so
 .Python
 *.egg-info
 .installed.cfg
 *.egg
-.venv
-venv
+**/.venv
+**/venv
+**/env
+**/ENV
+**/build
 
 # IDE
 .idea
@@ -21,21 +24,32 @@ venv
 *.swo
 
 # Environment
-.env
-.env.local
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local runtime data and scratch files (media is mounted separately)
+/media/
+/work/
+/tmp/
+/temp/
+/logs/
+*.log
+*.db
+*.sqlite3
 
 # Testing
-.pytest_cache
+**/.pytest_cache
 .coverage
 htmlcov
 .tox
 .nox
 
 # Type checking
-.mypy_cache
+**/.mypy_cache
 
 # Ruff
-.ruff_cache
+**/.ruff_cache
 
 # Documentation
 *.md
@@ -46,8 +60,7 @@ Dockerfile
 docker-compose*.yml
 
 .claude
-.vscode
 
 # Frontend (node_modules excluded, source needed for build)
-frontend/node_modules
-frontend/dist
+**/node_modules
+**/dist

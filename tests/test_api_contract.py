@@ -252,3 +252,119 @@ async def test_auth_relevant_user_update_syncs_auth(db_session, monkeypatch):
 
     assert response.status_code == 200
     assert RecordingAuthSyncService.calls == [{"user_id": user.id, "recreate_token": False}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("permission", [None, False, True])
+async def test_create_user_portal_permission(db_session, monkeypatch, permission):
+    from app.routes import users as users_route
+
+    class FakeCreateAuthSync:
+        def __init__(self, db):
+            pass
+
+        async def sync_user_create(self, user):
+            pass
+
+    monkeypatch.setattr(users_route, "AuthSyncService", FakeCreateAuthSync)
+    payload = {"first_name": "Portal", "last_name": "User", "agreement_number": "portal-create"}
+    if permission is not None:
+        payload["portal_allowed"] = permission
+
+    async with _client_with_db(db_session) as client:
+        response = await client.post("/api/v1/users", json=payload)
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["portal_allowed"] is (permission is True)
+        user = await db_session.get(User, data["id"])
+        assert user.portal_allowed is (permission is True)
+
+
+@pytest.mark.asyncio
+async def test_portal_permission_updates_preserve_playback_and_skip_auth(db_session, monkeypatch):
+    from app.routes import users as users_route
+    from app.services.user_service import UserService
+
+    RecordingAuthSyncService.calls = []
+    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    user = await UserService(db_session).create("Portal", "User", "portal-update")
+    assert user.portal_allowed is False
+
+    async with _client_with_db(db_session) as client:
+        for permission in [True, False]:
+            response = await client.patch(
+                f"/api/v1/users/{user.id}", json={"portal_allowed": permission}
+            )
+            assert response.status_code == 200
+            assert response.json()["data"]["portal_allowed"] is permission
+            await db_session.refresh(user)
+            assert user.portal_allowed is permission
+            assert user.status == UserStatus.ENABLED
+            assert user.max_sessions == 1
+            assert user.valid_from is None
+            assert user.valid_until is None
+
+        assert RecordingAuthSyncService.calls == []
+        await client.patch(f"/api/v1/users/{user.id}", json={"portal_allowed": True})
+        response = await client.patch(f"/api/v1/users/{user.id}", json={"max_sessions": 2})
+        assert response.status_code == 200
+        assert response.json()["data"]["portal_allowed"] is True
+        assert RecordingAuthSyncService.calls == [{"user_id": user.id, "recreate_token": False}]
+
+        detail = await client.get(f"/api/v1/users/{user.id}")
+        listing = await client.get("/api/v1/users")
+        assert detail.json()["data"]["portal_allowed"] is True
+        assert listing.json()["data"]["items"][0]["portal_allowed"] is True
+
+
+@pytest.mark.asyncio
+async def test_null_portal_permission_is_rejected_on_create_and_update(db_session):
+    from app.services.user_service import UserService
+
+    user = await UserService(db_session).create("Portal", "User", "portal-null", portal_allowed=True)
+    async with _client_with_db(db_session) as client:
+        create = await client.post("/api/v1/users", json={
+            "first_name": "Portal", "last_name": "User",
+            "agreement_number": "portal-null-create", "portal_allowed": None,
+        })
+        update = await client.patch(f"/api/v1/users/{user.id}", json={"portal_allowed": None})
+
+    assert create.status_code == 422
+    assert update.status_code == 422
+    await db_session.refresh(user)
+    assert user.portal_allowed is True
+
+
+def test_user_patch_openapi_portal_permission_is_optional_boolean():
+    schema = app.openapi()["components"]["schemas"]["UserUpdate"]
+    permission = schema["properties"]["portal_allowed"]
+
+    assert permission["type"] == "boolean"
+    assert "default" not in permission
+    assert "portal_allowed" not in schema.get("required", [])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+async def test_users_sort_portal_permission_with_stable_pagination(db_session, direction):
+    from app.services.user_service import UserService
+
+    users = [
+        await UserService(db_session).create(
+            "Portal", "User", f"portal-sort-{index}", portal_allowed=permission
+        )
+        for index, permission in enumerate([True, False, True, False, True, False])
+    ]
+    expected = sorted(users, key=lambda user: (
+        user.portal_allowed if direction == "asc" else not user.portal_allowed,
+        user.id,
+    ))
+    ids = []
+    async with _client_with_db(db_session) as client:
+        for page in [1, 2, 3]:
+            response = await client.get("/api/v1/users", params={
+                "sort_by": "portal_allowed", "sort_dir": direction, "per_page": 2, "page": page,
+            })
+            assert response.status_code == 200
+            ids.extend(item["id"] for item in response.json()["data"]["items"])
+    assert ids == [user.id for user in expected]

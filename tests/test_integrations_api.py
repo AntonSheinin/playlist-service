@@ -238,6 +238,7 @@ async def test_get_user_returns_compact_integration_summary(db_session):
         "last_name": "Smith",
         "agreement_number": "AG12345",
         "status": "enabled",
+        "portal_allowed": False,
         "max_sessions": 1,
         "valid_until": response.json()["data"]["valid_until"],
     }
@@ -373,3 +374,22 @@ async def test_active_sessions_use_existing_mapping(db_session, monkeypatch):
         "user_agent": "hls",
     }
     assert FakeAuthServiceClient.calls == [{"user_id": str(user.id), "skip": 0, "limit": 100}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("permission", [False, True])
+async def test_integration_detail_and_lookup_expose_portal_permission(db_session, permission):
+    user = await _create_user(db_session)
+    user.portal_allowed = permission
+    await db_session.commit()
+
+    async with _client_with_db(db_session) as client:
+        detail = await client.get(f"/api/v1/integrations/users/{user.id}", headers=_headers())
+        lookup = await client.get(
+            "/api/v1/integrations/users/find", params={"q": user.agreement_number}, headers=_headers()
+        )
+
+    assert detail.status_code == 200
+    assert lookup.status_code == 200
+    assert detail.json()["data"]["portal_allowed"] is permission
+    assert lookup.json()["data"]["user"]["portal_allowed"] is permission

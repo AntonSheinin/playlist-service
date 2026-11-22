@@ -72,6 +72,7 @@ export function UserDetailPage() {
   const [agreementNumber, setAgreementNumber] = useState("");
   const [maxSessions, setMaxSessions] = useState(1);
   const [status, setStatus] = useState("enabled");
+  const [portalAllowed, setPortalAllowed] = useState(false);
 
   // Multi-selects
   const [selectedTariffs, setSelectedTariffs] = useState<SelectOption[]>([]);
@@ -144,6 +145,7 @@ export function UserDetailPage() {
       setAgreementNumber(user.agreement_number);
       setMaxSessions(user.max_sessions);
       setStatus(user.status);
+      setPortalAllowed(user.portal_allowed);
       setValidFrom(parseLocalDate(user.valid_from));
       setValidUntil(parseLocalDate(user.valid_until));
       setSelectedTariffs(user.tariffs.map((t) => ({ value: t.id, label: t.name })));
@@ -169,6 +171,7 @@ export function UserDetailPage() {
       agreement_number: agreementNumber,
       max_sessions: maxSessions,
       status: status as "enabled" | "disabled",
+      portal_allowed: portalAllowed,
       tariff_ids: selectedTariffs.map((t) => t.value),
       package_ids: selectedPackages.map((p) => p.value),
       channel_ids: selectedChannels.map((c) => c.value),
@@ -198,7 +201,7 @@ export function UserDetailPage() {
     } catch {
       showToast("Failed to save user", "error");
     }
-  }, [firstName, lastName, agreementNumber, maxSessions, status, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, updateUser, createUser, showToast, navigate]);
+  }, [firstName, lastName, agreementNumber, maxSessions, status, portalAllowed, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, updateUser, createUser, showToast, navigate]);
 
   async function handleRegenToken() {
     if (!userId) return;
@@ -319,6 +322,15 @@ export function UserDetailPage() {
             <option value="enabled">Enabled</option>
             <option value="disabled">Disabled</option>
           </Select>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={portalAllowed}
+              onChange={(e) => setPortalAllowed(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            Allow portal access
+          </label>
           {isEdit && user && (
             <>
               <div>
