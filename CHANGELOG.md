@@ -15,6 +15,8 @@
 
 ### Changed
 
+- Renamed Playlist Service to RuTV Middleware in the admin UI, API
+  documentation, and MCP. Existing playlist links keep working.
 - Unified public playlist delivery, admin downloads, and previews in an internal
   playlist service, replacing the full-user filename scan with indexed lookup.
 - Personal-detail edits now preserve playlist names. Explicit renames replace

@@ -16,7 +16,7 @@ class AuthTokenCreate(BaseModel):
     """Request payload for creating a token in Auth Service."""
 
     token: str
-    user_id: str  # stringified playlist-service users.id
+    user_id: str  # stringified RuTV Middleware users.id
     status: str  # "active" or "suspended"
     max_sessions: int
     valid_from: datetime | None = None

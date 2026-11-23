@@ -1,5 +1,5 @@
 class PlaylistServiceError(Exception):
-    """Base exception for playlist service."""
+    """Base exception for RuTV Middleware."""
 
     status_code: int = 500
 

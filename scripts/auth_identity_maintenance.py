@@ -1,6 +1,6 @@
 """Normalize Auth Backend user_id values and run full Auth resync.
 
-Run from the Playlist Service environment. For normalization modes, provide
+Run from the RuTV Middleware environment. For normalization modes, provide
 AUTH_DATABASE_URL for direct access to the Auth Backend database.
 """
 

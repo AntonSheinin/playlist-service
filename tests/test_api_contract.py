@@ -32,6 +32,16 @@ async def _client_with_db(db_session) -> AsyncIterator[httpx.AsyncClient]:
 
 
 @pytest.mark.asyncio
+async def test_health_identifies_rutv_middleware():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "up", "service": "rutv-middleware"}
+
+
+@pytest.mark.asyncio
 async def test_representative_success_response_envelope(db_session):
     async with _client_with_db(db_session) as client:
         response = await client.get("/api/v1/lookup/groups")

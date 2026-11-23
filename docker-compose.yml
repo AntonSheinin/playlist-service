@@ -1,8 +1,8 @@
 services:
-  playlist-service:
-    image: ghcr.io/antonsheinin/playlist-service:latest
+  rutv-middleware:
+    image: ghcr.io/antonsheinin/rutv-middleware:latest
     build: .
-    container_name: playlist-service
+    container_name: rutv-middleware
     ports:
       - "8080:8080"
     env_file:
@@ -22,22 +22,22 @@ services:
     networks:
       - playlist-network
 
-  playlist-mcp-server:
-    image: ghcr.io/antonsheinin/playlist-service:latest
+  rutv-middleware-mcp:
+    image: ghcr.io/antonsheinin/rutv-middleware:latest
     build: .
-    container_name: playlist-mcp-server
+    container_name: rutv-middleware-mcp
     command: ["python", "-m", "app.mcp_server"]
     ports:
       - "8091:8091"
     env_file:
       - .env
     environment:
-      PLAYLIST_SERVICE_API_URL: http://playlist-service:8080
-      PLAYLIST_SERVICE_API_KEY: ${INTEGRATION_API_KEY}
+      RUTV_MIDDLEWARE_API_URL: http://rutv-middleware:8080
+      RUTV_MIDDLEWARE_API_KEY: ${INTEGRATION_API_KEY}
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8091
     depends_on:
-      playlist-service:
+      rutv-middleware:
         condition: service_healthy
     restart: unless-stopped
     networks:

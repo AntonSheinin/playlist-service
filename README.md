@@ -1,6 +1,6 @@
-# Playlist Service
+# RuTV Middleware
 
-IPTV Playlist Service for Flussonic and Nimble stream providers.
+IPTV middleware for Flussonic and Nimble stream providers.
 
 ## Features
 
@@ -21,8 +21,8 @@ IPTV Playlist Service for Flussonic and Nimble stream providers.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/AntonSheinin/playlist-service.git
-cd playlist-service
+git clone https://github.com/AntonSheinin/rutv-middleware.git
+cd rutv-middleware
 ```
 
 2. Create a `.env` file from the example:
@@ -60,23 +60,49 @@ docker-compose up -d
 
 5. Run database migrations:
 ```bash
-docker-compose exec playlist-service alembic upgrade head
+docker-compose exec rutv-middleware alembic upgrade head
 ```
 
 6. Create an admin user:
 ```bash
-docker-compose exec -it playlist-service python scripts/create_admin.py
+docker-compose exec -it rutv-middleware python scripts/create_admin.py
 ```
 
 7. Access the application at http://localhost:8080
 
-The Docker Compose stack also starts the remote MCP server at http://localhost:8091/mcp when `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` are configured in `.env`. Compose passes `INTEGRATION_API_KEY` to the MCP container as `PLAYLIST_SERVICE_API_KEY`.
+The Docker Compose stack also starts the remote MCP server at http://localhost:8091/mcp when `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` are configured in `.env`. Compose passes `INTEGRATION_API_KEY` to the MCP container as `RUTV_MIDDLEWARE_API_KEY`.
 
 `media/` contains local runtime files and is mounted into the container separately.
 Provision it independently on each host, including `media/rutv-logo.png` for the UI
 and channel logos under `media/logos/`. Git, Docker builds, and the deployment
 workflow exclude this directory; deployments preserve the server's existing media.
 `work/`, `tmp/`, and `temp/` are also local-only and excluded from Git and Docker builds.
+
+## First deployment after the rename
+
+Rename the GitHub repository to `AntonSheinin/rutv-middleware` and update local Git
+remotes. Verify that the existing **Deploy** workflow can publish to the renamed
+GHCR package. Back up the current Compose configuration and record the deployed
+image before running the workflow.
+
+The old and new API and MCP containers use the same host ports. For the first
+cutover, run the following from `/home/anton/playlist_service` while the old Compose
+file is still in place, then dispatch the existing **Deploy** workflow on `main`:
+
+```bash
+sudo docker compose stop playlist-service playlist-mcp-server
+sudo docker compose rm -f playlist-service playlist-mcp-server
+```
+
+Keep the same server directory and Compose project so PostgreSQL continues using
+its existing volume. The path `/home/anton/playlist_service` is also used by APK
+publishing and device provisioning.
+
+Check monitoring for the new `/health` service value and update standalone
+MCP instances to the renamed environment variables before restarting them.
+After deployment, verify an existing playlist and an authenticated MCP read.
+Compare the PostgreSQL volume, Alembic revision, and record counts with the
+pre-deploy snapshot.
 
 ## Development Setup
 
@@ -135,12 +161,13 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for changes awaiting release.
+See the [service specification](rutv-middleware-specification.md) and
+[changelog](CHANGELOG.md) for the service contracts and changes awaiting release.
 
 ## Project Structure
 
 ```
-playlist-service/
+rutv-middleware/
 |-- app/
 |   |-- main.py                 # FastAPI application
 |   |-- config.py               # Configuration settings
@@ -192,7 +219,7 @@ permission values.
 
 ## Integration API
 
-Playlist Service exposes a narrow service-to-service API for urgent user support actions. CRM, automation, and other non-agent systems call this API directly. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`.
+RuTV Middleware exposes a narrow service-to-service API for urgent user support actions. CRM, automation, and other non-agent systems call this API directly. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`.
 
 Stage 1 endpoints:
 
@@ -259,14 +286,14 @@ The MCP server is a separate remote HTTP process for agent clients, such as a Te
 Standalone MCP process environment:
 
 ```env
-PLAYLIST_SERVICE_API_URL=http://localhost:8080
-PLAYLIST_SERVICE_API_KEY=your-integration-api-key
+RUTV_MIDDLEWARE_API_URL=http://localhost:8080
+RUTV_MIDDLEWARE_API_KEY=your-integration-api-key
 MCP_HOST=0.0.0.0
 MCP_PORT=8091
 MCP_AUTH_TOKEN=your-mcp-bearer-token
 ```
 
-When using Docker Compose, set only `INTEGRATION_API_KEY`; Compose injects it into the MCP container as `PLAYLIST_SERVICE_API_KEY`.
+When using Docker Compose, set only `INTEGRATION_API_KEY`; Compose injects it into the MCP container as `RUTV_MIDDLEWARE_API_KEY`.
 
 Run it with:
 
@@ -386,9 +413,9 @@ delivery/preview endpoints and reuses the existing channel-resolution rules.
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |
 | `RUTV_SITE_URL` | RUTV site base URL | Required |
 | `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |
-| `BASE_URL` | Public Playlist Service base URL, including port when needed | Required |
-| `PLAYLIST_SERVICE_API_URL` | Playlist Service base URL used by the MCP server | http://127.0.0.1:8080 |
-| `PLAYLIST_SERVICE_API_KEY` | Integration API key used by the MCP server outside Docker Compose | Defaults to `${INTEGRATION_API_KEY}` in Compose |
+| `BASE_URL` | Public RuTV Middleware base URL, including port when needed | Required |
+| `RUTV_MIDDLEWARE_API_URL` | RuTV Middleware base URL used by the MCP server | http://127.0.0.1:8080 |
+| `RUTV_MIDDLEWARE_API_KEY` | Integration API key used by the MCP server outside Docker Compose | Defaults to `${INTEGRATION_API_KEY}` in Compose |
 | `MCP_HOST` | MCP server bind address | 127.0.0.1 |
 | `MCP_PORT` | MCP server port | 8091 |
 | `MCP_AUTH_TOKEN` | Bearer token required by remote MCP clients | Required for MCP |

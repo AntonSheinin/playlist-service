@@ -35,8 +35,8 @@ class McpSettings(BaseSettings):
         extra="ignore",
     )
 
-    playlist_service_api_url: str = "http://127.0.0.1:8080"
-    playlist_service_api_key: str | None = None
+    rutv_middleware_api_url: str = "http://127.0.0.1:8080"
+    rutv_middleware_api_key: str | None = None
     mcp_host: str = "127.0.0.1"
     mcp_port: int = 8091
     mcp_auth_token: str | None = None
@@ -46,7 +46,7 @@ class PlaylistIntegrationError(ToolError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
         self.message = message
-        super().__init__(f"Playlist Service returned {status_code}: {message}")
+        super().__init__(f"RuTV Middleware returned {status_code}: {message}")
 
 
 class BearerTokenMiddleware:
@@ -75,8 +75,8 @@ class BearerTokenMiddleware:
 
 class PlaylistIntegrationClient:
     def __init__(self, settings: McpSettings) -> None:
-        self.base_url = settings.playlist_service_api_url.rstrip("/")
-        self.api_key = settings.playlist_service_api_key
+        self.base_url = settings.rutv_middleware_api_url.rstrip("/")
+        self.api_key = settings.rutv_middleware_api_key
 
     async def request(
         self,
@@ -87,7 +87,7 @@ class PlaylistIntegrationClient:
         params: dict[str, Any] | None = None,
     ) -> Any:
         if not self.api_key:
-            raise ToolError("PLAYLIST_SERVICE_API_KEY is not configured")
+            raise ToolError("RUTV_MIDDLEWARE_API_KEY is not configured")
 
         async with httpx.AsyncClient(
             base_url=self.base_url,
@@ -97,7 +97,7 @@ class PlaylistIntegrationClient:
             try:
                 response = await client.request(method, path, json=json, params=params)
             except httpx.RequestError as e:
-                raise ToolError(f"Playlist Service request failed: {e}") from e
+                raise ToolError(f"RuTV Middleware request failed: {e}") from e
 
         if response.is_error:
             payload = self._parse_json_or_none(response)
@@ -114,7 +114,7 @@ class PlaylistIntegrationClient:
             return response.json()
         except ValueError as e:
             raise ToolError(
-                f"Playlist Service returned {response.status_code} with non-JSON response"
+                f"RuTV Middleware returned {response.status_code} with non-JSON response"
             ) from e
 
     def _parse_json_or_none(self, response: httpx.Response) -> Any:
@@ -159,7 +159,7 @@ def create_mcp(settings: McpSettings | None = None) -> FastMCP:
     settings = settings or McpSettings()
     client = PlaylistIntegrationClient(settings)
     mcp = FastMCP(
-        "Playlist Service",
+        "RuTV Middleware",
         host=settings.mcp_host,
         port=settings.mcp_port,
         streamable_http_path="/mcp",

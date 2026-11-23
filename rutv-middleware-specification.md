@@ -1,8 +1,8 @@
-# Playlist Service Specification
+# RuTV Middleware Specification
 
 ## Summary
 
-Playlist Service is an admin application for managing IPTV channel catalogs, channel assignments, user access, and generated playlists across multiple stream providers.
+RuTV Middleware is an admin application for managing IPTV channel catalogs, channel assignments, user access, and generated playlists across multiple stream providers.
 
 The current implementation supports two explicit providers:
 
@@ -149,7 +149,7 @@ The MCP server is a separate remote HTTP process and is not part of the FastAPI 
 - Docker Compose service: `playlist-mcp-server`
 - MCP transport: Streamable HTTP at `/mcp`
 - MCP authentication: `Authorization: Bearer <MCP_AUTH_TOKEN>`
-- Playlist Service authentication: MCP server calls the Integration API with `X-API-Key: <PLAYLIST_SERVICE_API_KEY>`. Docker Compose derives this from `INTEGRATION_API_KEY`.
+- RuTV Middleware authentication: MCP server calls the Integration API with `X-API-Key: <RUTV_MIDDLEWARE_API_KEY>`. Docker Compose derives this from `INTEGRATION_API_KEY`.
 - MCP tools must call Integration API endpoints over HTTP and must not access SQLAlchemy models, sessions, or services directly
 
 Stage 1 tools:
@@ -194,8 +194,8 @@ Integration API settings:
 
 MCP server settings:
 
-- `PLAYLIST_SERVICE_API_URL`
-- `PLAYLIST_SERVICE_API_KEY` outside Docker Compose; Compose sets it from `INTEGRATION_API_KEY`
+- `RUTV_MIDDLEWARE_API_URL`
+- `RUTV_MIDDLEWARE_API_KEY` outside Docker Compose; Compose sets it from `INTEGRATION_API_KEY`
 - `MCP_HOST`
 - `MCP_PORT`
 - `MCP_AUTH_TOKEN`

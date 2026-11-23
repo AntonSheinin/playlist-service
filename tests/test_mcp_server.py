@@ -15,6 +15,15 @@ from app.mcp_server import (
 )
 
 
+def test_mcp_reads_rutv_middleware_environment(monkeypatch):
+    monkeypatch.setenv("RUTV_MIDDLEWARE_API_URL", "http://rutv-middleware:8080")
+    monkeypatch.setenv("RUTV_MIDDLEWARE_API_KEY", "test-integration-key")
+    settings = McpSettings(_env_file=None)
+    assert settings.rutv_middleware_api_url == "http://rutv-middleware:8080"
+    assert settings.rutv_middleware_api_key == "test-integration-key"
+    assert create_mcp(settings).name == "RuTV Middleware"
+
+
 def test_closed_sse_writer_filter_only_suppresses_expected_shutdown_error():
     filter_ = ClosedSseWriterFilter()
     closed_record = logging.LogRecord(
@@ -44,8 +53,8 @@ def test_closed_sse_writer_filter_only_suppresses_expected_shutdown_error():
 async def test_mcp_app_rejects_missing_and_invalid_bearer_token():
     app = create_app(
         McpSettings(
-            playlist_service_api_url="http://playlist.test",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test",
+            rutv_middleware_api_key="integration-key",
             mcp_auth_token="mcp-secret",
         )
     )
@@ -100,8 +109,8 @@ async def test_playlist_integration_client_sends_expected_auth_method_path_and_b
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     client = PlaylistIntegrationClient(
         McpSettings(
-            playlist_service_api_url="http://playlist.test/",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test/",
+            rutv_middleware_api_key="integration-key",
         )
     )
 
@@ -142,8 +151,8 @@ async def test_playlist_integration_client_preserves_status_for_non_json_errors(
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     client = PlaylistIntegrationClient(
         McpSettings(
-            playlist_service_api_url="http://playlist.test/",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test/",
+            rutv_middleware_api_key="integration-key",
         )
     )
 
@@ -152,7 +161,7 @@ async def test_playlist_integration_client_preserves_status_for_non_json_errors(
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.message == "Unexpected error"
-    assert str(exc_info.value) == "Playlist Service returned 502: Unexpected error"
+    assert str(exc_info.value) == "RuTV Middleware returned 502: Unexpected error"
 
 
 @pytest.mark.asyncio
@@ -184,8 +193,8 @@ async def test_playlist_integration_client_extracts_fastapi_validation_detail(mo
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     client = PlaylistIntegrationClient(
         McpSettings(
-            playlist_service_api_url="http://playlist.test/",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test/",
+            rutv_middleware_api_key="integration-key",
         )
     )
 
@@ -215,8 +224,8 @@ async def test_playlist_integration_client_preserves_status_for_non_json_success
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     client = PlaylistIntegrationClient(
         McpSettings(
-            playlist_service_api_url="http://playlist.test/",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test/",
+            rutv_middleware_api_key="integration-key",
         )
     )
 
@@ -230,8 +239,8 @@ async def test_playlist_integration_client_preserves_status_for_non_json_success
 async def test_mcp_exposes_expected_tools():
     mcp = create_mcp(
         McpSettings(
-            playlist_service_api_url="http://playlist.test",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test",
+            rutv_middleware_api_key="integration-key",
             mcp_auth_token="mcp-secret",
         )
     )
@@ -284,17 +293,17 @@ async def test_mcp_find_user_translates_only_lookup_404(monkeypatch):
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     mcp = create_mcp(
         McpSettings(
-            playlist_service_api_url="http://playlist.test",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test",
+            rutv_middleware_api_key="integration-key",
         )
     )
 
     find_result = await mcp.call_tool("find_user", {"q": "missing"})
 
     assert find_result[1] == {"match_type": "none", "user": None, "candidates": []}
-    with pytest.raises(ToolError, match="Playlist Service returned 500"):
+    with pytest.raises(ToolError, match="RuTV Middleware returned 500"):
         await mcp.call_tool("find_user", {"q": "backend failure"})
-    with pytest.raises(ToolError, match="Playlist Service returned 404"):
+    with pytest.raises(ToolError, match="RuTV Middleware returned 404"):
         await mcp.call_tool("get_user", {"user_id": 999})
 
 
@@ -332,8 +341,8 @@ async def test_mcp_tool_call_routes_to_playlist_integration_api(monkeypatch):
     monkeypatch.setattr("app.mcp_server.httpx.AsyncClient", FakeAsyncClient)
     mcp = create_mcp(
         McpSettings(
-            playlist_service_api_url="http://playlist.test",
-            playlist_service_api_key="integration-key",
+            rutv_middleware_api_url="http://playlist.test",
+            rutv_middleware_api_key="integration-key",
         )
     )
 

@@ -68,10 +68,10 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex min-h-full flex-col bg-card text-card-foreground">
-      <div className="flex min-h-20 items-center gap-3 border-b border-border px-4">
-        <img src="/media/rutv-logo.png" alt="RUTV logo" className="h-12 w-12 shrink-0 object-contain" />
+      <div className="flex min-h-20 items-center gap-2 border-b border-border px-3 pr-11 md:pr-3">
+        <img src="/media/rutv-logo.png" alt="RuTV Middleware logo" className="h-9 w-9 shrink-0 object-contain" />
         <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="truncate text-base font-bold text-card-foreground">RuTV</div>
+            <div className="text-sm font-bold text-card-foreground">RuTV Middleware</div>
             <ThemeToggle className="ml-auto hidden md:inline-flex" />
         </div>
       </div>
@@ -132,7 +132,7 @@ export function NavBar() {
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
-          <span className="min-w-0 flex-1 truncate text-base font-bold text-card-foreground">RuTV</span>
+          <span className="min-w-0 flex-1 text-sm font-bold text-card-foreground">RuTV Middleware</span>
           <ThemeToggle />
         </div>
       </header>

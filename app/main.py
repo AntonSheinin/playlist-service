@@ -26,15 +26,15 @@ def _server_port_from_base_url(base_url: str) -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
-    logger.info("Playlist Service starting up")
+    logger.info("RuTV Middleware starting up")
     yield
-    logger.info("Playlist Service shutting down")
+    logger.info("RuTV Middleware shutting down")
     await engine.dispose()
 
 
 app = FastAPI(
-    title="Playlist Service",
-    description="IPTV Playlist Service for multiple stream providers",
+    title="RuTV Middleware",
+    description="IPTV middleware for multiple stream providers",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -55,7 +55,7 @@ if FRONTEND_ASSETS.exists():
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Lightweight unauthenticated liveness probe."""
-    return {"status": "up", "service": "playlist-service"}
+    return {"status": "up", "service": "rutv-middleware"}
 
 
 # Include routers (API first, then pages with SPA catch-all last)

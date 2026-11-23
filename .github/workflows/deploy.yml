@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_NAME: ghcr.io/antonsheinin/playlist-service:latest
+  IMAGE_NAME: ghcr.io/antonsheinin/rutv-middleware:latest
   DEPLOY_HOST: 46.224.52.226
   DEPLOY_USER: anton
   DEPLOY_PATH: /home/anton/playlist_service
@@ -91,10 +91,10 @@ jobs:
 
           echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-          sudo docker compose pull playlist-service playlist-mcp-server
-          sudo docker compose up -d --no-build --force-recreate playlist-service
-          sudo docker compose exec -T playlist-service alembic upgrade head </dev/null
-          sudo docker compose up -d --no-build --force-recreate playlist-mcp-server
+          sudo docker compose pull rutv-middleware rutv-middleware-mcp
+          sudo docker compose up -d --no-build --force-recreate rutv-middleware
+          sudo docker compose exec -T rutv-middleware alembic upgrade head </dev/null
+          sudo docker compose up -d --no-build --force-recreate rutv-middleware-mcp
 
           sudo docker compose ps
           curl -fsS http://localhost:8080/health
@@ -110,7 +110,7 @@ jobs:
 
           if [ "$mcp_status" != "401" ]; then
             echo "MCP server did not become ready; last HTTP status: $mcp_status"
-            sudo docker compose logs --tail=100 playlist-mcp-server
+            sudo docker compose logs --tail=100 rutv-middleware-mcp
             exit 1
           fi
           EOF

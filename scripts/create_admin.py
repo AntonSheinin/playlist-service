@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Script to create an admin user for the Playlist Service."""
+"""Script to create an admin user for the RuTV Middleware."""
 
 import asyncio
 import getpass
@@ -43,7 +43,7 @@ async def create_admin(username: str, password: str) -> None:
 def main() -> None:
     """Main entry point."""
     print("=" * 50)
-    print("Playlist Service - Create Admin User")
+    print("RuTV Middleware - Create Admin User")
     print("=" * 50)
     print()
 

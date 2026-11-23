@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-Playlist Service is a FastAPI backend with a React/Vite admin UI. It manages IPTV channels, packages, tariffs, users, playlist generation, and synchronization with external Auth, EPG, RUTV, Flussonic, and Nimble services.
+RuTV Middleware is a FastAPI backend with a React/Vite admin UI. It manages IPTV channels, packages, tariffs, users, playlist generation, and synchronization with external Auth, EPG, RUTV, Flussonic, and Nimble services.
 
 ## Repository Layout
 
@@ -12,7 +12,7 @@ Playlist Service is a FastAPI backend with a React/Vite admin UI. It manages IPT
 - `app/routes/`: HTTP route handlers. Keep these thin: validate/request orchestration only.
 - `app/services/`: business workflows and persistence-oriented logic.
 - `app/clients/`: external service clients and provider integrations.
-- `app/mcp_server.py`: remote MCP server process. It must call Playlist Service Integration API over HTTP and must not access the database directly.
+- `app/mcp_server.py`: remote MCP server process. It must call RuTV Middleware Integration API over HTTP and must not access the database directly.
 - `app/models.py`: SQLAlchemy models and association tables.
 - `app/schemas.py`: Pydantic API schemas.
 - `alembic/`: database migrations.

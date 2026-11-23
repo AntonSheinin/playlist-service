@@ -1,7 +1,7 @@
 [project]
-name = "playlist-service"
+name = "rutv-middleware"
 version = "1.0.0"
-description = "IPTV Playlist Service for multiple stream providers"
+description = "IPTV middleware for multiple stream providers"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
