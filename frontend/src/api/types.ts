@@ -206,6 +206,9 @@ export interface UserListItem {
   agreement_number: string;
   status: UserStatus;
   portal_allowed: boolean;
+  auth_synced: boolean;
+  portal_synced: boolean;
+  portal_sync_available: boolean;
   max_sessions: number;
   created_at: string;
   tariffs: TariffLookup[];
@@ -220,15 +223,23 @@ export interface UserResponse {
   max_sessions: number;
   status: UserStatus;
   portal_allowed: boolean;
+  max_portal_devices: number;
   valid_from: string | null;
   valid_until: string | null;
   token: string;
   auth_token_id: number | null;
+  auth_synced: boolean;
+  portal_synced: boolean;
+  portal_sync_available: boolean;
   tariffs: TariffLookup[];
   packages: PackageLookup[];
   channels: ChannelLookup[];
   created_at: string;
   updated_at: string;
+}
+
+export interface UserSaveResponse extends UserResponse {
+  auth_sync_result: "skipped" | "succeeded" | "failed";
 }
 
 export interface UserCreate {
@@ -238,6 +249,7 @@ export interface UserCreate {
   max_sessions: number;
   status: UserStatus;
   portal_allowed?: boolean;
+  max_portal_devices?: number;
   valid_from?: string | null;
   valid_until?: string | null;
   tariff_ids: number[];
@@ -253,6 +265,7 @@ export interface UserUpdate {
   max_sessions?: number;
   status?: UserStatus;
   portal_allowed?: boolean;
+  max_portal_devices?: number;
   valid_from?: string | null;
   valid_until?: string | null;
   clear_valid_from?: boolean;

@@ -16,6 +16,9 @@ export function buildUserUpdate(
   if (values.max_sessions !== user.max_sessions) update.max_sessions = values.max_sessions;
   if (values.status !== user.status) update.status = values.status;
   if (values.portal_allowed !== user.portal_allowed) update.portal_allowed = values.portal_allowed;
+  if (values.portal_allowed && values.max_portal_devices !== user.max_portal_devices) {
+    update.max_portal_devices = values.max_portal_devices;
+  }
 
   if (!sameAssignments(values.tariff_ids, user.tariffs)) update.tariff_ids = values.tariff_ids;
   if (!sameAssignments(values.package_ids, user.packages)) update.package_ids = values.package_ids;

@@ -199,7 +199,11 @@ async def delete_channel(
 ) -> MessageResponse:
     """Delete a channel. Use force=true to delete non-orphaned channels."""
     service = ChannelService(db)
-    await service.delete(channel_id, force=force)
+    auth_sync = AuthSyncService(db)
+    await auth_sync.apply_catalog_change(
+        lambda: auth_sync.get_user_ids_for_channel(channel_id),
+        lambda: service.delete(channel_id, force=force),
+    )
     return MessageResponse(message="Channel deleted successfully")
 
 
@@ -226,13 +230,15 @@ async def update_channel_packages(
     """Update channel's package assignments."""
     service = ChannelService(db)
     auth_sync = AuthSyncService(db)
-    current_channel = await service.get_by_id(channel_id)
-    affected_package_ids = {package.id for package in current_channel.packages}
-    affected_package_ids.update(data.package_ids)
 
-    channel = await service.update_packages(channel_id, data.package_ids)
-    affected_user_ids = await auth_sync.get_user_ids_for_packages(list(affected_package_ids))
-    await auth_sync.sync_users_by_ids(affected_user_ids)
+    async def affected_users() -> list[int]:
+        current_channel = await service.get_by_id(channel_id)
+        package_ids = {package.id for package in current_channel.packages}
+        return await auth_sync.get_user_ids_for_packages(list(package_ids.union(data.package_ids)))
+
+    channel = await auth_sync.apply_catalog_change(
+        affected_users, lambda: service.update_packages(channel_id, data.package_ids)
+    )
     return SuccessResponse(data=ChannelResponse.model_validate(channel))
 
 

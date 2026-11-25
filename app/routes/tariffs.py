@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.dependencies import CurrentAdminId, DBSession
+from app.models import Tariff
 from app.schemas import (
     SuccessResponse,
     TariffCreate,
@@ -67,15 +68,18 @@ async def update_tariff(
     """Update a tariff."""
     service = TariffService(db)
     auth_sync = AuthSyncService(db)
-    affected_user_ids = await auth_sync.get_user_ids_for_tariffs([tariff_id])
 
-    tariff = await service.update(
-        tariff_id,
-        name=data.name,
-        description=data.description,
-        package_ids=data.package_ids,
-    )
-    await auth_sync.sync_users_by_ids(affected_user_ids)
+    async def change() -> Tariff:
+        return await service.update(
+            tariff_id, name=data.name, description=data.description, package_ids=data.package_ids
+        )
+
+    if data.package_ids is None:
+        tariff = await change()
+    else:
+        tariff = await auth_sync.apply_catalog_change(
+            lambda: auth_sync.get_user_ids_for_tariffs([tariff_id]), change
+        )
     return SuccessResponse(data=TariffResponse.model_validate(tariff))
 
 
@@ -88,8 +92,8 @@ async def delete_tariff(
     """Delete a tariff."""
     service = TariffService(db)
     auth_sync = AuthSyncService(db)
-    affected_user_ids = await auth_sync.get_user_ids_for_tariffs([tariff_id])
-
-    info = await service.delete(tariff_id)
-    await auth_sync.sync_users_by_ids(affected_user_ids)
+    info = await auth_sync.apply_catalog_change(
+        lambda: auth_sync.get_user_ids_for_tariffs([tariff_id]),
+        lambda: service.delete(tariff_id),
+    )
     return SuccessResponse(data=TariffDeleteInfo(**info))

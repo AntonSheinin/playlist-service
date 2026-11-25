@@ -230,7 +230,6 @@ async def normalize_auth_db(*, apply: bool) -> None:
 async def full_resync() -> None:
     async with async_session_factory() as session:
         summary = await AuthSyncService(session).sync_all_users()
-        await session.commit()
     print_counts("Full Auth resync result", summary)
 
 

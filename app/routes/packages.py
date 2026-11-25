@@ -91,10 +91,10 @@ async def delete_package(
     """Delete a package."""
     service = PackageService(db)
     auth_sync = AuthSyncService(db)
-    affected_user_ids = await auth_sync.get_user_ids_for_packages([package_id])
-
-    info = await service.delete(package_id)
-    await auth_sync.sync_users_by_ids(affected_user_ids)
+    info = await auth_sync.apply_catalog_change(
+        lambda: auth_sync.get_user_ids_for_packages([package_id]),
+        lambda: service.delete(package_id),
+    )
     return SuccessResponse(data=PackageDeleteInfo(**info))
 
 
@@ -108,8 +108,8 @@ async def remove_package_channel(
     """Remove a channel from a package."""
     service = PackageService(db)
     auth_sync = AuthSyncService(db)
-    affected_user_ids = await auth_sync.get_user_ids_for_packages([package_id])
-
-    await service.remove_channel(package_id, channel_id)
-    await auth_sync.sync_users_by_ids(affected_user_ids)
+    await auth_sync.apply_catalog_change(
+        lambda: auth_sync.get_user_ids_for_packages([package_id]),
+        lambda: service.remove_channel(package_id, channel_id),
+    )
     return MessageResponse(message="Channel removed from package")

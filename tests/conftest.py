@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -33,7 +34,20 @@ from app.models import Base
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncSession:
+async def db_session(monkeypatch) -> AsyncSession:
+    from app.services import auth_locks
+
+    @asynccontextmanager
+    async def test_lock(*args, **kwargs):
+        yield
+
+    monkeypatch.setattr(auth_locks, "auth_catalog_lock", test_lock)
+    monkeypatch.setattr(auth_locks, "auth_account_lock", test_lock)
+
+    async def try_test_account_locks(*args):
+        return None
+
+    monkeypatch.setattr(auth_locks, "try_catalog_account_locks", try_test_account_locks)
     engine = create_async_engine(
         "sqlite+aiosqlite://",
         connect_args={"check_same_thread": False},

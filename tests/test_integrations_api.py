@@ -20,14 +20,13 @@ class RecordingStrictAuthSyncService:
     def __init__(self, db):
         self.db = db
 
-    async def sync_user_update(self, user, *, recreate_token=False, strict=False):
+    async def sync_user_update(self, user, *, strict=False):
         self.calls.append(
             {
                 "user_id": user.id,
                 "status": user.status,
                 "max_sessions": user.max_sessions,
                 "valid_until": user.valid_until,
-                "recreate_token": recreate_token,
                 "strict": strict,
             }
         )
@@ -35,6 +34,7 @@ class RecordingStrictAuthSyncService:
             from app.exceptions import AuthServiceError
 
             raise AuthServiceError("sync failed")
+        user.auth_synced = True
 
 
 class FakeAuthServiceClient:
@@ -247,11 +247,11 @@ async def test_get_user_returns_compact_integration_summary(db_session):
 
 @pytest.mark.asyncio
 async def test_enable_disable_and_max_sessions_call_strict_auth_sync(db_session, monkeypatch):
-    from app.routes import integrations as integrations_route
+    from app.services import account_service
 
     RecordingStrictAuthSyncService.calls = []
     RecordingStrictAuthSyncService.fail = False
-    monkeypatch.setattr(integrations_route, "AuthSyncService", RecordingStrictAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingStrictAuthSyncService)
     user = await _create_user(db_session, status=UserStatus.DISABLED)
 
     async with _client_with_db(db_session) as client:
@@ -280,11 +280,11 @@ async def test_enable_disable_and_max_sessions_call_strict_auth_sync(db_session,
 
 @pytest.mark.asyncio
 async def test_invalid_max_sessions_is_rejected_before_auth_sync(db_session, monkeypatch):
-    from app.routes import integrations as integrations_route
+    from app.services import account_service
 
     RecordingStrictAuthSyncService.calls = []
     RecordingStrictAuthSyncService.fail = False
-    monkeypatch.setattr(integrations_route, "AuthSyncService", RecordingStrictAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingStrictAuthSyncService)
     user = await _create_user(db_session)
 
     async with _client_with_db(db_session) as client:
@@ -300,11 +300,11 @@ async def test_invalid_max_sessions_is_rejected_before_auth_sync(db_session, mon
 
 @pytest.mark.asyncio
 async def test_valid_until_requires_timezone_and_calls_strict_auth_sync(db_session, monkeypatch):
-    from app.routes import integrations as integrations_route
+    from app.services import account_service
 
     RecordingStrictAuthSyncService.calls = []
     RecordingStrictAuthSyncService.fail = False
-    monkeypatch.setattr(integrations_route, "AuthSyncService", RecordingStrictAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingStrictAuthSyncService)
     user = await _create_user(db_session)
 
     async with _client_with_db(db_session) as client:
@@ -332,12 +332,14 @@ async def test_valid_until_requires_timezone_and_calls_strict_auth_sync(db_sessi
 
 @pytest.mark.asyncio
 async def test_auth_sync_failure_rolls_back_local_user_change(db_session, monkeypatch):
-    from app.routes import integrations as integrations_route
+    from app.services import account_service
 
     RecordingStrictAuthSyncService.calls = []
     RecordingStrictAuthSyncService.fail = True
-    monkeypatch.setattr(integrations_route, "AuthSyncService", RecordingStrictAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingStrictAuthSyncService)
     user = await _create_user(db_session, status=UserStatus.ENABLED)
+    user.auth_synced = True
+    await db_session.commit()
 
     async with _client_with_db(db_session) as client:
         response = await client.post(
@@ -348,6 +350,7 @@ async def test_auth_sync_failure_rolls_back_local_user_change(db_session, monkey
     await db_session.refresh(user)
     assert response.status_code == 502
     assert user.status == UserStatus.ENABLED
+    assert user.auth_synced is False
     assert RecordingStrictAuthSyncService.calls[0]["strict"] is True
 
 

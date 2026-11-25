@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added separate Auth and Proxy Portal sync indicators to the users table and
+  account details, with a **Sync Auth** retry action and a development-only
+  **Sync Portal** mock.
+- Added **Max Portal Devices** for accounts with Portal access. The limit
+  defaults to 1. Migrations `008` and `009` add sync tracking and the device limit.
 - Added editable, persistent playlist URL names in user details and migration
   `007` to preserve existing filenames with case-insensitive uniqueness.
 - Added a per-user Propy portal permission, editable in the admin user form and
@@ -15,6 +20,10 @@
 
 ### Changed
 
+- Admin saves now show a warning when Auth sync fails and keep the account
+  available for retry. Account deletion waits for Auth token revocation.
+- Moved service contract documentation into the README and removed the separate
+  specification.
 - Renamed Playlist Service to RuTV Middleware in the admin UI, API
   documentation, and MCP. Existing playlist links keep working.
 - Unified public playlist delivery, admin downloads, and previews in an internal
@@ -32,6 +41,8 @@
 
 ### Fixed
 
+- Fixed Auth retries failing to clear a removed validity date and token rotation
+  retries leaving the previous token active.
 - Fixed unrelated user edits changing validity times. Playlist-name-only edits
   now preserve exact validity timestamps and do not trigger Auth synchronization.
 - Fixed successful playlist renames leaving the old URL displayed when the

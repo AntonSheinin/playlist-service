@@ -6,6 +6,7 @@ import {
   updateUser,
   deleteUser,
   regenerateToken,
+  syncUser,
   getResolvedChannels,
   previewPlaylist,
   getUserSessions,
@@ -71,7 +72,7 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteUser(id),
-    onSuccess: (_, id) => {
+    onSettled: (_, __, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
       qc.invalidateQueries({ queryKey: queryKeys.users.resolvedChannels(id) });
       qc.invalidateQueries({ queryKey: queryKeys.users.playlist(id) });
@@ -88,6 +89,21 @@ export function useRegenerateToken() {
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
       qc.invalidateQueries({ queryKey: queryKeys.users.playlist(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() });
+    },
+  });
+}
+
+export function useSyncUser(service: "auth" | "portal") {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => syncUser(id, service),
+    onSuccess: (user, id) => qc.setQueryData(queryKeys.users.detail(id), user),
+    onSettled: async (_, __, id) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.users.detail(id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.users.all() }),
+      ]);
     },
   });
 }

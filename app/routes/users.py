@@ -6,7 +6,6 @@ from fastapi.responses import PlainTextResponse
 
 from app.clients.auth_service import AuthServiceClient
 from app.dependencies import CurrentAdminId, DBSession
-from app.exceptions import ValidationError
 from app.models import UserStatus
 from app.schemas import (
     MessageResponse,
@@ -20,9 +19,11 @@ from app.schemas import (
     UserCreate,
     UserListItem,
     UserResponse,
+    UserSaveResponse,
     UserUpdate,
 )
-from app.services.auth_sync import AuthSyncService
+from app.services.account_service import AccountService
+from app.services.portal_sync import PortalSyncService
 from app.services.playlist_service import PlaylistService
 from app.services.user_service import UserService
 from app.utils.log_mapping import (
@@ -88,124 +89,23 @@ async def get_user(
     return SuccessResponse(data=UserResponse.model_validate(user))
 
 
-@router.post("", response_model=SuccessResponse[UserResponse])
+@router.post("", response_model=SuccessResponse[UserSaveResponse])
 async def create_user(
     data: UserCreate,
     _admin_id: CurrentAdminId,
     db: DBSession,
-) -> SuccessResponse[UserResponse]:
-    """Create a new user and sync to Auth Service."""
-    user_service = UserService(db)
-    auth_sync = AuthSyncService(db)
-
-    user = await user_service.create(
-        first_name=data.first_name,
-        last_name=data.last_name,
-        agreement_number=data.agreement_number,
-        max_sessions=data.max_sessions,
-        status=data.status,
-        portal_allowed=data.portal_allowed,
-        valid_from=data.valid_from,
-        valid_until=data.valid_until,
-        tariff_ids=data.tariff_ids,
-        package_ids=data.package_ids,
-        channel_ids=data.channel_ids,
-    )
-
-    # Sync to Auth Service
-    await auth_sync.sync_user_create(user)
-
-    # Refresh user to get updated auth_token_id
-    user = await user_service.get_by_id(user.id)
-
-    return SuccessResponse(data=UserResponse.model_validate(user))
+) -> SuccessResponse[UserSaveResponse]:
+    return SuccessResponse(data=await AccountService(db).create(data))
 
 
-@router.patch("/{user_id}", response_model=SuccessResponse[UserResponse])
+@router.patch("/{user_id}", response_model=SuccessResponse[UserSaveResponse])
 async def update_user(
     user_id: int,
     data: UserUpdate,
     _admin_id: CurrentAdminId,
     db: DBSession,
-) -> SuccessResponse[UserResponse]:
-    """Update a user and sync to Auth Service."""
-    user_service = UserService(db)
-    auth_sync = AuthSyncService(db)
-    current_user = await user_service.get_by_id(user_id)
-    current_valid_from = current_user.valid_from
-    current_valid_until = current_user.valid_until
-    current_status = current_user.status
-    current_max_sessions = current_user.max_sessions
-    current_tariff_ids = {tariff.id for tariff in current_user.tariffs}
-    current_package_ids = {package.id for package in current_user.packages}
-    current_channel_ids = {channel.id for channel in current_user.channels}
-
-    next_valid_from = current_valid_from
-    if data.clear_valid_from:
-        next_valid_from = None
-    if data.valid_from is not None:
-        next_valid_from = data.valid_from
-
-    next_valid_until = current_valid_until
-    if data.clear_valid_until:
-        next_valid_until = None
-    if data.valid_until is not None:
-        next_valid_until = data.valid_until
-
-    valid_from_changed = next_valid_from != current_valid_from
-    valid_until_changed = next_valid_until != current_valid_until
-    valid_until_cleared = current_valid_until is not None and next_valid_until is None
-    status_changed = data.status is not None and data.status != current_status
-    max_sessions_changed = (
-        data.max_sessions is not None and data.max_sessions != current_max_sessions
-    )
-    tariffs_changed = data.tariff_ids is not None and set(data.tariff_ids) != current_tariff_ids
-    packages_changed = (
-        data.package_ids is not None and set(data.package_ids) != current_package_ids
-    )
-    channels_changed = (
-        data.channel_ids is not None and set(data.channel_ids) != current_channel_ids
-    )
-    auth_fields_changed = (
-        status_changed
-        or max_sessions_changed
-        or valid_from_changed
-        or valid_until_changed
-        or tariffs_changed
-        or packages_changed
-        or channels_changed
-    )
-    if next_valid_from is not None and next_valid_until is not None:
-        if next_valid_until <= next_valid_from:
-            raise ValidationError("Valid until must be after valid from")
-
-    user = await user_service.update(
-        user_id,
-        playlist_name=data.playlist_name,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        agreement_number=data.agreement_number,
-        max_sessions=data.max_sessions,
-        status=data.status,
-        portal_allowed=data.portal_allowed,
-        valid_from=data.valid_from,
-        valid_until=data.valid_until,
-        clear_valid_from=data.clear_valid_from,
-        clear_valid_until=data.clear_valid_until,
-        tariff_ids=data.tariff_ids,
-        package_ids=data.package_ids,
-        channel_ids=data.channel_ids,
-    )
-
-    if auth_fields_changed:
-        # Clearing valid_until requires recreate because Auth Backend PATCH omits null fields.
-        await auth_sync.sync_user_update(
-            user,
-            recreate_token=valid_from_changed or valid_until_cleared,
-        )
-        user = await user_service.get_by_id(user_id)
-
-    return SuccessResponse(data=UserResponse.model_validate(user))
+) -> SuccessResponse[UserSaveResponse]:
+    return SuccessResponse(data=await AccountService(db).update(user_id, data))
 
 
 @router.delete("/{user_id}", response_model=MessageResponse)
@@ -214,36 +114,36 @@ async def delete_user(
     _admin_id: CurrentAdminId,
     db: DBSession,
 ) -> MessageResponse:
-    """Delete a user and remove from Auth Service."""
-    user_service = UserService(db)
-    auth_sync = AuthSyncService(db)
-
-    user = await user_service.delete(user_id)
-
-    # Remove from Auth Service
-    await auth_sync.sync_user_delete(user)
-
+    await AccountService(db).delete(user_id)
     return MessageResponse(message="User deleted successfully")
 
 
-@router.post("/{user_id}/regenerate-token", response_model=SuccessResponse[UserResponse])
+@router.post("/{user_id}/regenerate-token", response_model=SuccessResponse[UserSaveResponse])
 async def regenerate_token(
     user_id: int,
     _admin_id: CurrentAdminId,
     db: DBSession,
+) -> SuccessResponse[UserSaveResponse]:
+    return SuccessResponse(data=await AccountService(db).regenerate_token(user_id))
+
+
+@router.post("/{user_id}/sync-auth", response_model=SuccessResponse[UserResponse])
+async def sync_auth(
+    user_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
 ) -> SuccessResponse[UserResponse]:
-    """Regenerate user's token and sync to Auth Service."""
-    user_service = UserService(db)
-    auth_sync = AuthSyncService(db)
+    user = await AccountService(db).retry_auth(user_id)
+    return SuccessResponse(data=UserResponse.model_validate(user))
 
-    user = await user_service.regenerate_token(user_id)
 
-    # Sync token regeneration to Auth Service
-    await auth_sync.sync_token_regenerate(user)
-
-    # Refresh user
-    user = await user_service.get_by_id(user.id)
-
+@router.post("/{user_id}/sync-portal", response_model=SuccessResponse[UserResponse])
+async def sync_portal(
+    user_id: int,
+    _admin_id: CurrentAdminId,
+    db: DBSession,
+) -> SuccessResponse[UserResponse]:
+    user = await PortalSyncService(db).sync(user_id)
     return SuccessResponse(data=UserResponse.model_validate(user))
 
 

@@ -112,8 +112,9 @@ class RecordingAuthSyncService:
     def __init__(self, db):
         self.db = db
 
-    async def sync_user_update(self, user, *, recreate_token=False):
-        self.calls.append({"user_id": user.id, "recreate_token": recreate_token})
+    async def sync_user_update(self, user, *, strict=False):
+        self.calls.append({"user_id": user.id, "strict": strict})
+        user.auth_synced = True
 
 
 @pytest.mark.asyncio
@@ -194,10 +195,10 @@ async def test_sessions_and_access_logs_query_auth_by_playlist_user_id(db_sessio
 
 @pytest.mark.asyncio
 async def test_name_only_user_update_does_not_sync_auth(db_session, monkeypatch):
-    from app.routes import users as users_route
+    from app.services import account_service
 
     RecordingAuthSyncService.calls = []
-    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingAuthSyncService)
     user = User(
         playlist_name="test_playlist",
         first_name="A",
@@ -219,10 +220,10 @@ async def test_name_only_user_update_does_not_sync_auth(db_session, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_agreement_number_only_user_update_does_not_sync_auth(db_session, monkeypatch):
-    from app.routes import users as users_route
+    from app.services import account_service
 
     RecordingAuthSyncService.calls = []
-    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingAuthSyncService)
     user = User(
         playlist_name="test_playlist",
         first_name="A",
@@ -246,10 +247,10 @@ async def test_agreement_number_only_user_update_does_not_sync_auth(db_session, 
 
 @pytest.mark.asyncio
 async def test_auth_relevant_user_update_syncs_auth(db_session, monkeypatch):
-    from app.routes import users as users_route
+    from app.services import account_service
 
     RecordingAuthSyncService.calls = []
-    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingAuthSyncService)
     user = User(
         playlist_name="test_playlist",
         first_name="A",
@@ -266,13 +267,13 @@ async def test_auth_relevant_user_update_syncs_auth(db_session, monkeypatch):
         response = await client.patch(f"/api/v1/users/{user.id}", json={"max_sessions": 2})
 
     assert response.status_code == 200
-    assert RecordingAuthSyncService.calls == [{"user_id": user.id, "recreate_token": False}]
+    assert RecordingAuthSyncService.calls == [{"user_id": user.id, "strict": False}]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("permission", [None, False, True])
 async def test_create_user_portal_permission(db_session, monkeypatch, permission):
-    from app.routes import users as users_route
+    from app.services import account_service
 
     class FakeCreateAuthSync:
         def __init__(self, db):
@@ -281,7 +282,7 @@ async def test_create_user_portal_permission(db_session, monkeypatch, permission
         async def sync_user_create(self, user):
             pass
 
-    monkeypatch.setattr(users_route, "AuthSyncService", FakeCreateAuthSync)
+    monkeypatch.setattr(account_service, "AuthSyncService", FakeCreateAuthSync)
     payload = {"first_name": "Portal", "last_name": "User", "agreement_number": "portal-create"}
     if permission is not None:
         payload["portal_allowed"] = permission
@@ -297,11 +298,11 @@ async def test_create_user_portal_permission(db_session, monkeypatch, permission
 
 @pytest.mark.asyncio
 async def test_portal_permission_updates_preserve_playback_and_skip_auth(db_session, monkeypatch):
-    from app.routes import users as users_route
+    from app.services import account_service
     from app.services.user_service import UserService
 
     RecordingAuthSyncService.calls = []
-    monkeypatch.setattr(users_route, "AuthSyncService", RecordingAuthSyncService)
+    monkeypatch.setattr(account_service, "AuthSyncService", RecordingAuthSyncService)
     user = await UserService(db_session).create("Portal", "User", "portal-update")
     assert user.portal_allowed is False
 
@@ -324,7 +325,7 @@ async def test_portal_permission_updates_preserve_playback_and_skip_auth(db_sess
         response = await client.patch(f"/api/v1/users/{user.id}", json={"max_sessions": 2})
         assert response.status_code == 200
         assert response.json()["data"]["portal_allowed"] is True
-        assert RecordingAuthSyncService.calls == [{"user_id": user.id, "recreate_token": False}]
+        assert RecordingAuthSyncService.calls == [{"user_id": user.id, "strict": False}]
 
         detail = await client.get(f"/api/v1/users/{user.id}")
         listing = await client.get("/api/v1/users")

@@ -3,6 +3,7 @@ from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.config import get_settings
 from app.models import StreamSource, SyncStatus, UserStatus
 from app.utils.playlist_name import validate_playlist_name
 
@@ -320,6 +321,7 @@ class UserCreate(BaseModel):
     max_sessions: int = Field(1, ge=1, le=100)
     status: UserStatus = UserStatus.ENABLED
     portal_allowed: bool = False
+    max_portal_devices: int = Field(default=1, strict=True, ge=1, le=2_147_483_647)
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     tariff_ids: list[int] = Field(default_factory=list)
@@ -346,6 +348,7 @@ class UserUpdate(BaseModel):
         default=None,
         json_schema_extra=lambda schema: schema.pop("default", None),
     )
+    max_portal_devices: int | None = Field(default=None, strict=True, ge=1, le=2_147_483_647)
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     clear_valid_from: bool = False
@@ -374,7 +377,21 @@ class UserUpdate(BaseModel):
         return self
 
 
-class UserResponse(OrmModel):
+class UserSyncFields(OrmModel):
+    portal_allowed: bool
+    auth_synced: bool
+    portal_synced: bool
+    portal_sync_available: bool = False
+
+    @model_validator(mode="after")
+    def set_portal_availability(self) -> "UserSyncFields":
+        self.portal_sync_available = self.portal_allowed and get_settings().active_portal_mock is not None
+        if not self.portal_sync_available:
+            self.portal_synced = False
+        return self
+
+
+class UserResponse(UserSyncFields):
     playlist_name: str
     id: int
     first_name: str
@@ -382,7 +399,7 @@ class UserResponse(OrmModel):
     agreement_number: str
     max_sessions: int
     status: UserStatus
-    portal_allowed: bool
+    max_portal_devices: int
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     token: str
@@ -394,13 +411,16 @@ class UserResponse(OrmModel):
     updated_at: datetime
 
 
-class UserListItem(OrmModel):
+class UserSaveResponse(UserResponse):
+    auth_sync_result: Literal["skipped", "succeeded", "failed"]
+
+
+class UserListItem(UserSyncFields):
     id: int
     first_name: str
     last_name: str
     agreement_number: str
     status: UserStatus
-    portal_allowed: bool
     max_sessions: int
     created_at: datetime
     tariffs: list[TariffLookup] = Field(default_factory=list)

@@ -7,9 +7,9 @@ IPTV middleware for Flussonic and Nimble stream providers.
 - Sync channels from Flussonic and Nimble (read-only cache)
 - Organize channels into groups, packages, and tariffs
 - Manage users with subscription-based channel access
-- Manage Propy portal permissions from the user form and sort users by portal access
+- Manage Proxy Portal permissions and device limits from the user form
 - Generate personalized M3U/M3U8 playlists with authentication tokens
-- Synchronize user tokens with an external Auth Service
+- Track account sync status and retry failed Auth Service updates from the admin UI
 
 ## Technology Stack
 
@@ -70,7 +70,7 @@ docker-compose exec -it rutv-middleware python scripts/create_admin.py
 
 7. Access the application at http://localhost:8080
 
-The Docker Compose stack also starts the remote MCP server at http://localhost:8091/mcp when `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` are configured in `.env`. Compose passes `INTEGRATION_API_KEY` to the MCP container as `RUTV_MIDDLEWARE_API_KEY`.
+For remote agent access, see [MCP Server](#mcp-server).
 
 `media/` contains local runtime files and is mounted into the container separately.
 Provision it independently on each host, including `media/rutv-logo.png` for the UI
@@ -151,7 +151,7 @@ Run backend checks from the repository root:
 
 ```powershell
 .\.venv\Scripts\uv.exe run python -m compileall app scripts tests
-.\.venv\Scripts\uv.exe run pytest
+.\.venv\Scripts\uv.exe run python -m pytest
 ```
 
 Run frontend checks from `frontend/`:
@@ -161,8 +161,7 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-See the [service specification](rutv-middleware-specification.md) and
-[changelog](CHANGELOG.md) for the service contracts and changes awaiting release.
+See the [changelog](CHANGELOG.md) for changes awaiting release.
 
 ## Project Structure
 
@@ -196,30 +195,58 @@ Once running, API documentation is available at:
 
 ## User Portal Permission
 
-`portal_allowed` is a stored Boolean that indicates whether a user is allowed to
-connect to the Propy portal. New users default to `false`. The admin create/edit
-form includes an **Allow portal access** checkbox, and the users table shows
-**Allowed / Denied** in a sortable **Portal allowed** column.
+`portal_allowed` stores Proxy Portal permission and defaults to `false` for
+new users. The admin form has an **Allow portal access** checkbox. Staff can
+edit **Max Portal Devices** only while access is allowed. The limit defaults to
+`1` for new and existing users and must be a positive integer. Turning access
+off preserves the saved limit. Changing the permission or the limit clears
+Portal sync confirmation.
 
-The existing admin endpoints accept the field:
-
-- `POST /api/v1/users`: omission defaults to `false`.
-- `PATCH /api/v1/users/{user_id}`: omission preserves the value; `true` grants
-  permission and `false` revokes it. Explicit `null` is rejected.
-- User list, detail, create, and update responses include the Boolean.
+Admin user creation and updates accept `portal_allowed` and
+`max_portal_devices`. On update, omitted fields keep their saved values.
+Explicit `null` for `portal_allowed` returns HTTP 422. The device limit is
+included in account detail and save responses.
 
 Sort the admin list with `sort_by=portal_allowed` and `sort_dir=asc` (Denied first)
 or `desc` (Allowed first). Equal values are ordered by user ID ascending. Changing
 the table sort resets pagination to page 1.
 
-Apply Alembic migration `006` before deploying the updated backend and UI. It adds
-the non-nullable column, sets all existing users to `false`, and retains a database
-default of `false` for future inserts. The downgrade removes the column and its
-permission values.
+### Account sync
+
+The users table and account details show Auth sync status. They show Portal sync
+status only for accounts with saved Portal access enabled. **Synced** means the
+service confirmed the saved settings during the last successful sync. **Not synced**
+covers accounts awaiting sync and failed attempts.
+
+Admin saves attempt Auth sync when a user is created or their effective playback
+settings change. An Auth failure leaves the account saved with **Not synced** and
+shows a warning. Profile-only edits skip Auth. Staff can retry saved settings with
+**Sync Auth**, which calls `POST /api/v1/users/{user_id}/sync-auth`. Account
+deletion completes only after Auth confirms token revocation.
+
+**Sync Portal** uses saved settings and requires Portal access to be enabled.
+Save changes to the permission or device limit before syncing. The staff endpoint
+is `POST /api/v1/users/{user_id}/sync-portal`. The Portal adapter is a mock for
+development and tests. In production, the button is disabled and the endpoint
+returns HTTP 503. To try the mock on a local development database, use:
+
+```dotenv
+APP_ENVIRONMENT=development
+PORTAL_SYNC_MOCK=success
+```
+
+Set `PORTAL_SYNC_MOCK=failure` to exercise the retry flow.
+
+Run `alembic upgrade head` before starting the updated backend. Migration
+`008` adds the sync flags and initializes them to false. Migration `009` adds
+the device limit and clears previous Portal confirmations. To reconcile existing
+Auth records and update their flags, run
+`uv run python scripts/auth_identity_maintenance.py --full-resync` once Auth
+Service is reachable.
 
 ## Integration API
 
-RuTV Middleware exposes a narrow service-to-service API for urgent user support actions. CRM, automation, and other non-agent systems call this API directly. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`.
+CRM and automation clients call the service-to-service API for urgent user support. Configure `INTEGRATION_API_KEY` and send it as `X-API-Key` on requests to `/api/v1/integrations/*`. The API uses `SuccessResponse` for successful calls and the standard error envelope for failures. Mutations identify users by `user_id`. Callers can use the agreement number to look up that ID.
 
 Stage 1 endpoints:
 
@@ -234,12 +261,14 @@ Stage 1 endpoints:
 User search is exact-only in stage 1. It matches agreement number, first name, last name, full name, or reversed full name. It is case-insensitive and trims leading/trailing whitespace, but it does not perform partial or fuzzy matching.
 
 User detail and exact lookup responses include the `portal_allowed` Boolean
-described in [User Portal Permission](#user-portal-permission).
+described in [User Portal Permission](#user-portal-permission). These compact
+responses omit playlist tokens, Auth token IDs, package and channel assignments,
+and admin-only metadata. The sessions endpoint returns current active sessions
+as a single list without pagination or access history.
 
-Propy must read and enforce this permission. Account status and validity do not change
-the flag; any additional status or expiry checks are Propy's responsibility. Changing
-only this flag does not synchronize Auth Service or alter playback access. This change
-does not implement Propy connection checks, caching, or session revocation.
+Proxy Portal reads and enforces this permission. Account status and validity
+are managed separately. Permission and device-limit edits affect only Portal
+sync state. This release provides the Portal mock for admin sync.
 
 Examples:
 
@@ -277,11 +306,14 @@ curl -H "X-API-Key: $INTEGRATION_API_KEY" \
   "http://localhost:8080/api/v1/integrations/users/10/sessions"
 ```
 
-Integration writes that affect playback access strictly sync the Auth Service before returning success. If Auth Service sync fails, the local database change is rolled back and the endpoint returns an error. Telegram agents should format datetime values for human display.
+Integration writes that affect playback access require Auth Service confirmation
+before returning success. If sync fails, the endpoint rolls back the playback
+change and returns an error. The admin UI shows the unconfirmed Auth status so
+staff can retry from saved settings.
 
 ## MCP Server
 
-The MCP server is a separate remote HTTP process for agent clients, such as a Telegram bot agent. It calls the Integration API and does not access the database directly.
+The MCP server is a separate process for agent clients such as a Telegram bot. It serves the Streamable HTTP transport at `/mcp`. Every tool calls the Integration API over HTTP, which owns database access and business logic.
 
 Standalone MCP process environment:
 
@@ -293,7 +325,9 @@ MCP_PORT=8091
 MCP_AUTH_TOKEN=your-mcp-bearer-token
 ```
 
-When using Docker Compose, set only `INTEGRATION_API_KEY`; Compose injects it into the MCP container as `RUTV_MIDDLEWARE_API_KEY`.
+For Docker Compose, set `MCP_AUTH_TOKEN` and `INTEGRATION_API_KEY` in `.env`.
+Compose passes `INTEGRATION_API_KEY` to the MCP container as `RUTV_MIDDLEWARE_API_KEY`.
+The default Compose endpoint is `http://localhost:8091/mcp`.
 
 Run it with:
 
@@ -301,10 +335,10 @@ Run it with:
 python -m app.mcp_server
 ```
 
-With Docker Compose, it runs as the `playlist-mcp-server` service:
+To start the MCP service with Docker Compose:
 
 ```bash
-docker-compose up -d playlist-mcp-server
+docker-compose up -d rutv-middleware-mcp
 ```
 
 The MCP endpoint is:
@@ -331,18 +365,48 @@ Available tools:
 
 ## Key Workflows
 
+### Channel Identity
+
+A channel is identified by `(source, stream_name)`. The supported `source` values
+are `flussonic` and `nimble`. When both providers have the same `stream_name`,
+each provider has a separate assignable channel row. Package, tariff, and user
+assignments refer to `channel.id`. Auth Service receives plain stream names in
+`allowed_streams`, deduplicated by `stream_name` across providers.
+
+The admin UI and API expose `source`. It appears in channel lists and details,
+lookups, nested channels in package and user details, and resolved user channels.
+Provider clients handle API calls, response parsing, health checks, and playback
+URL construction. The Flussonic client uses the V3 API, and the Nimble client
+uses the configured WMSPanel API.
+
 ### Channel Sync
-1. Admin triggers sync for Flussonic or Nimble in the dashboard
-2. Service fetches channel list from the selected provider API
-3. New channels are added, existing channels updated
-4. Channels missing from that provider are marked as "orphaned"
+
+The dashboard triggers `POST /api/v1/channels/sync` with either
+`?source=flussonic` or `?source=nimble`. Each request syncs one provider. It
+upserts channels by `(source, stream_name)` and marks missing channels from that
+provider as orphaned.
+
+| Refreshed from the provider | Preserved from the admin UI |
+|----------|-------------|
+| `tvg_name`, `display_name`, `catchup_days`, `sync_status`, `last_seen_at` | `tvg_id`, `tvg_logo`, `channel_number`, group assignments, package assignments |
+
+### Dashboard
+
+The dashboard shows aggregate stats and cards for Flussonic, Nimble, Auth, EPG,
+and RUTV. Configured provider cards show health and provider stats. An
+unavailable provider reports `down`. An unconfigured provider reports
+`Not configured`, and the dashboard disables its sync action.
+
+Provider stats are available at `GET /api/v1/dashboard/flussonic` and
+`GET /api/v1/dashboard/nimble`.
 
 ### Playlist Generation
-1. Admin creates a user with tariffs/packages/channels
-2. Service generates a unique token
-3. Service registers the token with Auth Service
-4. Admin downloads the playlist file
-5. Playlist contains all resolved channels with embedded token
+
+When an admin creates a user, the service generates a unique token and
+registers it with Auth Service. The in-process `PlaylistService` resolves the
+user's channel assignments for public delivery, admin downloads, and previews.
+It builds each row's playback URL using that row's provider and embeds the user
+token. If both provider variants are assigned, both appear in the playlist.
 
 ### Playlist URL Names
 
@@ -357,7 +421,7 @@ rejected, without trimming or rewriting input. Case is preserved. Uniqueness and
 public lookup use PostgreSQL `lower()`, replacing the former Python `casefold()`
 matching. Renaming immediately replaces the URL: update configured players;
 the previous name returns 404 unless subsequently assigned to another user.
-Tokens and playback permissions are unaffected by name-only edits.
+A name-only edit preserves the token and playback permissions and skips Auth sync.
 
 The edit form submits only changed fields. Leaving a validity date unchanged
 preserves its exact saved timestamp, including its time of day and fractional
@@ -386,13 +450,12 @@ Optional PostgreSQL tests use a disposable server and create/drop isolated schem
 
 ```powershell
 $env:PLAYLIST_TEST_POSTGRES_URL = 'postgresql+asyncpg://postgres@127.0.0.1:55439/postgres'
-.\.venv\Scripts\uv.exe run pytest tests/test_playlist_postgres.py
+.\.venv\Scripts\uv.exe run python -m pytest tests/test_playlist_postgres.py
 ```
 
-Playlist rendering remains in-process. `PlaylistService` coordinates the three
-delivery/preview endpoints and reuses the existing channel-resolution rules.
-
 ## Environment Variables
+
+Each stream provider can be configured independently.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -402,14 +465,21 @@ delivery/preview endpoints and reuses the existing channel-resolution rules.
 | `FLUSSONIC_URL` | Flussonic API base URL | Optional |
 | `FLUSSONIC_USERNAME` | Flussonic API username | Optional |
 | `FLUSSONIC_PASSWORD` | Flussonic API password | Optional |
+| `FLUSSONIC_TIMEOUT` | Flussonic API request timeout in seconds | `60` |
+| `FLUSSONIC_PAGE_LIMIT` | Flussonic API items per page | `500` |
 | `WMSPANEL_API_URL` | WMSPanel API base URL | Optional |
 | `WMSPANEL_CLIENT_ID` | WMSPanel API client ID | Optional |
 | `WMSPANEL_API_KEY` | WMSPanel API key | Optional |
 | `WMSPANEL_SERVER_ID` | WMSPanel server ID for the Nimble instance | Optional |
+| `NIMBLE_TIMEOUT` | WMSPanel API request timeout in seconds | `30` |
 | `NIMBLE_PLAYBACK_URL` | Nimble playback base URL | Optional |
 | `NIMBLE_APPLICATION` | Nimble application name used for playback/stat filtering | `live` |
+| `NIMBLE_PLAYLIST_PATH` | Playlist path appended to the Nimble stream URL | `playlist.m3u8` |
+| `NIMBLE_TOKEN_QUERY_PARAM` | Query parameter for the Nimble playback token | `token` |
 | `AUTH_SERVICE_URL` | Auth Service base URL | Required |
 | `AUTH_SERVICE_API_KEY` | Auth Service API key | Required |
+| `APP_ENVIRONMENT` | Application environment, one of `production`, `development`, or `test` | `production` |
+| `PORTAL_SYNC_MOCK` | Portal sync result in development and tests, either `success` or `failure` | Unset |
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |
 | `RUTV_SITE_URL` | RUTV site base URL | Required |
 | `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |

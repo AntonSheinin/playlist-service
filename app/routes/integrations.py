@@ -15,7 +15,7 @@ from app.schemas import (
     SessionEntry,
     SuccessResponse,
 )
-from app.services.auth_sync import AuthSyncService
+from app.services.account_service import AccountService
 from app.services.user_service import UserService
 from app.utils.log_mapping import map_session_log_entry
 
@@ -44,57 +44,18 @@ async def _run_strict_user_update(
     db: DBSession,
     update: Callable[[UserService], Awaitable[User]],
 ) -> SuccessResponse[IntegrationUserSummary]:
-    user_service = UserService(db)
-    auth_sync = AuthSyncService(db)
+    context = {"source": "integration_api", "action": action, "user_id": user_id}
     try:
-        user = await update(user_service)
+        user = await AccountService(db).strict_auth_update(user_id, update)
+    except AuthServiceError:
+        logger.info("Integration API write failed", extra={**context, "result": "failure"})
+        raise
     except PlaylistServiceError:
-        logger.info(
-            "Integration API write rejected",
-            extra={
-                "source": "integration_api",
-                "action": action,
-                "user_id": user_id,
-                "result": "rejected",
-            },
-        )
+        logger.info("Integration API write rejected", extra={**context, "result": "rejected"})
         raise
 
-    try:
-        await auth_sync.sync_user_update(user, strict=True)
-        refreshed_user = await user_service.get_by_id(user_id)
-        logger.info(
-            "Integration API write completed",
-            extra={
-                "source": "integration_api",
-                "action": action,
-                "user_id": user_id,
-                "result": "success",
-            },
-        )
-        return SuccessResponse(data=_user_summary(refreshed_user))
-    except AuthServiceError:
-        logger.info(
-            "Integration API write failed",
-            extra={
-                "source": "integration_api",
-                "action": action,
-                "user_id": user_id,
-                "result": "failure",
-            },
-        )
-        raise
-    except PlaylistServiceError:
-        logger.info(
-            "Integration API write failed after auth sync",
-            extra={
-                "source": "integration_api",
-                "action": action,
-                "user_id": user_id,
-                "result": "failure",
-            },
-        )
-        raise
+    logger.info("Integration API write completed", extra={**context, "result": "success"})
+    return SuccessResponse(data=_user_summary(user))
 
 
 @router.get("/users/find", response_model=SuccessResponse[IntegrationUserFindResponse])

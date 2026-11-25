@@ -93,10 +93,10 @@ class AuthServiceClient:
                 raise AuthServiceNotFoundError(f"Not found: {path}")
 
             logger.error(
-                "Auth service %s failed: %d - %s", operation, response.status_code, response.text
+                "Auth service %s failed: %d", operation, response.status_code
             )
             raise AuthServiceError(
-                f"Failed to {operation}: {response.status_code} - {response.text}"
+                f"Failed to {operation}: HTTP {response.status_code}"
             )
 
         except httpx.TimeoutException:
@@ -115,8 +115,11 @@ class AuthServiceClient:
             accept_statuses={200, 201},
             operation=f"create token for {data.user_id}",
         )
-        logger.info("Created auth token %d for user %s", result["id"], data.user_id)
-        return result["id"]
+        token_id = result.get("id")
+        if type(token_id) is not int or token_id <= 0:
+            raise AuthServiceError("Auth Service returned an invalid token ID")
+        logger.info("Created auth token %d for user %s", token_id, data.user_id)
+        return token_id
 
     async def update_token(self, auth_token_id: int, data: AuthTokenUpdate) -> None:
         """Update a token in Auth Service."""
@@ -140,17 +143,21 @@ class AuthServiceClient:
 
     async def find_token_by_value(self, token: str, *, limit: int = 1000) -> dict[str, Any] | None:
         """Find an Auth Service token record by token value."""
-        payload = await self._request_json_list(
-            "GET",
-            "/api/tokens",
-            params={"skip": 0, "limit": limit},
-            accept_statuses={200},
-            operation="find token by value",
-        )
-        for item in payload:
-            if isinstance(item, dict) and item.get("token") == token:
-                return item
-        return None
+        skip = 0
+        while True:
+            payload = await self._request_json_list(
+                "GET",
+                "/api/tokens",
+                params={"skip": skip, "limit": limit},
+                accept_statuses={200},
+                operation="find token by value",
+            )
+            for item in payload:
+                if isinstance(item, dict) and item.get("token") == token:
+                    return item
+            if not payload or len(payload) < limit:
+                return None
+            skip += len(payload)
 
     async def delete_token(self, auth_token_id: int) -> None:
         """Delete a token from Auth Service."""
@@ -252,7 +259,10 @@ class AuthServiceClient:
             accept_statuses=accept_statuses,
             operation=operation,
         )
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise AuthServiceError(f"Invalid Auth response during {operation}") from exc
         if isinstance(payload, dict):
             return payload
         raise AuthServiceError(f"Unexpected Auth response format during {operation}")
@@ -273,7 +283,10 @@ class AuthServiceClient:
             accept_statuses=accept_statuses,
             operation=operation,
         )
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise AuthServiceError(f"Invalid Auth response during {operation}") from exc
         if isinstance(payload, list):
             return payload
         raise AuthServiceError(f"Unexpected Auth response format during {operation}")

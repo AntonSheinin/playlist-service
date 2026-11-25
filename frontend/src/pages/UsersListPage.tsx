@@ -22,6 +22,8 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { SortableHeader } from "../components/table/SortableHeader";
 import { ResizableHeader } from "../components/table/ResizableHeader";
 import { MobileFilterToggle } from "../components/ui/MobileData";
+import { AccountSyncBadges } from "../components/users/AccountSyncBadges";
+import { ApiError } from "../api/client";
 import type { UserListItem } from "../api/types";
 
 function parsePage(value: string | null): number {
@@ -111,6 +113,7 @@ export function UsersListPage() {
       { accessorKey: "max_sessions", id: "sessions" },
       { accessorKey: "status", id: "status" },
       { accessorKey: "portal_allowed", id: "portal_allowed" },
+      { id: "sync" },
       { id: "actions" },
     ],
     []
@@ -125,11 +128,15 @@ export function UsersListPage() {
   async function handleToggleStatus(user: UserListItem) {
     const nextStatus = user.status === "enabled" ? "disabled" : "enabled";
     try {
-      await updateUser.mutateAsync({
+      const saved = await updateUser.mutateAsync({
         id: user.id,
         data: { status: nextStatus },
       });
-      showToast(`Status set to ${nextStatus}`, "success");
+      if (saved.auth_sync_result === "failed") {
+        showToast(`Status set to ${nextStatus}. Auth sync failed.`, "warning");
+      } else {
+        showToast(`Status set to ${nextStatus}`, "success");
+      }
     } catch {
       showToast("Failed to update status", "error");
     }
@@ -141,8 +148,8 @@ export function UsersListPage() {
       await deleteUserMut.mutateAsync(deleteTarget.id);
       showToast("User deleted", "success");
       setDeleteTarget(null);
-    } catch {
-      showToast("Failed to delete user", "error");
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Failed to delete user", "error");
     }
   }
 
@@ -272,6 +279,9 @@ export function UsersListPage() {
               <ResizableHeader colKey="portal_allowed" width={widths.portal_allowed} onResize={onResize}>
                 <SortableHeader label="Portal allowed" field="portal_allowed" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
               </ResizableHeader>
+              <ResizableHeader colKey="sync" width={widths.sync} onResize={onResize}>
+                Sync
+              </ResizableHeader>
               <ResizableHeader colKey="actions" width={widths.actions} onResize={onResize} className="w-40" minWidth={160}>
                 Actions
               </ResizableHeader>
@@ -279,7 +289,7 @@ export function UsersListPage() {
           </thead>
             <tbody className="divide-y divide-border bg-card">
             {users.length === 0 ? (
-              <EmptyState message="No users found" colSpan={7} />
+              <EmptyState message="No users found" colSpan={8} />
             ) : (
               userTable.getRowModel().rows.map((row) => {
                 const user = row.original;
@@ -332,6 +342,13 @@ export function UsersListPage() {
                     <Badge variant={user.portal_allowed ? "green" : "red"}>
                       {user.portal_allowed ? "Allowed" : "Denied"}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <AccountSyncBadges
+                      authSynced={user.auth_synced}
+                      portalAllowed={user.portal_allowed}
+                      portalSynced={user.portal_synced}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">

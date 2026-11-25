@@ -4,6 +4,7 @@ from sqlalchemy import func, or_, select, union
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import CompoundSelect
 
 from app.exceptions import DuplicateEntryError, NotFoundError, ValidationError
 from app.models import (
@@ -27,6 +28,23 @@ def _to_db_datetime(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         return value
     return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def user_channel_assignments(user_ids: list[int] | None = None) -> CompoundSelect:
+    """Select direct and inherited (user_id, channel_id) pairs."""
+    direct = select(user_channels.c.user_id, user_channels.c.channel_id)
+    packages = select(user_packages.c.user_id, package_channels.c.channel_id).select_from(
+        user_packages.join(package_channels, user_packages.c.package_id == package_channels.c.package_id)
+    )
+    tariffs = select(user_tariffs.c.user_id, package_channels.c.channel_id).select_from(
+        user_tariffs.join(tariff_packages, user_tariffs.c.tariff_id == tariff_packages.c.tariff_id)
+        .join(package_channels, tariff_packages.c.package_id == package_channels.c.package_id)
+    )
+    if user_ids is not None:
+        direct = direct.where(user_channels.c.user_id.in_(user_ids))
+        packages = packages.where(user_packages.c.user_id.in_(user_ids))
+        tariffs = tariffs.where(user_tariffs.c.user_id.in_(user_ids))
+    return union(direct, packages, tariffs)
 
 
 class UserService:
@@ -200,8 +218,11 @@ class UserService:
         package_ids: list[int] | None = None,
         channel_ids: list[int] | None = None,
         portal_allowed: bool = False,
+        max_portal_devices: int = 1,
     ) -> User:
         """Create a new user."""
+        if not portal_allowed and max_portal_devices != 1:
+            raise ValidationError("Allow portal access before changing the portal device limit")
         await self._ensure_agreement_available(agreement_number)
 
         try:
@@ -221,6 +242,7 @@ class UserService:
             max_sessions=max_sessions,
             status=status,
             portal_allowed=portal_allowed,
+            max_portal_devices=max_portal_devices,
             valid_from=_to_db_datetime(valid_from) if valid_from is not None else None,
             valid_until=_to_db_datetime(valid_until) if valid_until is not None else None,
             token=token,
@@ -265,9 +287,15 @@ class UserService:
         clear_valid_until: bool = False,
         portal_allowed: bool | None = None,
         playlist_name: str | None = None,
+        max_portal_devices: int | None = None,
     ) -> User:
         """Update a user."""
         user = await self.get_by_id(user_id)
+        next_portal_allowed = user.portal_allowed if portal_allowed is None else portal_allowed
+        device_limit_changed = max_portal_devices is not None and max_portal_devices != user.max_portal_devices
+        if device_limit_changed and not next_portal_allowed:
+            raise ValidationError("Allow portal access before changing the portal device limit")
+
         if playlist_name is not None and playlist_name != user.playlist_name:
             try:
                 validate_playlist_name(playlist_name)
@@ -294,8 +322,11 @@ class UserService:
         if status is not None:
             user.status = status
 
-        if portal_allowed is not None:
-            user.portal_allowed = portal_allowed
+        if user.portal_allowed != next_portal_allowed or device_limit_changed:
+            user.portal_synced = False
+        user.portal_allowed = next_portal_allowed
+        if max_portal_devices is not None:
+            user.max_portal_devices = max_portal_devices
 
         if valid_from is not None:
             user.valid_from = _to_db_datetime(valid_from)
@@ -338,7 +369,9 @@ class UserService:
     async def regenerate_token(self, user_id: int) -> User:
         """Regenerate user's token."""
         user = await self.get_by_id(user_id)
+        user.auth_previous_token = user.token
         user.token = generate_token()
+        user.auth_synced = False
         await self.db.flush()
         return await self.get_by_id(user_id)
 
@@ -355,44 +388,11 @@ class UserService:
         if result.scalar_one_or_none() is None:
             raise NotFoundError(self.not_found_message)
 
-        direct_channel_ids = select(user_channels.c.channel_id).where(
-            user_channels.c.user_id == user_id
-        )
-        package_channel_ids = (
-            select(package_channels.c.channel_id)
-            .select_from(
-                user_packages.join(
-                    package_channels,
-                    user_packages.c.package_id == package_channels.c.package_id,
-                )
-            )
-            .where(user_packages.c.user_id == user_id)
-        )
-        tariff_channel_ids = (
-            select(package_channels.c.channel_id)
-            .select_from(
-                user_tariffs.join(
-                    tariff_packages,
-                    user_tariffs.c.tariff_id == tariff_packages.c.tariff_id,
-                ).join(
-                    package_channels,
-                    tariff_packages.c.package_id == package_channels.c.package_id,
-                )
-            )
-            .where(user_tariffs.c.user_id == user_id)
-        )
-
-        channel_ids_stmt = union(direct_channel_ids, package_channel_ids, tariff_channel_ids)
-        result = await self.db.execute(channel_ids_stmt)
-        channel_ids = [channel_id for channel_id in result.scalars().all() if channel_id is not None]
-
-        if not channel_ids:
-            return []
-
+        assignments = user_channel_assignments([user_id]).subquery()
         # Fetch all channels ordered by channel number (fallback to sort_order for ties/nulls).
         stmt = (
             select(Channel)
-            .where(Channel.id.in_(channel_ids))
+            .join(assignments, assignments.c.channel_id == Channel.id)
             .options(selectinload(Channel.groups))
             .order_by(
                 Channel.channel_number.asc().nulls_last(),
@@ -402,9 +402,3 @@ class UserService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-
-    async def set_auth_token_id(self, user_id: int, auth_token_id: int | None) -> None:
-        """Set the auth service token ID for a user."""
-        user = await self.get_by_id(user_id)
-        user.auth_token_id = auth_token_id
-        await self.db.flush()

@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, Index, String, Table, Text, UniqueConstraint, false, func
+from sqlalchemy import CheckConstraint, Column, Enum, ForeignKey, Integer, Index, String, Table, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -164,6 +164,9 @@ class Tariff(Base, TimestampMixin):
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("max_portal_devices >= 1", name="ck_users_max_portal_devices_positive"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -178,7 +181,11 @@ class User(Base, TimestampMixin):
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     playlist_name: Mapped[str] = mapped_column(String(302), nullable=False)
     portal_allowed: Mapped[bool] = mapped_column(default=False, server_default=false(), nullable=False)
+    max_portal_devices: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
     auth_token_id: Mapped[int | None] = mapped_column(nullable=True)
+    auth_synced: Mapped[bool] = mapped_column(default=False, server_default=false(), nullable=False)
+    portal_synced: Mapped[bool] = mapped_column(default=False, server_default=false(), nullable=False)
+    auth_previous_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(nullable=True)
 

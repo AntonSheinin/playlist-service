@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, type FormEvent } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   useUser,
@@ -6,6 +6,7 @@ import {
   useUpdateUser,
   useDeleteUser,
   useRegenerateToken,
+  useSyncUser,
   useResolvedChannels,
   usePlaylistPreview,
   useUserSessions,
@@ -25,6 +26,7 @@ import { Select } from "../components/ui/Select";
 import { Card } from "../components/ui/Card";
 import { SectionCard } from "../components/ui/SectionCard";
 import { UserDetailHeader } from "../components/users/UserDetailHeader";
+import { AccountSyncBadges } from "../components/users/AccountSyncBadges";
 import {
   AccessLogModal,
   PlaylistPreviewModal,
@@ -58,6 +60,9 @@ export function UserDetailPage() {
   const updateUser = useUpdateUser();
   const deleteUserMut = useDeleteUser();
   const regenToken = useRegenerateToken();
+  const syncAuth = useSyncUser("auth");
+  const syncPortal = useSyncUser("portal");
+  const portalSyncAvailable = user?.portal_sync_available ?? false;
   const { data: resolvedChannels } = useResolvedChannels(userId);
 
   // Lookups
@@ -76,6 +81,11 @@ export function UserDetailPage() {
   const [maxSessions, setMaxSessions] = useState(1);
   const [status, setStatus] = useState("enabled");
   const [portalAllowed, setPortalAllowed] = useState(false);
+  const [maxPortalDevices, setMaxPortalDevices] = useState("1");
+  const portalSettingsChanged = !!user && (
+    portalAllowed !== user.portal_allowed ||
+    (portalAllowed && Number(maxPortalDevices) !== user.max_portal_devices)
+  );
 
   // Multi-selects
   const [selectedTariffs, setSelectedTariffs] = useState<SelectOption[]>([]);
@@ -139,10 +149,19 @@ export function UserDetailPage() {
     [lookupChannels]
   );
 
-  // Populate form when user data loads
+  const loadedForm = useRef("");
+  // Sync status refreshes should preserve unsaved edits.
   useEffect(() => {
     if (!user) return;
+    const savedForm = JSON.stringify([
+      user.id, user.first_name, user.last_name, user.agreement_number, user.playlist_name,
+      user.max_sessions, user.status, user.portal_allowed, user.max_portal_devices,
+      user.valid_from, user.valid_until,
+      user.tariffs, user.packages, user.channels,
+    ]);
+    if (loadedForm.current === savedForm) return;
     const timeout = window.setTimeout(() => {
+      loadedForm.current = savedForm;
       setFirstName(user.first_name);
       setLastName(user.last_name);
       setAgreementNumber(user.agreement_number);
@@ -151,6 +170,7 @@ export function UserDetailPage() {
       setMaxSessions(user.max_sessions);
       setStatus(user.status);
       setPortalAllowed(user.portal_allowed);
+      setMaxPortalDevices(String(user.max_portal_devices));
       setValidFrom(parseLocalDate(user.valid_from));
       setValidUntil(parseLocalDate(user.valid_until));
       setSelectedTariffs(user.tariffs.map((t) => ({ value: t.id, label: t.name })));
@@ -184,6 +204,7 @@ export function UserDetailPage() {
       max_sessions: maxSessions,
       status: status as "enabled" | "disabled",
       portal_allowed: portalAllowed,
+      ...(portalAllowed ? { max_portal_devices: Number(maxPortalDevices) } : {}),
       tariff_ids: selectedTariffs.map((t) => t.value),
       package_ids: selectedPackages.map((p) => p.value),
       channel_ids: selectedChannels.map((c) => c.value),
@@ -195,11 +216,19 @@ export function UserDetailPage() {
       if (isEdit) {
         if (!user) return;
         const payload = buildUserUpdate(user, { ...base, playlist_name: playlistName });
-        await updateUser.mutateAsync({ id: userId!, data: payload });
-        showToast("User updated", "success");
+        const saved = await updateUser.mutateAsync({ id: userId!, data: payload });
+        if (saved.auth_sync_result === "failed") {
+          showToast("Account saved. Auth sync failed.", "warning");
+        } else {
+          showToast("User updated", "success");
+        }
       } else {
         const newUser = await createUser.mutateAsync(base);
-        showToast("User created", "success");
+        if (newUser.auth_sync_result === "failed") {
+          showToast("Account created. Auth sync failed.", "warning");
+        } else {
+          showToast("User created", "success");
+        }
         navigate(`/users/${newUser.id}`, { replace: true });
       }
     } catch (error) {
@@ -212,13 +241,30 @@ export function UserDetailPage() {
       }
       showToast(message, "error");
     }
-  }, [firstName, lastName, agreementNumber, playlistName, maxSessions, status, portalAllowed, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, user, updateUser, createUser, showToast, navigate]);
+  }, [firstName, lastName, agreementNumber, playlistName, maxSessions, status, portalAllowed, maxPortalDevices, selectedTariffs, selectedPackages, selectedChannels, validFrom, validUntil, isEdit, userId, user, updateUser, createUser, showToast, navigate]);
+
+  async function handleSync(service: "auth" | "portal") {
+    if (!userId) return;
+    const mutation = service === "auth" ? syncAuth : syncPortal;
+    const name = service === "auth" ? "Auth" : "Portal";
+    try {
+      await mutation.mutateAsync(userId);
+      showToast(`${name} synced`, "success");
+    } catch (error) {
+      const detail = error instanceof ApiError ? ` ${error.message}` : "";
+      showToast(`${name} sync failed.${detail}`, "error");
+    }
+  }
 
   async function handleRegenToken() {
     if (!userId) return;
     try {
-      await regenToken.mutateAsync(userId);
-      showToast("Token regenerated", "success");
+      const saved = await regenToken.mutateAsync(userId);
+      if (saved.auth_sync_result === "failed") {
+        showToast("Token regenerated. Auth sync failed.", "warning");
+      } else {
+        showToast("Token regenerated", "success");
+      }
       setRegenOpen(false);
     } catch {
       showToast("Failed to regenerate token", "error");
@@ -231,8 +277,8 @@ export function UserDetailPage() {
       await deleteUserMut.mutateAsync(userId);
       showToast("User deleted", "success");
       navigate("/users", { replace: true });
-    } catch {
-      showToast("Failed to delete user", "error");
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Failed to delete user", "error");
     }
   }
 
@@ -365,6 +411,16 @@ export function UserDetailPage() {
             />
             Allow portal access
           </label>
+          <Input
+            label="Max Portal Devices"
+            type="number"
+            min={1}
+            max={2_147_483_647}
+            required={portalAllowed}
+            disabled={!portalAllowed}
+            value={maxPortalDevices}
+            onChange={(e) => setMaxPortalDevices(e.target.value)}
+          />
           {isEdit && user && (
             <>
               <div>
@@ -433,6 +489,21 @@ export function UserDetailPage() {
         </SectionCard>
 
         <Card className="border border-border bg-muted p-4">
+          {user && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <AccountSyncBadges
+                authSynced={user.auth_synced}
+                portalAllowed={user.portal_allowed}
+                portalSynced={user.portal_synced}
+              />
+              {portalSettingsChanged && (
+                <span className="text-xs text-muted-foreground">Save Portal changes before syncing.</span>
+              )}
+              {user.portal_allowed && !portalSyncAvailable && !portalSettingsChanged && (
+                <span className="text-xs text-muted-foreground">Proxy Portal integration is pending.</span>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-3">
             <Link to="/users">
               <Button type="button" variant="secondary">Cancel</Button>
@@ -442,6 +513,30 @@ export function UserDetailPage() {
                 Delete
               </Button>
           )}
+            {user && (
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={user.auth_synced || updateUser.isPending}
+                  loading={syncAuth.isPending}
+                  onClick={() => handleSync("auth")}
+                >
+                  Sync Auth
+                </Button>
+                {user.portal_allowed && (
+                  <Button
+                    variant="secondary"
+                    disabled={
+                      portalSettingsChanged || !portalSyncAvailable || user.portal_synced || updateUser.isPending
+                    }
+                    loading={syncPortal.isPending}
+                    onClick={() => handleSync("portal")}
+                  >
+                    Sync Portal
+                  </Button>
+                )}
+              </>
+            )}
             <Button type="submit" loading={createUser.isPending || updateUser.isPending}>
               Save
             </Button>

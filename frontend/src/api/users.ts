@@ -2,6 +2,7 @@ import { get, post, patch, fetchMessage } from "./client";
 import type {
   UserListItem,
   UserResponse,
+  UserSaveResponse,
   UserCreate,
   UserUpdate,
   ResolvedChannel,
@@ -39,23 +40,27 @@ export function getUser(id: number): Promise<UserResponse> {
   return get<UserResponse>(`/api/v1/users/${id}`);
 }
 
-export function createUser(data: UserCreate): Promise<UserResponse> {
-  return post<UserResponse>("/api/v1/users", data);
+export function createUser(data: UserCreate): Promise<UserSaveResponse> {
+  return post<UserSaveResponse>("/api/v1/users", data);
 }
 
 export function updateUser(
   id: number,
   data: UserUpdate
-): Promise<UserResponse> {
-  return patch<UserResponse>(`/api/v1/users/${id}`, data);
+): Promise<UserSaveResponse> {
+  return patch<UserSaveResponse>(`/api/v1/users/${id}`, data);
 }
 
 export function deleteUser(id: number): Promise<string> {
   return fetchMessage(`/api/v1/users/${id}`, { method: "DELETE" });
 }
 
-export function regenerateToken(id: number): Promise<UserResponse> {
-  return post<UserResponse>(`/api/v1/users/${id}/regenerate-token`);
+export function regenerateToken(id: number): Promise<UserSaveResponse> {
+  return post<UserSaveResponse>(`/api/v1/users/${id}/regenerate-token`);
+}
+
+export function syncUser(id: number, service: "auth" | "portal"): Promise<UserResponse> {
+  return post<UserResponse>(`/api/v1/users/${id}/sync-${service}`);
 }
 
 export function getResolvedChannels(id: number): Promise<ResolvedChannel[]> {

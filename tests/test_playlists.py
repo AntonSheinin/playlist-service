@@ -24,7 +24,7 @@ def test_default_name_preserves_existing_sanitization_and_length():
 @pytest.mark.asyncio
 async def test_admin_creation_initializes_name_and_keeps_integration_contract(db_session, monkeypatch):
     sync = AsyncMock()
-    monkeypatch.setattr("app.routes.users.AuthSyncService.sync_user_create", sync)
+    monkeypatch.setattr("app.services.auth_sync.AuthSyncService.sync_user_create", sync)
     app.dependency_overrides[get_current_admin_id] = lambda: 1
     try:
         async with _client_with_db(db_session) as client:
@@ -58,7 +58,7 @@ async def test_rename_updates_all_playlist_outputs_without_auth_sync(db_session,
     await db_session.commit()
     user_id, token = user.id, user.token
     sync = AsyncMock()
-    monkeypatch.setattr("app.routes.users.AuthSyncService.sync_user_update", sync)
+    monkeypatch.setattr("app.services.auth_sync.AuthSyncService.sync_user_update", sync)
     app.dependency_overrides[get_current_admin_id] = lambda: 1
     try:
         async with _client_with_db(db_session) as client:

@@ -1,6 +1,7 @@
 import logging
 import sys
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -61,6 +62,16 @@ class Settings(BaseSettings):
     auth_service_url: str = Field(min_length=1)
     auth_service_api_key: str = Field(min_length=1)
     auth_service_timeout: float
+
+    # Proxy Portal test adapter. No remote client is configured yet.
+    app_environment: Literal["production", "development", "test"] = "production"
+    portal_sync_mock: Literal["success", "failure"] | None = None
+
+    @property
+    def active_portal_mock(self) -> Literal["success", "failure"] | None:
+        if self.app_environment in {"development", "test"}:
+            return self.portal_sync_mock
+        return None
 
     # EPG Service
     epg_service_url: str = Field(min_length=1)
