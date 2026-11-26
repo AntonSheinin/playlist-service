@@ -33,10 +33,18 @@ import {
   SessionsLogModal,
 } from "../components/users/UserDetailModals";
 import { ApiError } from "../api/client";
+import type { UserSaveResponse } from "../api/types";
 import { buildPlaylistUrl } from "../utils/playlist";
 import { buildUserUpdate } from "../utils/userForm";
 import { formatDate, parseLocalDate } from "../utils/formatters";
 import { formatChannelOptionLabel } from "../utils/channels";
+
+function syncFailureMessage(user: UserSaveResponse): string {
+  const failed = [];
+  if (user.auth_sync_result === "failed") failed.push("Auth");
+  if (user.portal_sync_result === "failed") failed.push("Portal");
+  return failed.length ? ` ${failed.join(" and ")} sync failed.` : "";
+}
 
 function todayStr(): string {
   return formatDate(new Date());
@@ -217,18 +225,12 @@ export function UserDetailPage() {
         if (!user) return;
         const payload = buildUserUpdate(user, { ...base, playlist_name: playlistName });
         const saved = await updateUser.mutateAsync({ id: userId!, data: payload });
-        if (saved.auth_sync_result === "failed") {
-          showToast("Account saved. Auth sync failed.", "warning");
-        } else {
-          showToast("User updated", "success");
-        }
+        const warning = syncFailureMessage(saved);
+        showToast(warning ? `Account saved.${warning}` : "User updated", warning ? "warning" : "success");
       } else {
         const newUser = await createUser.mutateAsync(base);
-        if (newUser.auth_sync_result === "failed") {
-          showToast("Account created. Auth sync failed.", "warning");
-        } else {
-          showToast("User created", "success");
-        }
+        const warning = syncFailureMessage(newUser);
+        showToast(warning ? `Account created.${warning}` : "User created", warning ? "warning" : "success");
         navigate(`/users/${newUser.id}`, { replace: true });
       }
     } catch (error) {
@@ -260,11 +262,8 @@ export function UserDetailPage() {
     if (!userId) return;
     try {
       const saved = await regenToken.mutateAsync(userId);
-      if (saved.auth_sync_result === "failed") {
-        showToast("Token regenerated. Auth sync failed.", "warning");
-      } else {
-        showToast("Token regenerated", "success");
-      }
+      const warning = syncFailureMessage(saved);
+      showToast(warning ? `Token regenerated.${warning}` : "Token regenerated", warning ? "warning" : "success");
       setRegenOpen(false);
     } catch {
       showToast("Failed to regenerate token", "error");
@@ -493,14 +492,14 @@ export function UserDetailPage() {
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <AccountSyncBadges
                 authSynced={user.auth_synced}
-                portalAllowed={user.portal_allowed}
+                portalSyncAvailable={user.portal_sync_available}
                 portalSynced={user.portal_synced}
               />
               {portalSettingsChanged && (
                 <span className="text-xs text-muted-foreground">Save Portal changes before syncing.</span>
               )}
               {user.portal_allowed && !portalSyncAvailable && !portalSettingsChanged && (
-                <span className="text-xs text-muted-foreground">Proxy Portal integration is pending.</span>
+                <span className="text-xs text-muted-foreground">Portal sync is unavailable.</span>
               )}
             </div>
           )}
@@ -523,11 +522,11 @@ export function UserDetailPage() {
                 >
                   Sync Auth
                 </Button>
-                {user.portal_allowed && (
+                {portalSyncAvailable && (
                   <Button
                     variant="secondary"
                     disabled={
-                      portalSettingsChanged || !portalSyncAvailable || user.portal_synced || updateUser.isPending
+                      portalSettingsChanged || updateUser.isPending
                     }
                     loading={syncPortal.isPending}
                     onClick={() => handleSync("portal")}

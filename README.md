@@ -53,19 +53,20 @@ WMSPANEL_SERVER_ID=your-nimble-server-id
 NIMBLE_PLAYBACK_URL=http://your-nimble-server:8081
 ```
 
-4. Start the services:
+4. Start PostgreSQL and run database migrations.
 ```bash
-docker-compose up -d
+docker compose up -d --wait postgres
+docker compose run --rm --no-deps --build -T rutv-middleware alembic upgrade head
 ```
 
-5. Run database migrations:
+5. Start the application services.
 ```bash
-docker-compose exec rutv-middleware alembic upgrade head
+docker compose up -d
 ```
 
-6. Create an admin user:
+6. Create an admin user.
 ```bash
-docker-compose exec -it rutv-middleware python scripts/create_admin.py
+docker compose exec rutv-middleware python scripts/create_admin.py
 ```
 
 7. Access the application at http://localhost:8080
@@ -213,10 +214,9 @@ the table sort resets pagination to page 1.
 
 ### Account sync
 
-The users table and account details show Auth sync status. They show Portal sync
-status only for accounts with saved Portal access enabled. **Synced** means the
-service confirmed the saved settings during the last successful sync. **Not synced**
-covers accounts awaiting sync and failed attempts.
+The users table and account details show Auth sync status and show Portal sync
+status when Portal is configured. **Synced** means the service acknowledged the
+current saved settings. **Not synced** covers changes that have not been acknowledged.
 
 Admin saves attempt Auth sync when a user is created or their effective playback
 settings change. An Auth failure leaves the account saved with **Not synced** and
@@ -224,18 +224,33 @@ shows a warning. Profile-only edits skip Auth. Staff can retry saved settings wi
 **Sync Auth**, which calls `POST /api/v1/users/{user_id}/sync-auth`. Account
 deletion completes only after Auth confirms token revocation.
 
-**Sync Portal** uses saved settings and requires Portal access to be enabled.
-Save changes to the permission or device limit before syncing. The staff endpoint
-is `POST /api/v1/users/{user_id}/sync-portal`. The Portal adapter is a mock for
-development and tests. In production, the button is disabled and the endpoint
-returns HTTP 503. To try the mock on a local development database, use:
+Set `PORTAL_BASE_URL` and `PORTAL_API_KEY` together to enable Portal Proxy
+integration, or leave both empty. `PORTAL_TIMEOUT` defaults to 15 seconds.
+Middleware validates the base URL at startup and sends the key in the
+`X-Internal-Api-Key` header. Use HTTPS for Portal connections. When Portal runs on
+the Docker host, Compose maps `host.docker.internal` to the host gateway so
+middleware can use `http://host.docker.internal:8092`. Compose passes the Portal
+key only to middleware.
 
-```dotenv
-APP_ENVIRONMENT=development
-PORTAL_SYNC_MOCK=success
-```
+Account creation, edits to names, Portal settings or individual account
+assignments, and confirmed token rotations sync directly to Portal. Shared
+catalog edits have no automatic Portal sync. Suspension clears the stored Portal
+playlist. Permanent deletion revokes Auth access and then removes the account
+from Portal before deleting the local user. If Portal deletion fails, retry the
+delete from the admin UI.
 
-Set `PORTAL_SYNC_MOCK=failure` to exercise the retry flow.
+**Sync Portal** sends the latest saved snapshot for an enabled or suspended
+account through `POST /api/v1/users/{user_id}/sync-portal`. If a Portal call fails
+after an account save, the UI reports that the account was saved and sync failed.
+The endpoint returns HTTP 503 when Portal is unconfigured.
+
+Before enabling Portal in production, run `uv run python -m scripts.portal_sync --check-size`
+from the middleware environment to check generated URLs and the 8 MiB request
+size limit. Once configured, run `uv run python -m scripts.portal_sync` to backfill
+existing accounts, including suspended accounts and accounts previously marked
+synced by the mock. The command can be rerun. Use
+`uv run python -m scripts.portal_sync --verify-account ACCOUNT_ID` to compare
+stored Portal metadata with the middleware account.
 
 Run `alembic upgrade head` before starting the updated backend. Migration
 `008` adds the sync flags and initializes them to false. Migration `009` adds
@@ -478,8 +493,9 @@ Each stream provider can be configured independently.
 | `NIMBLE_TOKEN_QUERY_PARAM` | Query parameter for the Nimble playback token | `token` |
 | `AUTH_SERVICE_URL` | Auth Service base URL | Required |
 | `AUTH_SERVICE_API_KEY` | Auth Service API key | Required |
-| `APP_ENVIRONMENT` | Application environment, one of `production`, `development`, or `test` | `production` |
-| `PORTAL_SYNC_MOCK` | Portal sync result in development and tests, either `success` or `failure` | Unset |
+| `PORTAL_BASE_URL` | RuTV Portal Proxy base URL, with HTTP allowed on `host.docker.internal` | Unset |
+| `PORTAL_API_KEY` | Secret sent in the `X-Internal-Api-Key` header | Unset |
+| `PORTAL_TIMEOUT` | Portal request timeout in seconds | `15` |
 | `EPG_SERVICE_URL` | EPG Service base URL | Required |
 | `RUTV_SITE_URL` | RUTV site base URL | Required |
 | `RUTV_STATS_TOKEN` | RUTV stats token sent in `X-Stats-Token` | Required |

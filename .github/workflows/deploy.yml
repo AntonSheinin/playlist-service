@@ -92,8 +92,9 @@ jobs:
           echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
           sudo docker compose pull rutv-middleware rutv-middleware-mcp
+          sudo docker compose up -d --wait postgres
+          sudo docker compose run --rm --no-deps -T rutv-middleware alembic upgrade head </dev/null
           sudo docker compose up -d --no-build --force-recreate rutv-middleware
-          sudo docker compose exec -T rutv-middleware alembic upgrade head </dev/null
           sudo docker compose up -d --no-build --force-recreate rutv-middleware-mcp
 
           sudo docker compose ps

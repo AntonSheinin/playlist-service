@@ -346,7 +346,7 @@ export function UsersListPage() {
                   <td className="px-4 py-3">
                     <AccountSyncBadges
                       authSynced={user.auth_synced}
-                      portalAllowed={user.portal_allowed}
+                      portalSyncAvailable={user.portal_sync_available}
                       portalSynced={user.portal_synced}
                     />
                   </td>

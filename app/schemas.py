@@ -385,7 +385,7 @@ class UserSyncFields(OrmModel):
 
     @model_validator(mode="after")
     def set_portal_availability(self) -> "UserSyncFields":
-        self.portal_sync_available = self.portal_allowed and get_settings().active_portal_mock is not None
+        self.portal_sync_available = get_settings().portal_configured
         if not self.portal_sync_available:
             self.portal_synced = False
         return self
@@ -413,6 +413,7 @@ class UserResponse(UserSyncFields):
 
 class UserSaveResponse(UserResponse):
     auth_sync_result: Literal["skipped", "succeeded", "failed"]
+    portal_sync_result: Literal["skipped", "succeeded", "failed"]
 
 
 class UserListItem(UserSyncFields):

@@ -240,6 +240,7 @@ export interface UserResponse {
 
 export interface UserSaveResponse extends UserResponse {
   auth_sync_result: "skipped" | "succeeded" | "failed";
+  portal_sync_result: "skipped" | "succeeded" | "failed";
 }
 
 export interface UserCreate {

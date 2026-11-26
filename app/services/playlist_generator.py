@@ -1,12 +1,14 @@
-from app.config import get_settings
+from urllib.parse import urljoin, urlsplit
+
 from app.clients.stream_provider import get_stream_provider
+from app.config import get_settings
 from app.models import Channel, User
 
 
 class PlaylistGenerator:
     """Service for generating M3U8 playlists."""
 
-    def generate(self, user: User, channels: list[Channel]) -> str:
+    def generate(self, user: User, channels: list[Channel], *, require_absolute_urls: bool = False) -> str:
         """
         Generate M3U8 playlist content for a user.
 
@@ -50,6 +52,8 @@ class PlaylistGenerator:
             if channel.tvg_logo:
                 logo_url = self._build_logo_url(channel.tvg_logo, logo_base_url)
                 if logo_url:
+                    if require_absolute_urls and not logo_url.lower().startswith("data:"):
+                        self._validate_http_url(logo_url)
                     attrs.append(f'tvg-logo="{logo_url}"')
 
             # Display name for the channel
@@ -57,13 +61,30 @@ class PlaylistGenerator:
 
             # Build EXTINF line
             extinf = f'#EXTINF:-1 {" ".join(attrs)},{display_name}'
+            if require_absolute_urls and ("\n" in extinf or "\r" in extinf):
+                raise ValueError("Invalid line break in playlist metadata")
             lines.append(extinf)
 
             provider = get_stream_provider(channel.source)
             stream_url = provider.build_stream_url(channel.stream_name, user.token)
+            if require_absolute_urls:
+                self._validate_http_url(stream_url)
             lines.append(stream_url)
 
         return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _validate_http_url(url: str) -> None:
+        parsed = urlsplit(url)
+        port = parsed.port
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or port == 0
+            or "\n" in url
+            or "\r" in url
+        ):
+            raise ValueError("Invalid HTTP(S) playlist URL")
 
     def _escape(self, value: str) -> str:
         """Escape special characters in attribute values."""
@@ -79,6 +100,8 @@ class PlaylistGenerator:
             return cleaned
         if not base_url:
             return cleaned
+        if cleaned.startswith("//"):
+            return urljoin(base_url, cleaned)
         if cleaned.startswith("/"):
             return f"{base_url}{cleaned}"
         return f"{base_url}/{cleaned}"

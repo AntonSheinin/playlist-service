@@ -5,8 +5,10 @@
 ### Added
 
 - Added separate Auth and Proxy Portal sync indicators to the users table and
-  account details, with a **Sync Auth** retry action and a development-only
-  **Sync Portal** mock.
+  account details, with **Sync Auth** and **Sync Portal** retry actions.
+- Added direct Portal Proxy synchronization for account changes, playlist
+  assignments, suspension, and deletion. Staff can resync a saved account, and
+  operators can check payload sizes and backfill existing accounts.
 - Added **Max Portal Devices** for accounts with Portal access. The limit
   defaults to 1. Migrations `008` and `009` add sync tracking and the device limit.
 - Added editable, persistent playlist URL names in user details and migration
@@ -41,6 +43,8 @@
 
 ### Fixed
 
+- Deployments now complete database migrations before starting the updated
+  middleware and MCP services.
 - Fixed Auth retries failing to clear a removed validity date and token rotation
   retries leaving the previous token active.
 - Fixed unrelated user edits changing validity times. Playlist-name-only edits

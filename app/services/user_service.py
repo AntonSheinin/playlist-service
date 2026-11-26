@@ -322,8 +322,6 @@ class UserService:
         if status is not None:
             user.status = status
 
-        if user.portal_allowed != next_portal_allowed or device_limit_changed:
-            user.portal_synced = False
         user.portal_allowed = next_portal_allowed
         if max_portal_devices is not None:
             user.max_portal_devices = max_portal_devices

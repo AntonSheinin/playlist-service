@@ -7,6 +7,8 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,11 +31,10 @@ services:
     command: ["python", "-m", "app.mcp_server"]
     ports:
       - "8091:8091"
-    env_file:
-      - .env
     environment:
       RUTV_MIDDLEWARE_API_URL: http://rutv-middleware:8080
       RUTV_MIDDLEWARE_API_KEY: ${INTEGRATION_API_KEY}
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8091
     depends_on:
@@ -46,8 +47,10 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: playlist-postgres
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

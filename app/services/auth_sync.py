@@ -259,6 +259,19 @@ class AuthSyncService:
         if failure is not None:
             raise AuthServiceError("Account retained because Auth token revocation failed") from failure
 
+    async def has_registered_token(self, user: User) -> bool:
+        async with AuthServiceClient() as client:
+            if user.auth_token_id is not None:
+                try:
+                    record = await client.get_token(user.auth_token_id)
+                except AuthServiceNotFoundError:
+                    pass
+                else:
+                    if record.get("token") == user.token:
+                        return record.get("user_id") == str(user.id)
+            record = await client.find_token_by_value(user.token)
+            return record is not None and record.get("user_id") == str(user.id)
+
     async def sync_all_users(self) -> dict[str, int]:
         """Resync all Playlist users to Auth Service and return summary counts."""
         accounts = (

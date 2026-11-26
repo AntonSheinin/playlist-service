@@ -1,9 +1,9 @@
 import logging
 import sys
 from functools import lru_cache
-from typing import Literal
 
-from pydantic import Field
+from httpx import InvalidURL, URL
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Time constants (seconds)
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     # Database
@@ -63,15 +64,48 @@ class Settings(BaseSettings):
     auth_service_api_key: str = Field(min_length=1)
     auth_service_timeout: float
 
-    # Proxy Portal test adapter. No remote client is configured yet.
-    app_environment: Literal["production", "development", "test"] = "production"
-    portal_sync_mock: Literal["success", "failure"] | None = None
+    # RuTV Portal Proxy
+    portal_base_url: str = ""
+    portal_api_key: SecretStr = SecretStr("")
+    portal_timeout: float = Field(default=15, gt=0)
 
     @property
-    def active_portal_mock(self) -> Literal["success", "failure"] | None:
-        if self.app_environment in {"development", "test"}:
-            return self.portal_sync_mock
-        return None
+    def portal_configured(self) -> bool:
+        return bool(self.portal_base_url.strip() and self.portal_api_key.get_secret_value().strip())
+
+    @field_validator("portal_base_url")
+    @classmethod
+    def validate_portal_base_url(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return value
+
+        message = "PORTAL_BASE_URL must be a valid HTTPS URL or use HTTP on host.docker.internal"
+        try:
+            url = URL(value)
+        except InvalidURL:
+            raise ValueError(message) from None
+
+        docker_http = url.scheme == "http" and url.host == "host.docker.internal"
+        if (
+            (url.scheme != "https" and not docker_http)
+            or not url.host
+            or url.userinfo
+            or url.query
+            or url.fragment
+            or (url.port is not None and not 1 <= url.port <= 65535)
+            or any(character.isspace() for character in value)
+        ):
+            raise ValueError(message)
+        return value
+
+    @model_validator(mode="after")
+    def validate_portal_credentials(self) -> "Settings":
+        has_url = bool(self.portal_base_url.strip())
+        has_key = bool(self.portal_api_key.get_secret_value().strip())
+        if has_url != has_key:
+            raise ValueError("Set PORTAL_BASE_URL and PORTAL_API_KEY together")
+        return self
 
     # EPG Service
     epg_service_url: str = Field(min_length=1)

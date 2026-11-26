@@ -87,6 +87,20 @@ class AuthServiceNotFoundError(AuthServiceError):
         self.code = "AUTH_SERVICE_NOT_FOUND"
 
 
+class PortalUnavailableError(PlaylistServiceError):
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("Portal integration is unavailable", code="PORTAL_SYNC_UNAVAILABLE")
+
+
+class PortalSyncError(PlaylistServiceError):
+    status_code = 502
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code="PORTAL_SYNC_ERROR")
+
+
 class EpgServiceError(PlaylistServiceError):
     """EPG Service API error."""
 

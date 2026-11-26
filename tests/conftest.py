@@ -29,6 +29,8 @@ os.environ.setdefault("LOOKUP_MAX_LIMIT", "1000")
 os.environ.setdefault("TOKEN_LENGTH", "32")
 os.environ.setdefault("LOG_LEVEL", "INFO")
 os.environ.setdefault("INTEGRATION_API_KEY", "integration-test-key")
+os.environ["PORTAL_BASE_URL"] = ""
+os.environ["PORTAL_API_KEY"] = ""
 
 from app.models import Base
 

@@ -29,7 +29,11 @@ class PlaylistService:
         self.db = db
 
     async def generate(
-        self, *, user_id: int | None = None, playlist_name: str | None = None
+        self,
+        *,
+        user_id: int | None = None,
+        playlist_name: str | None = None,
+        require_absolute_urls: bool = False,
     ) -> GeneratedPlaylist:
         if (user_id is None) == (playlist_name is None):
             raise ValueError("Provide either user_id or playlist_name")
@@ -45,6 +49,6 @@ class PlaylistService:
         channels = await UserService(self.db).resolve_channels(user.id)
         return GeneratedPlaylist(
             filename=f"{user.playlist_name}.m3u8",
-            content=PlaylistGenerator().generate(user, channels),
+            content=PlaylistGenerator().generate(user, channels, require_absolute_urls=require_absolute_urls),
             channel_count=len(channels),
         )
